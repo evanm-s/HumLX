@@ -13,11 +13,11 @@ use serde::{Deserialize, Serialize};
 use crate::artnet;
 use crate::dmx::Universe;
 use crate::error::{Error, Result};
-use crate::fixture::{Attribute, Library};
+use crate::fixture::{Attribute, Library, Mode};
 use crate::osc::{OscSettings, OscStatus};
 use crate::patch::{mode_of, Patch};
 use crate::playback::{CueList, Effect, Playbacks, RunningEffects};
-use crate::programmer::{Group, Preset, Programmer};
+use crate::programmer::{Group, Preset, Programmer, Rgb, Values};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
@@ -74,6 +74,9 @@ pub struct State {
     pub output: OutputSettings,
     pub status: OutputStatus,
     pub blackout: bool,
+    /// Picks out the selected fixtures: full, white and tight, with every
+    /// other fixture out. A temporary override that is never recorded.
+    pub highlight: bool,
     pub programmer: Programmer,
     pub groups: Vec<Group>,
     pub presets: Vec<Preset>,
@@ -170,6 +173,22 @@ impl State {
             look.entry(*fixture).or_default().merge(values);
         }
         self.running_effects.apply(&self.effects, &mut look, now);
+        if self.highlight {
+            for fixture in self.patch.fixtures() {
+                let values = look.entry(fixture.id).or_default();
+                if self.programmer.selection.contains(&fixture.id) {
+                    let tight = mode_of(&self.library, fixture).map_or(0.0, tightest_zoom);
+                    values.merge(&Values {
+                        intensity: Some(1.0),
+                        colour: Some(Rgb::WHITE),
+                        other: [(Attribute::Zoom, tight)].into(),
+                        ..Default::default()
+                    });
+                } else {
+                    values.intensity = Some(0.0);
+                }
+            }
+        }
 
         let mut universe = Universe::default();
         for fixture in self.patch.fixtures() {
@@ -180,6 +199,7 @@ impl State {
             let programmed = look.get(&fixture.id).map(|v| v.render(mode));
             // Without a dimmer channel, blackout has to pull the colour mix down instead.
             let has_dimmer = mode.channels.iter().any(|c| c.attribute == Attribute::Intensity);
+            let highlighted = self.highlight && self.programmer.selection.contains(&fixture.id);
             for (i, channel) in mode.channels.iter().enumerate() {
                 // Channel test levels win over the programmer and playbacks, which win over resting levels.
                 let mut value = tests
@@ -187,6 +207,10 @@ impl State {
                     .copied()
                     .or_else(|| programmed.as_ref().and_then(|p| p[i]))
                     .unwrap_or(channel.default);
+                // A highlighted fixture's shutter opens, even if a cue left it strobing or closed.
+                if highlighted && channel.attribute == Attribute::Shutter && tests.is_none_or(|t| !t.contains_key(&i)) {
+                    value = channel.highlight_value();
+                }
                 let dims = if has_dimmer {
                     channel.attribute == Attribute::Intensity
                 } else {
@@ -200,6 +224,25 @@ impl State {
         }
         self.universe = universe;
         &self.universe
+    }
+}
+
+/// The zoom level, from 0 to 1, that gives `mode` its narrowest beam. Most
+/// fixtures zoom from narrow to wide, so 0 unless the profile says otherwise.
+fn tightest_zoom(mode: &Mode) -> f32 {
+    let reversed = mode
+        .channels
+        .iter()
+        .filter(|c| c.attribute == Attribute::Zoom)
+        .flat_map(|c| &c.capabilities)
+        .any(|capability| {
+            let label = capability.label.to_lowercase();
+            label.contains("wide to narrow") || label.contains("big to small") || label.contains("large to small")
+        });
+    if reversed {
+        1.0
+    } else {
+        0.0
     }
 }
 
@@ -470,6 +513,62 @@ mod tests {
         state.running_effects.start(1, start);
         state.compose_at(start + Duration::from_millis(750));
         assert_eq!(state.universe().get(1), 0); // in the off half of the square wave
+    }
+
+    #[test]
+    fn highlight_picks_out_the_selection() {
+        use crate::programmer::{Rgb, SelectMode};
+        let library = Library::with_bundled();
+        let mut patch = Patch::default();
+        for (profile, mode, id, address) in [
+            ("generic/moving-head-wash", "12ch", 1, 1),
+            ("generic/moving-head-wash", "12ch", 2, 13),
+            ("generic/rgb-par", "3ch RGB", 3, 25),
+        ] {
+            patch
+                .add(
+                    &library,
+                    &NewFixtures {
+                        profile: profile.into(),
+                        mode: mode.into(),
+                        count: 1,
+                        first_id: Some(id),
+                        address: Some(address),
+                        name: None,
+                    },
+                )
+                .unwrap();
+        }
+        let mut state = State::new(library, patch, OutputSettings::default());
+        state.programmer.select(&[1, 2, 3], SelectMode::Set);
+        state.programmer.update(|v| {
+            v.intensity = Some(0.5);
+            v.colour = Some(Rgb { r: 1.0, g: 0.0, b: 0.0 });
+            v.other.insert(Attribute::Shutter, 0.5); // strobing
+        });
+        state.programmer.select(&[1], SelectMode::Set);
+        state.highlight = true;
+        state.compose();
+        let wash = |state: &State, address: u16| {
+            (address..address + 12)
+                .map(|a| state.universe().get(a))
+                .collect::<Vec<_>>()
+        };
+        // Full, shutter open, white from the white emitter, zoom tight.
+        assert_eq!(&wash(&state, 1)[5..], &[255, 255, 0, 0, 0, 255, 0]);
+        // Everything else out, including a par with no dimmer.
+        assert_eq!(wash(&state, 13)[5], 0);
+        assert_eq!(
+            (25..28).map(|a| state.universe().get(a)).collect::<Vec<_>>(),
+            vec![0, 0, 0]
+        );
+
+        // Turning it off restores the programmer, which it never changed.
+        state.highlight = false;
+        state.compose();
+        assert_eq!(&wash(&state, 1)[5..8], &[128, 128, 255]);
+        assert_eq!(state.universe().get(25), 128);
+        assert_eq!(state.programmer.values[&1].intensity, Some(0.5));
     }
 
     #[test]

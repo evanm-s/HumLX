@@ -40,6 +40,7 @@ const profiles: Profile[] = Object.values(files).map((p) => ({
 let fixtures: Fixture[] = [];
 let output: OutputSettings = { enabled: true, target: "255.255.255.255", universe: 0, rateHz: 40 };
 let blackout = false;
+let highlight = false;
 const tests = new Map<number, Map<number, number>>();
 let packets = 0;
 let selection: number[] = [];
@@ -72,6 +73,11 @@ function combined(): Record<number, Values> {
       }
   }
   for (const [f, v] of Object.entries(values)) out[+f] = { ...out[+f], ...v };
+  if (highlight)
+    for (const f of fixtures)
+      out[f.id] = selection.includes(f.id)
+        ? { ...out[f.id], intensity: 1, colour: { r: 1, g: 1, b: 1 }, other: { ...out[f.id]?.other, zoom: 0 } }
+        : { ...out[f.id], intensity: 0 };
   return out;
 }
 
@@ -243,6 +249,7 @@ const commands: Record<string, (args: Args) => unknown> = {
     universe: universe(),
     status: { packetsSent: (packets += 4), lastError: null },
     blackout,
+    highlight,
     tested: [...tests.keys()].sort((a, b) => a - b),
     playbacks: [...running].map(([list, current]) => ({ list, current, fading: false })),
     runningEffects: [...effectsOn],
@@ -268,9 +275,11 @@ const commands: Record<string, (args: Args) => unknown> = {
     selection = [];
     running.clear();
     effectsOn.clear();
+    highlight = false;
   },
   set_output: ({ settings }) => (output = settings),
   set_blackout: ({ on }) => (blackout = on),
+  set_highlight: ({ on }) => (highlight = on),
   programmer,
   select: ({ fixtures, mode }) => {
     if (mode === "set") selection = [...fixtures];

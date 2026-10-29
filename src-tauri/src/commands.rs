@@ -58,6 +58,7 @@ pub struct Live {
     universe: Vec<u8>,
     status: OutputStatus,
     blackout: bool,
+    highlight: bool,
     /// Fixtures with channel test levels applied.
     tested: Vec<u32>,
     playbacks: Vec<crate::playback::PlaybackStatus>,
@@ -206,6 +207,7 @@ pub fn live(app: State<'_, App>) -> Live {
         universe: state.universe().as_bytes().to_vec(),
         status: state.status.clone(),
         blackout: state.blackout,
+        highlight: state.highlight,
         tested: state.tested_fixtures(),
         playbacks: crate::playback::statuses(&state),
         running_effects: state.running_effects.ids(),
@@ -225,6 +227,11 @@ pub fn set_output(app: State<'_, App>, settings: OutputSettings) -> Result<Outpu
 #[tauri::command]
 pub fn set_blackout(app: State<'_, App>, on: bool) {
     app.engine.state().blackout = on;
+}
+
+#[tauri::command]
+pub fn set_highlight(app: State<'_, App>, on: bool) {
+    app.engine.state().highlight = on;
 }
 
 #[tauri::command]
