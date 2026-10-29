@@ -101,6 +101,8 @@ export interface Live {
   status: OutputStatus;
   blackout: boolean;
   tested: number[];
+  playbacks: PlaybackStatus[];
+  runningEffects: number[];
 }
 
 export interface NewFixtures {
@@ -164,3 +166,45 @@ export interface ProgrammerView {
 }
 
 export type SelectMode = "set" | "toggle" | "add";
+
+export interface Cue {
+  name: string;
+  fade: number;
+  values: Record<string, Values>;
+}
+
+export interface CueList {
+  id: number;
+  name: string;
+  cues: Cue[];
+}
+
+export type EffectKind = "dimmer" | "rainbow" | "circle";
+export type Wave = "sine" | "square" | "saw";
+
+export interface EffectSettings {
+  name: string;
+  kind: EffectKind;
+  wave: Wave;
+  /** Cycles per second. */
+  rate: number;
+  size: number;
+  spread: number;
+}
+
+export interface Effect extends EffectSettings {
+  id: number;
+  fixtures: number[];
+}
+
+export interface PlaybackView {
+  cueLists: CueList[];
+  effects: Effect[];
+  masters: [number, number][];
+}
+
+export interface PlaybackStatus {
+  list: number;
+  current: number;
+  fading: boolean;
+}

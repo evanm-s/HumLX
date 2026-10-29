@@ -2,6 +2,7 @@
 //! show, and exposes commands to the UI.
 
 mod commands;
+mod playback;
 
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
@@ -57,6 +58,8 @@ impl App {
         let mut state = State::new(library, show.patch, show.output);
         state.groups = show.groups;
         state.presets = show.presets;
+        state.cue_lists = show.cue_lists;
+        state.effects = show.effects;
         let engine = Engine::start(state)?;
         Ok(Self {
             engine,
@@ -65,7 +68,7 @@ impl App {
         })
     }
 
-    /// Saves the patch and output settings after every change.
+    /// Saves the show after every change.
     fn save(&self) -> humlx_core::Result<()> {
         let show = {
             let state = self.engine.state();
@@ -74,6 +77,8 @@ impl App {
                 output: state.output.clone(),
                 groups: state.groups.clone(),
                 presets: state.presets.clone(),
+                cue_lists: state.cue_lists.clone(),
+                effects: state.effects.clone(),
                 ..Show::default()
             }
         };
@@ -133,6 +138,23 @@ pub fn run() {
             commands::record_preset,
             commands::apply_preset,
             commands::delete_preset,
+            playback::playback,
+            playback::new_cue_list,
+            playback::rename_cue_list,
+            playback::delete_cue_list,
+            playback::record_cue,
+            playback::update_cue,
+            playback::edit_cue,
+            playback::delete_cue,
+            playback::go,
+            playback::back,
+            playback::go_to,
+            playback::release_cue_list,
+            playback::release_all,
+            playback::set_master,
+            playback::save_effect,
+            playback::delete_effect,
+            playback::set_effect_running,
         ])
         .run(tauri::generate_context!())
         .expect("error while running HumLX");

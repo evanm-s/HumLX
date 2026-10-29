@@ -15,6 +15,8 @@ import type {
   SelectMode,
   Family,
   Attribute,
+  PlaybackView,
+  EffectSettings,
 } from "./types";
 
 /** True when running inside the desktop app rather than a plain browser. */
@@ -70,4 +72,24 @@ export const api = {
     invoke<ProgrammerView>("record_preset", { family, name, id }),
   applyPreset: (id: number) => invoke<ProgrammerView>("apply_preset", { id }),
   deletePreset: (id: number) => invoke<ProgrammerView>("delete_preset", { id }),
+
+  playback: () => invoke<PlaybackView>("playback"),
+  newCueList: (name: string) => invoke<PlaybackView>("new_cue_list", { name }),
+  renameCueList: (id: number, name: string) => invoke<PlaybackView>("rename_cue_list", { id, name }),
+  deleteCueList: (id: number) => invoke<PlaybackView>("delete_cue_list", { id }),
+  recordCue: (list: number, name: string, fade: number, after: number | null) =>
+    invoke<PlaybackView>("record_cue", { list, name, fade, after }),
+  updateCue: (list: number, index: number) => invoke<PlaybackView>("update_cue", { list, index }),
+  editCue: (list: number, index: number, name: string | null, fade: number | null) =>
+    invoke<PlaybackView>("edit_cue", { list, index, name, fade }),
+  deleteCue: (list: number, index: number) => invoke<PlaybackView>("delete_cue", { list, index }),
+  go: (list: number) => invoke<PlaybackView>("go", { list }),
+  back: (list: number) => invoke<PlaybackView>("back", { list }),
+  goTo: (list: number, index: number) => invoke<PlaybackView>("go_to", { list, index }),
+  releaseCueList: (list: number) => invoke<PlaybackView>("release_cue_list", { list }),
+  releaseAll: () => invoke<PlaybackView>("release_all"),
+  setMaster: (list: number, level: number) => invoke<PlaybackView>("set_master", { list, level }),
+  saveEffect: (settings: EffectSettings, id: number | null) => invoke<PlaybackView>("save_effect", { settings, id }),
+  deleteEffect: (id: number) => invoke<PlaybackView>("delete_effect", { id }),
+  setEffectRunning: (id: number, on: boolean) => invoke<PlaybackView>("set_effect_running", { id, on }),
 };

@@ -8,6 +8,7 @@ pub mod error;
 pub mod fixture;
 pub mod ofl;
 pub mod patch;
+pub mod playback;
 pub mod programmer;
 pub mod show;
 

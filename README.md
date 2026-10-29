@@ -10,6 +10,14 @@ up quickly.
   colour disc and quick swatches), pan and tilt (a touch pad with a fine mode)
   and beam controls. Colours work across RGB, RGBW, CMY and colour-wheel
   fixtures alike.
+- **Cues and cue lists**: record the programmer as a cue (cues track, so each
+  one only stores what changed), give it a name and fade time, and update or
+  delete it later. **GO** fades to the next cue, **Back** steps back.
+- **Playback faders**: each cue list gets a strip with a master fader, GO, Back
+  and Release. Intensity from several lists combines highest-takes-precedence;
+  the programmer always sits on top.
+- **Effects**: dimmer chases (sine, square or saw), rainbow colour and position
+  circles on any selection, with rate, size and spread across the fixtures.
 - **Groups and presets**: save a selection as a group, and record intensity,
   colour, position and beam presets that recall onto any selection.
 - **Patch** fixtures by type and mode, several at once, with automatic
@@ -22,10 +30,10 @@ up quickly.
   with **Locate** to bring a fixture up at full in white, centred.
 - **Art-Net output** of one universe at up to 44 packets per second, to a node's
   IP or broadcast, with node discovery and a **Blackout** button.
-- The patch, groups, presets and output settings save automatically after
+- The patch, groups, presets, cue lists, effects and output settings save automatically after
   every change.
 
-Cues, playback, effects and OSC follow in the next steps of the plan.
+OSC cue triggering, show files and a simple mode follow in the next step.
 
 ## Project layout
 

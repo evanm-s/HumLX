@@ -15,6 +15,7 @@ use crate::dmx::Universe;
 use crate::error::{Error, Result};
 use crate::fixture::{Attribute, Library};
 use crate::patch::{mode_of, Patch};
+use crate::playback::{CueList, Effect, Playbacks, RunningEffects};
 use crate::programmer::{Group, Preset, Programmer};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -75,6 +76,10 @@ pub struct State {
     pub programmer: Programmer,
     pub groups: Vec<Group>,
     pub presets: Vec<Preset>,
+    pub cue_lists: Vec<CueList>,
+    pub effects: Vec<Effect>,
+    pub playbacks: Playbacks,
+    pub running_effects: RunningEffects,
     /// Raw channel levels set from the channel test screen, by fixture
     /// number and channel index within the fixture.
     test_levels: HashMap<u32, HashMap<usize, u8>>,
@@ -151,17 +156,29 @@ impl State {
 
     /// Works out the level of every channel and stores it as the current universe.
     pub fn compose(&mut self) -> &Universe {
+        self.compose_at(Instant::now())
+    }
+
+    /// Works out the universe as it should be at `now`, which drives fades and effects.
+    pub fn compose_at(&mut self, now: Instant) -> &Universe {
+        // Playbacks, then the programmer on top, then effects moving whatever results.
+        let mut look = self.playbacks.output(now);
+        for (fixture, values) in &self.programmer.values {
+            look.entry(*fixture).or_default().merge(values);
+        }
+        self.running_effects.apply(&self.effects, &mut look, now);
+
         let mut universe = Universe::default();
         for fixture in self.patch.fixtures() {
             let Some(mode) = mode_of(&self.library, fixture) else {
                 continue;
             };
             let tests = self.test_levels.get(&fixture.id);
-            let programmed = self.programmer.values.get(&fixture.id).map(|v| v.render(mode));
+            let programmed = look.get(&fixture.id).map(|v| v.render(mode));
             // Without a dimmer channel, blackout has to pull the colour mix down instead.
             let has_dimmer = mode.channels.iter().any(|c| c.attribute == Attribute::Intensity);
             for (i, channel) in mode.channels.iter().enumerate() {
-                // Channel test levels win over the programmer, which wins over resting levels.
+                // Channel test levels win over the programmer and playbacks, which win over resting levels.
                 let mut value = tests
                     .and_then(|t| t.get(&i))
                     .copied()
@@ -398,6 +415,53 @@ mod tests {
         state.blackout = true;
         state.compose();
         assert_eq!(state.universe().get(1), 0);
+    }
+
+    #[test]
+    fn playback_under_programmer_and_effects() {
+        use crate::playback::{Cue, CueList, Effect, EffectKind, Wave};
+        use crate::programmer::{SelectMode, Values};
+        let mut state = state_with("generic/dimmer", "1ch", 1);
+        let list = CueList {
+            id: 1,
+            name: "Main".into(),
+            cues: vec![Cue {
+                name: "Warm".into(),
+                fade: 2.0,
+                values: [(
+                    1,
+                    Values {
+                        intensity: Some(1.0),
+                        ..Default::default()
+                    },
+                )]
+                .into(),
+            }],
+        };
+        let start = Instant::now();
+        state.playbacks.go(&list, start).unwrap();
+        state.cue_lists.push(list);
+        state.compose_at(start + Duration::from_secs(1));
+        assert_eq!(state.universe().get(1), 128); // halfway through the fade
+
+        state.programmer.select(&[1], SelectMode::Set);
+        state.programmer.update(|v| v.intensity = Some(0.25));
+        state.compose_at(start + Duration::from_secs(5));
+        assert_eq!(state.universe().get(1), 64); // programmer wins
+
+        state.effects.push(Effect {
+            id: 1,
+            name: "Pulse".into(),
+            kind: EffectKind::Dimmer,
+            wave: Wave::Square,
+            fixtures: vec![1],
+            rate: 1.0,
+            size: 1.0,
+            spread: 0.0,
+        });
+        state.running_effects.start(1, start);
+        state.compose_at(start + Duration::from_millis(750));
+        assert_eq!(state.universe().get(1), 0); // in the off half of the square wave
     }
 
     #[test]

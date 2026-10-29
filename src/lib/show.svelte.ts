@@ -1,7 +1,16 @@
 // App-wide state shared by every screen.
 
 import { api } from "./api";
-import type { Fixture, Live, OutputSettings, PatchView, Profile, ProgrammerView, Values } from "./types";
+import type {
+  Fixture,
+  Live,
+  OutputSettings,
+  PatchView,
+  PlaybackView,
+  Profile,
+  ProgrammerView,
+  Values,
+} from "./types";
 
 class ShowState {
   profiles = $state<Profile[]>([]);
@@ -12,7 +21,10 @@ class ShowState {
     status: { packetsSent: 0, lastError: null },
     blackout: false,
     tested: [],
+    playbacks: [],
+    runningEffects: [],
   });
+  playback = $state<PlaybackView>({ cueLists: [], effects: [], masters: [] });
   programmer = $state<ProgrammerView>({ selection: [], values: {}, groups: [], presets: [] });
   loaded = $state(false);
 
@@ -22,6 +34,7 @@ class ShowState {
     this.patch = overview.patch;
     this.output = overview.output;
     this.programmer = await api.programmer();
+    this.playback = await api.playback();
     this.loaded = true;
     for (const warning of overview.warnings) notify(warning, "warning");
   }
@@ -44,6 +57,16 @@ class ShowState {
   async program(action: () => Promise<ProgrammerView>) {
     const view = await attempt(action);
     if (view) this.programmer = view;
+    return view;
+  }
+
+  /** Runs a playback command, keeping its result and the programmer, which recording clears. */
+  async play(action: () => Promise<PlaybackView>) {
+    const view = await attempt(action);
+    if (view) {
+      this.playback = view;
+      this.programmer = await api.programmer();
+    }
     return view;
   }
 

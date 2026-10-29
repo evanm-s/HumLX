@@ -26,6 +26,12 @@ pub enum Error {
     UnknownGroup(u32),
     #[error("preset {0} does not exist")]
     UnknownPreset(u32),
+    #[error("cue {0} does not exist")]
+    UnknownCue(usize),
+    #[error("cue list {0} does not exist")]
+    UnknownCueList(u32),
+    #[error("effect {0} does not exist")]
+    UnknownEffect(u32),
     #[error("there is nothing in the programmer to record")]
     NothingToRecord,
     #[error("invalid fixture profile: {0}")]

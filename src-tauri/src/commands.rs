@@ -60,6 +60,8 @@ pub struct Live {
     blackout: bool,
     /// Fixtures with channel test levels applied.
     tested: Vec<u32>,
+    playbacks: Vec<crate::playback::PlaybackStatus>,
+    running_effects: Vec<u32>,
 }
 
 fn patch_view(app: &App) -> PatchView {
@@ -197,6 +199,8 @@ pub fn live(app: State<'_, App>) -> Live {
         status: state.status.clone(),
         blackout: state.blackout,
         tested: state.tested_fixtures(),
+        playbacks: crate::playback::statuses(&state),
+        running_effects: state.running_effects.ids(),
     }
 }
 

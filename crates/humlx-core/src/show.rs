@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use crate::engine::OutputSettings;
 use crate::error::{Error, Result};
 use crate::patch::Patch;
+use crate::playback::{CueList, Effect};
 use crate::programmer::{Group, Preset};
 
 const FORMAT_VERSION: u32 = 1;
@@ -23,6 +24,10 @@ pub struct Show {
     pub groups: Vec<Group>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub presets: Vec<Preset>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub cue_lists: Vec<CueList>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub effects: Vec<Effect>,
 }
 
 impl Default for Show {
@@ -33,6 +38,8 @@ impl Default for Show {
             output: OutputSettings::default(),
             groups: Vec::new(),
             presets: Vec::new(),
+            cue_lists: Vec::new(),
+            effects: Vec::new(),
         }
     }
 }
@@ -98,6 +105,25 @@ mod tests {
         let mut programmer = crate::programmer::Programmer::default();
         programmer.select(&[1, 2], crate::programmer::SelectMode::Set);
         programmer.update(|v| v.intensity = Some(0.5));
+        show.cue_lists.push(crate::playback::CueList {
+            id: 1,
+            name: "Main".into(),
+            cues: vec![crate::playback::Cue {
+                name: "Preset".into(),
+                fade: 3.0,
+                values: programmer.values.clone(),
+            }],
+        });
+        show.effects.push(crate::playback::Effect {
+            id: 1,
+            name: "Rainbow".into(),
+            kind: crate::playback::EffectKind::Rainbow,
+            wave: crate::playback::Wave::Sine,
+            fixtures: vec![1, 2],
+            rate: 0.2,
+            size: 1.0,
+            spread: 0.5,
+        });
         show.presets.push(
             crate::programmer::Preset::record(1, "Half".into(), crate::fixture::Family::Intensity, &programmer)
                 .unwrap(),

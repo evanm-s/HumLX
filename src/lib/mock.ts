@@ -4,7 +4,10 @@
 
 import type {
   Attribute,
+  CueList,
+  Effect,
   Family,
+  PlaybackView,
   Fixture,
   Group,
   Live,
@@ -42,6 +45,33 @@ let selection: number[] = [];
 let values: Record<number, Values> = {};
 let groups: Group[] = [];
 let presets: Preset[] = [];
+let cueLists: CueList[] = [];
+let effects: Effect[] = [];
+const running = new Map<number, number>(); // cue list -> current cue
+const masters = new Map<number, number>();
+const effectsOn = new Set<number>();
+
+const playback = (): PlaybackView => ({
+  cueLists: structuredClone(cueLists),
+  effects: structuredClone(effects),
+  masters: cueLists.map((l) => [l.id, masters.get(l.id) ?? 1]),
+});
+
+/** Playbacks (tracked, no fades) with the programmer on top. */
+function combined(): Record<number, Values> {
+  const out: Record<number, Values> = {};
+  for (const [id, current] of running) {
+    const list = cueLists.find((l) => l.id === id);
+    if (!list) continue;
+    for (const cue of list.cues.slice(0, current + 1))
+      for (const [f, v] of Object.entries(cue.values)) {
+        const scaled = { ...v, intensity: v.intensity == null ? undefined : v.intensity * (masters.get(id) ?? 1) };
+        out[+f] = { ...out[+f], ...Object.fromEntries(Object.entries(scaled).filter(([, x]) => x !== undefined)) };
+      }
+  }
+  for (const [f, v] of Object.entries(values)) out[+f] = { ...out[+f], ...v };
+  return out;
+}
 
 const FAMILY: Record<string, Family> = { intensity: "intensity", colour: "colour", pan: "position", tilt: "position" };
 
@@ -77,7 +107,7 @@ function nextId(ids: number[]) {
 
 /** Very rough stand-in for the Rust renderer, enough to preview levels. */
 function programmed(f: Fixture): (number | undefined)[] {
-  const v = values[f.id];
+  const v = combined()[f.id];
   const mode = modeOf(f);
   if (!v || !mode) return [];
   const has = (a: string) => mode.channels.some((c) => c.attribute === a);
@@ -206,6 +236,8 @@ const commands: Record<string, (args: Args) => unknown> = {
     status: { packetsSent: (packets += 4), lastError: null },
     blackout,
     tested: [...tests.keys()].sort((a, b) => a - b),
+    playbacks: [...running].map(([list, current]) => ({ list, current, fading: false })),
+    runningEffects: [...effectsOn],
   }),
   set_output: ({ settings }) => (output = settings),
   set_blackout: ({ on }) => (blackout = on),
@@ -264,6 +296,60 @@ const commands: Record<string, (args: Args) => unknown> = {
     return programmer();
   },
   delete_preset: ({ id }) => ((presets = presets.filter((p) => p.id !== id)), programmer()),
+  playback,
+  new_cue_list: ({ name }) => {
+    const id = nextId(cueLists.map((l) => l.id));
+    cueLists.push({ id, name: name.trim() || `Cue list ${id}`, cues: [] });
+    return playback();
+  },
+  rename_cue_list: ({ id, name }) => ((cueLists.find((l) => l.id === id)!.name = name), playback()),
+  delete_cue_list: ({ id }) => ((cueLists = cueLists.filter((l) => l.id !== id)), running.delete(id), playback()),
+  record_cue: ({ list, name, fade, after }) => {
+    if (!Object.keys(values).length) throw "There is nothing in the programmer to record";
+    const l = cueLists.find((x) => x.id === list)!;
+    const index = after == null ? l.cues.length : Math.min(after + 1, l.cues.length);
+    l.cues.splice(index, 0, { name: name.trim() || `Cue ${index + 1}`, fade, values: structuredClone(values) });
+    values = {};
+    running.set(list, index);
+    return playback();
+  },
+  update_cue: ({ list, index }) => {
+    const cue = cueLists.find((x) => x.id === list)!.cues[index];
+    for (const [f, v] of Object.entries(values)) cue.values[f] = { ...cue.values[f], ...v };
+    values = {};
+    return playback();
+  },
+  edit_cue: ({ list, index, name, fade }) => {
+    const cue = cueLists.find((x) => x.id === list)!.cues[index];
+    if (name != null) cue.name = name;
+    if (fade != null) cue.fade = fade;
+    return playback();
+  },
+  delete_cue: ({ list, index }) => (cueLists.find((x) => x.id === list)!.cues.splice(index, 1), playback()),
+  go: ({ list }) => {
+    const l = cueLists.find((x) => x.id === list)!;
+    if (!l.cues.length) throw "cue 1 does not exist";
+    const current = running.get(list);
+    running.set(list, current == null || current + 1 >= l.cues.length ? 0 : current + 1);
+    return playback();
+  },
+  back: ({ list }) => (running.has(list) && running.set(list, Math.max(0, running.get(list)! - 1)), playback()),
+  go_to: ({ list, index }) => (running.set(list, index), playback()),
+  release_cue_list: ({ list }) => (running.delete(list), playback()),
+  release_all: () => (running.clear(), effectsOn.clear(), playback()),
+  set_master: ({ list, level }) => (masters.set(list, level), playback()),
+  save_effect: ({ settings, id }) => {
+    if (id != null) Object.assign(effects.find((e) => e.id === id)!, settings);
+    else {
+      if (!selection.length) throw "select the fixtures for the effect first";
+      const eid = nextId(effects.map((e) => e.id));
+      effects.push({ ...settings, id: eid, fixtures: [...selection] });
+      effectsOn.add(eid);
+    }
+    return playback();
+  },
+  delete_effect: ({ id }) => ((effects = effects.filter((e) => e.id !== id)), effectsOn.delete(id), playback()),
+  set_effect_running: ({ id, on }) => (on ? effectsOn.add(id) : effectsOn.delete(id), playback()),
   discover_nodes: async () => {
     await new Promise((r) => setTimeout(r, 800));
     return [{ ip: "192.168.1.50", shortName: "Preview node", longName: "Pretend Art-Net node", outputs: [0, 1] }];
