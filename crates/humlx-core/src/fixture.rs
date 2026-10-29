@@ -6,7 +6,7 @@ use crate::error::{Error, Result};
 
 /// What a channel controls. Used to group controls in the UI and, later, to
 /// drive the programmer and presets by attribute rather than by raw channel.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Attribute {
     Intensity,
@@ -42,7 +42,7 @@ pub enum Attribute {
 }
 
 /// Broad groups of attributes, matching how presets are organised.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Family {
     Intensity,

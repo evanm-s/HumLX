@@ -179,7 +179,8 @@ label.field {
   gap: 8px;
 }
 
-.segmented button[aria-pressed="true"] {
+.segmented button[aria-pressed="true"],
+.segmented button[aria-selected="true"] {
   background: color-mix(in srgb, var(--accent) 20%, var(--panel-raised));
   border-color: var(--accent);
   color: var(--accent);

@@ -15,6 +15,7 @@ use crate::dmx::Universe;
 use crate::error::{Error, Result};
 use crate::fixture::{Attribute, Library};
 use crate::patch::{mode_of, Patch};
+use crate::programmer::{Group, Preset, Programmer};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
@@ -71,6 +72,9 @@ pub struct State {
     pub output: OutputSettings,
     pub status: OutputStatus,
     pub blackout: bool,
+    pub programmer: Programmer,
+    pub groups: Vec<Group>,
+    pub presets: Vec<Preset>,
     /// Raw channel levels set from the channel test screen, by fixture
     /// number and channel index within the fixture.
     test_levels: HashMap<u32, HashMap<usize, u8>>,
@@ -153,10 +157,16 @@ impl State {
                 continue;
             };
             let tests = self.test_levels.get(&fixture.id);
+            let programmed = self.programmer.values.get(&fixture.id).map(|v| v.render(mode));
             // Without a dimmer channel, blackout has to pull the colour mix down instead.
             let has_dimmer = mode.channels.iter().any(|c| c.attribute == Attribute::Intensity);
             for (i, channel) in mode.channels.iter().enumerate() {
-                let mut value = tests.and_then(|t| t.get(&i)).copied().unwrap_or(channel.default);
+                // Channel test levels win over the programmer, which wins over resting levels.
+                let mut value = tests
+                    .and_then(|t| t.get(&i))
+                    .copied()
+                    .or_else(|| programmed.as_ref().and_then(|p| p[i]))
+                    .unwrap_or(channel.default);
                 let dims = if has_dimmer {
                     channel.attribute == Attribute::Intensity
                 } else {
@@ -364,6 +374,30 @@ mod tests {
         let levels: Vec<u8> = (1..=6).map(|a| state.universe().get(a)).collect();
         assert_eq!(levels, vec![255, 255, 255, 255, 255, 0]);
         assert_eq!(state.tested_fixtures(), vec![1]);
+    }
+
+    #[test]
+    fn programmer_then_test_levels() {
+        use crate::programmer::{Rgb, SelectMode};
+        let mut state = state_with("generic/rgbw-par", "6ch DRGBW Strobe", 1);
+        state.programmer.select(&[1], SelectMode::Set);
+        state.programmer.update(|v| {
+            v.intensity = Some(1.0);
+            v.colour = Some(Rgb { r: 1.0, g: 0.0, b: 0.0 });
+        });
+        state.compose();
+        assert_eq!(
+            (1..=6).map(|a| state.universe().get(a)).collect::<Vec<_>>(),
+            vec![255, 255, 0, 0, 0, 0]
+        );
+
+        state.set_test_level(1, 2, 77).unwrap();
+        state.compose();
+        assert_eq!(state.universe().get(3), 77);
+
+        state.blackout = true;
+        state.compose();
+        assert_eq!(state.universe().get(1), 0);
     }
 
     #[test]

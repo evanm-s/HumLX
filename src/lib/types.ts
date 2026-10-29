@@ -125,3 +125,42 @@ export interface Node {
   longName: string;
   outputs: number[];
 }
+
+export type Family = "intensity" | "colour" | "position" | "beam" | "control";
+
+export interface Rgb {
+  r: number;
+  g: number;
+  b: number;
+}
+
+export interface Values {
+  intensity?: number;
+  colour?: Rgb;
+  pan?: number;
+  tilt?: number;
+  other?: Partial<Record<Attribute, number>>;
+}
+
+export interface Group {
+  id: number;
+  name: string;
+  fixtures: number[];
+}
+
+export interface Preset {
+  id: number;
+  name: string;
+  family: Family;
+  all?: Values;
+  fixtures?: Record<string, Values>;
+}
+
+export interface ProgrammerView {
+  selection: number[];
+  values: Record<string, Values>;
+  groups: Group[];
+  presets: Preset[];
+}
+
+export type SelectMode = "set" | "toggle" | "add";

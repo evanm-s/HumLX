@@ -1,7 +1,7 @@
 // App-wide state shared by every screen.
 
 import { api } from "./api";
-import type { Fixture, Live, OutputSettings, PatchView, Profile } from "./types";
+import type { Fixture, Live, OutputSettings, PatchView, Profile, ProgrammerView, Values } from "./types";
 
 class ShowState {
   profiles = $state<Profile[]>([]);
@@ -13,6 +13,7 @@ class ShowState {
     blackout: false,
     tested: [],
   });
+  programmer = $state<ProgrammerView>({ selection: [], values: {}, groups: [], presets: [] });
   loaded = $state(false);
 
   async load() {
@@ -20,6 +21,7 @@ class ShowState {
     this.profiles = overview.profiles;
     this.patch = overview.patch;
     this.output = overview.output;
+    this.programmer = await api.programmer();
     this.loaded = true;
     for (const warning of overview.warnings) notify(warning, "warning");
   }
@@ -30,6 +32,19 @@ class ShowState {
 
   channels(fixture: Fixture) {
     return this.profile(fixture.profile)?.modes.find((m) => m.name === fixture.mode)?.channels ?? [];
+  }
+
+  /** Programmer values of the first selected fixture, which the controls show. */
+  get current(): Values {
+    const first = this.programmer.selection[0];
+    return (first != null && this.programmer.values[first]) || {};
+  }
+
+  /** Runs a programmer command and keeps its result. */
+  async program(action: () => Promise<ProgrammerView>) {
+    const view = await attempt(action);
+    if (view) this.programmer = view;
+    return view;
   }
 
   fixture(id: number | null): Fixture | undefined {

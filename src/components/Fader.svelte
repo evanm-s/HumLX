@@ -10,10 +10,12 @@
     colour?: string;
     max?: number;
     active?: boolean;
+    /** A wider fader, for the main intensity control. */
+    wide?: boolean;
     onchange: (value: number) => void;
   }
 
-  let { value, label, sublabel, detail, colour = "var(--accent)", max = 255, active = false, onchange }: Props =
+  let { value, label, sublabel, detail, colour = "var(--accent)", max = 255, active = false, wide = false, onchange }: Props =
     $props();
 
   let track: HTMLDivElement;
@@ -61,7 +63,7 @@
   }
 </script>
 
-<div class="fader" class:active>
+<div class="fader" class:active class:wide>
   <div class="value">{shown}</div>
   <div
     class="track"
@@ -95,6 +97,15 @@
     gap: 8px;
     width: 104px;
     min-height: 0;
+  }
+
+  .wide {
+    width: 180px;
+  }
+
+  .wide .track {
+    width: 150px;
+    border-radius: 20px;
   }
 
   .value {

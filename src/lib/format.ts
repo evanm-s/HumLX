@@ -77,3 +77,29 @@ export function isIPv4(text: string): boolean {
   const parts = text.trim().split(".");
   return parts.length === 4 && parts.every((p) => /^\d{1,3}$/.test(p) && Number(p) <= 255);
 }
+
+export function hsvToRgb(h: number, s: number, v = 1): { r: number; g: number; b: number } {
+  const f = (n: number) => {
+    const k = (n + h / 60) % 6;
+    return v - v * s * Math.max(0, Math.min(k, 4 - k, 1));
+  };
+  return { r: f(5), g: f(3), b: f(1) };
+}
+
+export function rgbToHsv({ r, g, b }: { r: number; g: number; b: number }) {
+  const max = Math.max(r, g, b);
+  const d = max - Math.min(r, g, b);
+  let h = 0;
+  if (d > 0) {
+    if (max === r) h = ((g - b) / d) % 6;
+    else if (max === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+  }
+  return { h: (h * 60 + 360) % 360, s: max === 0 ? 0 : d / max, v: max };
+}
+
+export function rgbCss(c: { r: number; g: number; b: number } | undefined, fallback = "transparent"): string {
+  if (!c) return fallback;
+  const byte = (x: number) => Math.round(Math.max(0, Math.min(1, x)) * 255);
+  return `rgb(${byte(c.r)} ${byte(c.g)} ${byte(c.b)})`;
+}

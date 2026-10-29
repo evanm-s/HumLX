@@ -22,6 +22,12 @@ pub enum Error {
     AddressOutOfRange { address: Address, footprint: usize },
     #[error("there is no free block of {0} channels left in the universe")]
     UniverseFull(usize),
+    #[error("group {0} does not exist")]
+    UnknownGroup(u32),
+    #[error("preset {0} does not exist")]
+    UnknownPreset(u32),
+    #[error("there is nothing in the programmer to record")]
+    NothingToRecord,
     #[error("invalid fixture profile: {0}")]
     InvalidProfile(String),
     #[error("not supported yet: {0}")]

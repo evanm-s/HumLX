@@ -10,6 +10,11 @@ import type {
   Overview,
   PatchView,
   Profile,
+  ProgrammerView,
+  Rgb,
+  SelectMode,
+  Family,
+  Attribute,
 } from "./types";
 
 /** True when running inside the desktop app rather than a plain browser. */
@@ -50,4 +55,19 @@ export const api = {
   setOutput: (settings: OutputSettings) => invoke<OutputSettings>("set_output", { settings }),
   setBlackout: (on: boolean) => invoke<void>("set_blackout", { on }),
   discoverNodes: () => invoke<Node[]>("discover_nodes"),
+
+  programmer: () => invoke<ProgrammerView>("programmer"),
+  select: (fixtures: number[], mode: SelectMode) => invoke<ProgrammerView>("select", { fixtures, mode }),
+  selectGroup: (id: number, mode: SelectMode) => invoke<ProgrammerView>("select_group", { id, mode }),
+  setIntensity: (value: number) => invoke<ProgrammerView>("set_intensity", { value }),
+  setColour: (colour: Rgb) => invoke<ProgrammerView>("set_colour", { colour }),
+  setPosition: (pan: number | null, tilt: number | null) => invoke<ProgrammerView>("set_position", { pan, tilt }),
+  setAttribute: (attribute: Attribute, value: number) => invoke<ProgrammerView>("set_attribute", { attribute, value }),
+  clearProgrammer: (family: Family | null) => invoke<ProgrammerView>("clear_programmer", { family }),
+  saveGroup: (name: string, id: number | null) => invoke<ProgrammerView>("save_group", { name, id }),
+  deleteGroup: (id: number) => invoke<ProgrammerView>("delete_group", { id }),
+  recordPreset: (family: Family, name: string, id: number | null) =>
+    invoke<ProgrammerView>("record_preset", { family, name, id }),
+  applyPreset: (id: number) => invoke<ProgrammerView>("apply_preset", { id }),
+  deletePreset: (id: number) => invoke<ProgrammerView>("delete_preset", { id }),
 };

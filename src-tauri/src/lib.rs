@@ -54,7 +54,10 @@ impl App {
             Show::default()
         };
 
-        let engine = Engine::start(State::new(library, show.patch, show.output))?;
+        let mut state = State::new(library, show.patch, show.output);
+        state.groups = show.groups;
+        state.presets = show.presets;
+        let engine = Engine::start(state)?;
         Ok(Self {
             engine,
             paths,
@@ -69,6 +72,8 @@ impl App {
             Show {
                 patch: state.patch.clone(),
                 output: state.output.clone(),
+                groups: state.groups.clone(),
+                presets: state.presets.clone(),
                 ..Show::default()
             }
         };
@@ -115,6 +120,19 @@ pub fn run() {
             commands::set_output,
             commands::set_blackout,
             commands::discover_nodes,
+            commands::programmer,
+            commands::select,
+            commands::select_group,
+            commands::set_intensity,
+            commands::set_colour,
+            commands::set_position,
+            commands::set_attribute,
+            commands::clear_programmer,
+            commands::save_group,
+            commands::delete_group,
+            commands::record_preset,
+            commands::apply_preset,
+            commands::delete_preset,
         ])
         .run(tauri::generate_context!())
         .expect("error while running HumLX");

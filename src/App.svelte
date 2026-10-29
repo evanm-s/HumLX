@@ -5,19 +5,25 @@
   import { attempt, show } from "./lib/show.svelte";
   import ChannelTest from "./screens/ChannelTest.svelte";
   import Patch from "./screens/Patch.svelte";
+  import Programmer from "./screens/Programmer.svelte";
   import Settings from "./screens/Settings.svelte";
 
   const screens = [
+    { id: "programmer", label: "Programmer", icon: "◉" },
     { id: "patch", label: "Patch", icon: "▦" },
     { id: "test", label: "Channel test", icon: "☰" },
     { id: "output", label: "Output", icon: "⇄" },
   ] as const;
 
   type ScreenId = (typeof screens)[number]["id"];
-  let screen = $state<ScreenId>("patch");
+  let screen = $state<ScreenId>("programmer");
 
   onMount(() => {
-    attempt(() => show.load());
+    attempt(async () => {
+      await show.load();
+      // A new show has nothing to program yet, so start on the patch.
+      if (show.patch.fixtures.length === 0) screen = "patch";
+    });
     return show.startLive();
   });
 
@@ -57,9 +63,12 @@
 
   <main>
     {#if !inApp}<div class="preview">Preview mode in a browser. Run the desktop app to control lights.</div>{/if}
-    {#if show.loaded}
-      {#if screen === "patch"}<Patch />{:else if screen === "test"}<ChannelTest />{:else}<Settings />{/if}
-    {/if}
+    <div class="screen">
+      {#if show.loaded}
+        {#if screen === "programmer"}<Programmer />{:else if screen === "patch"}<Patch />{:else if screen === "test"}<ChannelTest
+          />{:else}<Settings />{/if}
+      {/if}
+    </div>
   </main>
 </div>
 
@@ -157,12 +166,13 @@
     padding: 24px;
     min-width: 0;
     min-height: 0;
-    display: grid;
-    grid-template-rows: auto 1fr;
+    display: flex;
+    flex-direction: column;
     gap: 12px;
   }
 
-  main > :global(:last-child) {
+  .screen {
+    flex: 1;
     min-height: 0;
   }
 

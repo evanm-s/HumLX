@@ -6,6 +6,12 @@ up quickly.
 
 ## What works today
 
+- **Programmer**: select fixtures or groups, then set intensity, colour (a
+  colour disc and quick swatches), pan and tilt (a touch pad with a fine mode)
+  and beam controls. Colours work across RGB, RGBW, CMY and colour-wheel
+  fixtures alike.
+- **Groups and presets**: save a selection as a group, and record intensity,
+  colour, position and beam presets that recall onto any selection.
 - **Patch** fixtures by type and mode, several at once, with automatic
   numbering and addressing, overlap checks and a live 512-channel address map.
 - **Fixture types**: generic dimmer, RGB and RGBW pars, and moving head spot
@@ -16,10 +22,10 @@ up quickly.
   with **Locate** to bring a fixture up at full in white, centred.
 - **Art-Net output** of one universe at up to 44 packets per second, to a node's
   IP or broadcast, with node discovery and a **Blackout** button.
-- The patch and output settings save automatically after every change.
+- The patch, groups, presets and output settings save automatically after
+  every change.
 
-Groups, the programmer, presets, cues, playback, effects and OSC follow in the
-next steps of the plan.
+Cues, playback, effects and OSC follow in the next steps of the plan.
 
 ## Project layout
 

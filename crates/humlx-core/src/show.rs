@@ -7,10 +7,11 @@ use serde::{Deserialize, Serialize};
 use crate::engine::OutputSettings;
 use crate::error::{Error, Result};
 use crate::patch::Patch;
+use crate::programmer::{Group, Preset};
 
 const FORMAT_VERSION: u32 = 1;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Show {
     pub version: u32,
@@ -18,6 +19,10 @@ pub struct Show {
     pub patch: Patch,
     #[serde(default)]
     pub output: OutputSettings,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub groups: Vec<Group>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub presets: Vec<Preset>,
 }
 
 impl Default for Show {
@@ -26,6 +31,8 @@ impl Default for Show {
             version: FORMAT_VERSION,
             patch: Patch::default(),
             output: OutputSettings::default(),
+            groups: Vec::new(),
+            presets: Vec::new(),
         }
     }
 }
@@ -83,6 +90,18 @@ mod tests {
             )
             .unwrap();
         show.output.target = "192.168.1.50".parse().unwrap();
+        show.groups.push(crate::programmer::Group {
+            id: 1,
+            name: "House".into(),
+            fixtures: vec![1, 2, 3, 4],
+        });
+        let mut programmer = crate::programmer::Programmer::default();
+        programmer.select(&[1, 2], crate::programmer::SelectMode::Set);
+        programmer.update(|v| v.intensity = Some(0.5));
+        show.presets.push(
+            crate::programmer::Preset::record(1, "Half".into(), crate::fixture::Family::Intensity, &programmer)
+                .unwrap(),
+        );
 
         let dir = std::env::temp_dir().join(format!("humlx-show-test-{}", std::process::id()));
         let path = dir.join("show.json");
