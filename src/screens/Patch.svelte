@@ -4,6 +4,7 @@
   import NumberField from "../components/NumberField.svelte";
   import { api } from "../lib/api";
   import { fixtureColour, range } from "../lib/format";
+  import { formKeys } from "../lib/keys";
   import { attempt, notify, show } from "../lib/show.svelte";
   import type { Fixture } from "../lib/types";
 
@@ -173,7 +174,7 @@
     {/if}
   </section>
 
-  <aside class="side panel scroll">
+  <aside class="side panel scroll" use:formKeys={{ onescape: selected ? () => (selectedId = null) : undefined }}>
     {#if selected}
       <div class="row">
         <h2>Fixture {selected.id}</h2>
@@ -215,7 +216,7 @@
       <div class="field">
         Fixture type
         {#if show.profiles.length > 8}
-          <input placeholder="Search types" bind:value={search} />
+          <input placeholder="Search types" bind:value={search} data-enter="ignore" />
         {/if}
         <div class="types">
           {#each matches as p (p.id)}

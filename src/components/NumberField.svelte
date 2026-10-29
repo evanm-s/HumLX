@@ -7,11 +7,20 @@
     min?: number;
     max?: number;
     placeholder?: string;
+    /** Allow fractions, such as fade times. Otherwise typed values are rounded. */
+    fractional?: boolean;
     onchange?: (value: number | null) => void;
   }
 
-  let { label, value = $bindable(), min = 0, max = Number.MAX_SAFE_INTEGER, placeholder, onchange }: Props =
-    $props();
+  let {
+    label,
+    value = $bindable(),
+    min = 0,
+    max = Number.MAX_SAFE_INTEGER,
+    placeholder,
+    fractional = false,
+    onchange,
+  }: Props = $props();
 
   function set(next: number | null) {
     value = next == null ? null : Math.max(min, Math.min(max, next));
@@ -23,9 +32,11 @@
     set(value == null && delta > 0 ? base : base + delta);
   }
 
+  const round = (n: number) => (fractional ? Math.round(n * 100) / 100 : Math.round(n));
+
   function input(event: Event) {
     const text = (event.target as HTMLInputElement).value.trim();
-    set(text === "" ? null : Number.isFinite(Number(text)) ? Math.round(Number(text)) : value);
+    set(text === "" ? null : Number.isFinite(Number(text)) ? round(Number(text)) : value);
   }
 </script>
 
@@ -33,7 +44,14 @@
   {label}
   <span class="number">
     <button type="button" aria-label="Decrease {label}" onclick={() => step(-1)}>−</button>
-    <input type="text" inputmode="numeric" value={value ?? ""} {placeholder} onchange={input} />
+    <input
+      type="text"
+      inputmode={fractional ? "decimal" : "numeric"}
+      aria-label={label}
+      value={value ?? ""}
+      {placeholder}
+      onchange={input}
+    />
     <button type="button" aria-label="Increase {label}" onclick={() => step(1)}>+</button>
   </span>
 </label>

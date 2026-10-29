@@ -2,6 +2,7 @@
   import NumberField from "../components/NumberField.svelte";
   import { api } from "../lib/api";
   import { isIPv4, portAddressParts } from "../lib/format";
+  import { formKeys } from "../lib/keys";
   import { attempt, notify, show } from "../lib/show.svelte";
   import type { Node } from "../lib/types";
 
@@ -51,7 +52,7 @@
     <h1>Art-Net output</h1>
   </header>
 
-  <section class="panel card">
+  <section class="panel card" use:formKeys>
     <div class="row">
       <h2>Output</h2>
       <span class="spacer"></span>

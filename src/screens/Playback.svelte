@@ -234,7 +234,7 @@
       Name
       <input bind:value={draftName} placeholder="e.g. Walk in" />
     </label>
-    <NumberField label="Fade time (seconds)" bind:value={draftFade} min={0} max={600} />
+    <NumberField label="Fade time (seconds)" fractional bind:value={draftFade} min={0} max={600} />
     {#snippet actions()}
       <button onclick={() => (dialog = null)}>Cancel</button>
       <button class="primary" onclick={saveCue}>Save</button>

@@ -70,7 +70,7 @@
     Cue name
     <input bind:value={name} placeholder={`Cue ${at + 1}`} />
   </label>
-  <NumberField label="Fade time (seconds)" bind:value={fade} min={0} max={600} />
+  <NumberField label="Fade time (seconds)" fractional bind:value={fade} min={0} max={600} />
   <p class="muted">
     {#if into}
       Becomes cue {at + 1} of {into.name}{at < into.cues.length ? ", and the cues after it move down one" : ""}.
