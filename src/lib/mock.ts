@@ -105,6 +105,12 @@ function nextId(ids: number[]) {
   return n;
 }
 
+function addCueList(name: string) {
+  const id = nextId(cueLists.map((l) => l.id));
+  cueLists.push({ id, name: name.trim() || `Cue list ${id}`, cues: [] });
+  return id;
+}
+
 /** Very rough stand-in for the Rust renderer, enough to preview levels. */
 function programmed(f: Fixture): (number | undefined)[] {
   const v = combined()[f.id];
@@ -297,15 +303,12 @@ const commands: Record<string, (args: Args) => unknown> = {
   },
   delete_preset: ({ id }) => ((presets = presets.filter((p) => p.id !== id)), programmer()),
   playback,
-  new_cue_list: ({ name }) => {
-    const id = nextId(cueLists.map((l) => l.id));
-    cueLists.push({ id, name: name.trim() || `Cue list ${id}`, cues: [] });
-    return playback();
-  },
+  new_cue_list: ({ name }) => (addCueList(name), playback()),
   rename_cue_list: ({ id, name }) => ((cueLists.find((l) => l.id === id)!.name = name), playback()),
   delete_cue_list: ({ id }) => ((cueLists = cueLists.filter((l) => l.id !== id)), running.delete(id), playback()),
-  record_cue: ({ list, name, fade, after }) => {
+  record_cue: ({ target, name, fade, after }) => {
     if (!Object.keys(values).length) throw "There is nothing in the programmer to record";
+    const list = "list" in target ? target.list : addCueList(target.new);
     const l = cueLists.find((x) => x.id === list)!;
     const index = after == null ? l.cues.length : Math.min(after + 1, l.cues.length);
     l.cues.splice(index, 0, { name: name.trim() || `Cue ${index + 1}`, fade, values: structuredClone(values) });

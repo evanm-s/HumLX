@@ -211,3 +211,9 @@ input[type="range"]::-webkit-slider-thumb {
   background: var(--accent);
   border: 3px solid var(--bg);
 }
+
+/* Record buttons, here and on the Programmer. */
+button.record:not(:disabled) {
+  border-color: var(--danger);
+  color: var(--danger);
+}

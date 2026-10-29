@@ -6,6 +6,7 @@
   import Dialog from "../components/Dialog.svelte";
   import Fader from "../components/Fader.svelte";
   import PositionPad from "../components/PositionPad.svelte";
+  import RecordCue from "../components/RecordCue.svelte";
   import { api } from "../lib/api";
   import { attributeName, capabilityAt, fixtureColour, rgbCss } from "../lib/format";
   import { show } from "../lib/show.svelte";
@@ -146,6 +147,8 @@
       recording = false;
     }
   }
+
+  let recordingCue = $state(false);
 </script>
 
 <div class="programmer">
@@ -155,6 +158,9 @@
       {selection.length === 0 ? "Nothing selected" : `${selection.length} selected`}
     </span>
     <span class="spacer"></span>
+    <button class="record" disabled={Object.keys(show.programmer.values).length === 0} onclick={() => (recordingCue = true)}>
+      ● Record cue
+    </button>
     <button class="danger" onclick={() => program(() => api.clearProgrammer(null))}>Clear all</button>
   </header>
 
@@ -373,6 +379,10 @@
       <button class="primary" onclick={saveName}>Save</button>
     {/snippet}
   </Dialog>
+{/if}
+
+{#if recordingCue}
+  <RecordCue onclose={() => (recordingCue = false)} />
 {/if}
 
 <style>

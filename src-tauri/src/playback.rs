@@ -87,14 +87,20 @@ pub fn playback(app: State<'_, App>) -> PlaybackView {
 #[tauri::command]
 pub fn new_cue_list(app: State<'_, App>, name: String) -> Result<PlaybackView> {
     change(&app, true, |state| {
-        let id = next_id(state.cue_lists.iter().map(|l| l.id));
-        let name = match name.trim() {
-            "" => format!("Cue list {id}"),
-            n => n.to_string(),
-        };
-        state.cue_lists.push(CueList { id, name, cues: vec![] });
+        add_cue_list(state, &name);
         Ok(())
     })
+}
+
+/// Adds an empty cue list, named "Cue list N" when the name is blank, and returns its id.
+fn add_cue_list(state: &mut EngineState, name: &str) -> u32 {
+    let id = next_id(state.cue_lists.iter().map(|l| l.id));
+    let name = match name.trim() {
+        "" => format!("Cue list {id}"),
+        n => n.to_string(),
+    };
+    state.cue_lists.push(CueList { id, name, cues: vec![] });
+    id
 }
 
 #[tauri::command]
@@ -114,13 +120,21 @@ pub fn delete_cue_list(app: State<'_, App>, id: u32) -> Result<PlaybackView> {
     })
 }
 
+/// Where a recorded cue goes: an existing cue list, or a new one with this name.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum RecordTarget {
+    List(u32),
+    New(String),
+}
+
 /// Records the programmer as a new cue, after cue `after` (0-based) or at the
-/// end. The programmer is then cleared and the list goes to the new cue, so
+/// end, of an existing cue list or a new one. The programmer is then cleared and the list goes to the new cue, so
 /// what was on stage stays on stage.
 #[tauri::command]
 pub fn record_cue(
     app: State<'_, App>,
-    list: u32,
+    target: RecordTarget,
     name: String,
     fade: f32,
     after: Option<usize>,
@@ -130,6 +144,10 @@ pub fn record_cue(
             return Err(Error::NothingToRecord);
         }
         let values = state.programmer.values.clone();
+        let list = match target {
+            RecordTarget::List(id) => id,
+            RecordTarget::New(list_name) => add_cue_list(state, &list_name),
+        };
         let cue_list = list_mut(state, list)?;
         let index = after.map_or(cue_list.cues.len(), |i| (i + 1).min(cue_list.cues.len()));
         let name = match name.trim() {

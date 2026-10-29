@@ -10,8 +10,9 @@ up quickly.
   colour disc and quick swatches), pan and tilt (a touch pad with a fine mode)
   and beam controls. Colours work across RGB, RGBW, CMY and colour-wheel
   fixtures alike.
-- **Cues and cue lists**: record the programmer as a cue (cues track, so each
-  one only stores what changed), give it a name and fade time, and update or
+- **Cues and cue lists**: tap **Record cue** on the Programmer or Playback
+  screen, then pick a cue list or name a new one. Cues track, so each
+  one only stores what changed. Give a cue a name and fade time, and update or
   delete it later. **GO** fades to the next cue, **Back** steps back.
 - **Playback faders**: each cue list gets a strip with a master fader, GO, Back
   and Release. Intensity from several lists combines highest-takes-precedence;

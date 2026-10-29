@@ -5,6 +5,7 @@
   import Dialog from "../components/Dialog.svelte";
   import Fader from "../components/Fader.svelte";
   import NumberField from "../components/NumberField.svelte";
+  import RecordCue from "../components/RecordCue.svelte";
   import { api } from "../lib/api";
   import { show } from "../lib/show.svelte";
   import type { Effect, EffectKind, EffectSettings, Wave } from "../lib/types";
@@ -32,12 +33,6 @@
   let draftFade = $state<number | null>(2);
   let confirmDelete = $state(false);
 
-  function openRecord() {
-    draftName = "";
-    draftFade = 2;
-    dialog = "record";
-  }
-
   function openEdit() {
     if (!list || cueIndex == null) return;
     const cue = list.cues[cueIndex];
@@ -47,16 +42,14 @@
   }
 
   async function saveCue() {
-    if (!list) return;
-    const fade = Math.max(0, draftFade ?? 0);
-    const ok =
-      dialog === "record"
-        ? await play(() => api.recordCue(list.id, draftName, fade, cueIndex))
-        : cueIndex != null && (await play(() => api.editCue(list.id, cueIndex!, draftName, fade)));
-    if (ok) {
-      if (dialog === "record") cueIndex = cueIndex == null ? list.cues.length : cueIndex + 1;
-      dialog = null;
-    }
+    if (!list || cueIndex == null) return;
+    const ok = await play(() => api.editCue(list.id, cueIndex!, draftName, Math.max(0, draftFade ?? 0)));
+    if (ok) dialog = null;
+  }
+
+  function recorded(id: number, index: number) {
+    listId = id;
+    cueIndex = index;
   }
 
   async function newList() {
@@ -116,6 +109,9 @@
       <button onclick={() => show.program(() => api.clearProgrammer(null))}>Clear programmer</button>
     {/if}
     <span class="spacer"></span>
+    <button class="record" disabled={programmed === 0} onclick={() => (dialog = "record")}>
+      ● Record cue{list && cueIndex != null && cueIndex < list.cues.length - 1 ? ` after ${cueIndex + 1}` : ""}
+    </button>
     <button class="danger" onclick={() => play(() => api.releaseAll())}>Release all</button>
   </header>
 
@@ -159,9 +155,6 @@
         {/each}
       </div>
       <div class="row actions">
-        <button class="record" disabled={programmed === 0} onclick={openRecord}>
-          ● Record cue{cueIndex != null ? ` after ${cueIndex + 1}` : ""}
-        </button>
         <button disabled={cueIndex == null || programmed === 0} onclick={() => play(() => api.updateCue(list.id, cueIndex!))}>
           Update cue
         </button>
@@ -172,7 +165,9 @@
         </button>
       </div>
     {:else}
-      <div class="empty muted">Make a cue list to start recording cues.</div>
+      <div class="empty muted">
+        No cue lists yet. Set a look in the Programmer, then tap <strong>Record cue</strong> to start one.
+      </div>
     {/if}
   </section>
 
@@ -231,22 +226,18 @@
   </section>
 </div>
 
-{#if dialog === "record" || dialog === "edit"}
-  <Dialog title={dialog === "record" ? "Record cue" : "Name and fade"} onclose={() => (dialog = null)}>
+{#if dialog === "record"}
+  <RecordCue list={listId} after={cueIndex} onclose={() => (dialog = null)} onrecorded={recorded} />
+{:else if dialog === "edit"}
+  <Dialog title="Name and fade" onclose={() => (dialog = null)}>
     <label class="field">
       Name
       <input bind:value={draftName} placeholder="e.g. Walk in" />
     </label>
     <NumberField label="Fade time (seconds)" bind:value={draftFade} min={0} max={600} />
-    {#if dialog === "record"}
-      <p class="muted">
-        Stores what the Programmer is setting on {programmed} fixtures. The Programmer is then cleared and the cue
-        list goes to the new cue, so the stage stays the same.
-      </p>
-    {/if}
     {#snippet actions()}
       <button onclick={() => (dialog = null)}>Cancel</button>
-      <button class="primary" onclick={saveCue}>{dialog === "record" ? "Record" : "Save"}</button>
+      <button class="primary" onclick={saveCue}>Save</button>
     {/snippet}
   </Dialog>
 {:else if dialog === "list"}
@@ -395,11 +386,6 @@
   .actions {
     flex-wrap: wrap;
     gap: 10px;
-  }
-
-  .record:not(:disabled) {
-    border-color: var(--danger);
-    color: var(--danger);
   }
 
   .effects {

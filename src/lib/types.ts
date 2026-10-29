@@ -179,6 +179,9 @@ export interface CueList {
   cues: Cue[];
 }
 
+/** Where a recorded cue goes: an existing cue list, or a new one with this name. */
+export type RecordTarget = { list: number } | { new: string };
+
 export type EffectKind = "dimmer" | "rainbow" | "circle";
 export type Wave = "sine" | "square" | "saw";
 

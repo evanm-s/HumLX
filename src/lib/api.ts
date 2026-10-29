@@ -17,6 +17,7 @@ import type {
   Attribute,
   PlaybackView,
   EffectSettings,
+  RecordTarget,
 } from "./types";
 
 /** True when running inside the desktop app rather than a plain browser. */
@@ -77,8 +78,9 @@ export const api = {
   newCueList: (name: string) => invoke<PlaybackView>("new_cue_list", { name }),
   renameCueList: (id: number, name: string) => invoke<PlaybackView>("rename_cue_list", { id, name }),
   deleteCueList: (id: number) => invoke<PlaybackView>("delete_cue_list", { id }),
-  recordCue: (list: number, name: string, fade: number, after: number | null) =>
-    invoke<PlaybackView>("record_cue", { list, name, fade, after }),
+  /** Records into an existing cue list, or a new one when `target` has a name. */
+  recordCue: (target: RecordTarget, name: string, fade: number, after: number | null) =>
+    invoke<PlaybackView>("record_cue", { target, name, fade, after }),
   updateCue: (list: number, index: number) => invoke<PlaybackView>("update_cue", { list, index }),
   editCue: (list: number, index: number, name: string | null, fade: number | null) =>
     invoke<PlaybackView>("edit_cue", { list, index, name, fade }),
