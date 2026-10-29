@@ -4,6 +4,7 @@
 
   import { api } from "../../lib/api";
   import { attributeName, fixtureColour, rgbCss } from "../../lib/format";
+  import { tapMode } from "../../lib/selection";
   import { show } from "../../lib/show.svelte";
   import type { Attribute, Rgb, Values } from "../../lib/types";
 
@@ -35,7 +36,8 @@
       .toUpperCase();
 
   function tap(id: number, event: MouseEvent) {
-    show.program(() => api.select([id], event.shiftKey || event.ctrlKey || event.metaKey ? "toggle" : "set"));
+    const mode = event.shiftKey || event.ctrlKey || event.metaKey ? "toggle" : tapMode("toggle");
+    show.program(() => api.select([id], mode));
   }
 </script>
 

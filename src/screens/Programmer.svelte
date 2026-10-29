@@ -14,6 +14,7 @@
   import { api } from "../lib/api";
   import { attributeName, capabilityAt, fixtureColour, rgbCss, SWATCHES } from "../lib/format";
   import { loadLayout, saveLayout, type Grid, type Layout } from "../lib/layout";
+  import { endSelectWindow, restartSelectWindow, tapMode } from "../lib/selection";
   import { show } from "../lib/show.svelte";
   import type { Attribute, Channel, Family } from "../lib/types";
 
@@ -73,7 +74,21 @@
 
   function tapGroup(id: number) {
     if (editingGroups) program(() => api.deleteGroup(id));
-    else program(() => api.selectGroup(id, "set"));
+    else program(() => api.selectGroup(id, tapMode("add")));
+  }
+
+  function tapFixture(id: number) {
+    program(() => api.select([id], tapMode("toggle")));
+  }
+
+  function selectAll() {
+    restartSelectWindow();
+    program(() => api.select(show.patch.fixtures.map((f) => f.id), "set"));
+  }
+
+  function selectNone() {
+    endSelectWindow();
+    program(() => api.select([], "set"));
   }
 
   async function saveGroup() {
@@ -154,8 +169,8 @@
 
 {#snippet tools(id: string)}
   {#if id === "fixtures"}
-    <button class="small" onclick={() => program(() => api.select(show.patch.fixtures.map((f) => f.id), "set"))}>All</button>
-    <button class="small" onclick={() => program(() => api.select([], "set"))}>None</button>
+    <button class="small" onclick={selectAll}>All</button>
+    <button class="small" onclick={selectNone}>None</button>
   {:else if id === "groups" && show.programmer.groups.length > 0}
     <button class="small" class:warn={editingGroups} onclick={() => (editingGroups = !editingGroups)}>
       {editingGroups ? "Done" : "Edit"}
@@ -173,7 +188,7 @@
   {#if id === "fixtures"}
     <div class="tiles">
       {#each show.patch.fixtures as f (f.id)}
-        <button class="tile" aria-pressed={selected.has(f.id)} onclick={() => program(() => api.select([f.id], "toggle"))}>
+        <button class="tile" aria-pressed={selected.has(f.id)} onclick={() => tapFixture(f.id)}>
           <span class="num" style:color={fixtureColour(f.id)}>{f.id}</span>
           <span class="name">{f.name}</span>
           {#if show.programmer.values[f.id]}<span class="dot" aria-label="Has programmer values"></span>{/if}
