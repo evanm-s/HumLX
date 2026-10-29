@@ -47,11 +47,15 @@ up quickly.
 
 ## Releasing
 
-Push a version tag, such as `git tag v0.2.0 && git push origin v0.2.0`. The
-Release workflow builds signed installers and publishes them with the
-`latest.json` the app checks. It needs the repository secrets
-`TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`, which
-match the public key in `src-tauri/tauri.conf.json`.
+Bump the version in `src-tauri/tauri.conf.json` (and `package.json` and
+`Cargo.toml` to match) and merge it into `main`. The Release workflow sees a
+version with no release yet, builds signed installers, and publishes
+`v<version>` with the `latest.json` the app checks. The release stays a draft
+until every file is attached. Pushing a `v*` tag by hand still works too.
+
+It needs the repository secrets `TAURI_SIGNING_PRIVATE_KEY` and
+`TAURI_SIGNING_PRIVATE_KEY_PASSWORD`, which match the public key in
+`src-tauri/tauri.conf.json`.
 
 ## Project layout
 
