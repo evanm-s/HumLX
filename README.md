@@ -45,8 +45,23 @@ npm run check          # type-check the UI
 npm run tauri build    # Windows installer in target/release/bundle
 ```
 
-Every push to a pull request runs the tests and builds a Windows installer,
-which can be downloaded from the run's artifacts on GitHub.
+Every push runs the tests and builds a Windows installer and a Linux
+AppImage, which can be downloaded from the run's artifacts on GitHub.
+
+### Trying it on Linux
+
+Download the AppImage from a CI run, then `chmod +x` it and run it. To run
+from source on Arch-based systems instead:
+
+```sh
+sudo pacman -S --needed webkit2gtk-4.1 base-devel rustup nodejs npm
+rustup default stable
+npm install && npm run tauri dev
+```
+
+Without a node on the network the app still runs: the address map and channel
+test faders show the live levels. If the AppImage shows a blank window, run it
+with `WEBKIT_DISABLE_DMABUF_RENDERER=1`.
 
 The show is saved to `%APPDATA%\au.com.humdinger.humlx\show.json`, and
 imported fixture types next to it in `fixtures\`.
