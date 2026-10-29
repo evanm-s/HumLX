@@ -3,6 +3,7 @@
   // record or recall presets. The main screen for operating the rig, laid out
   // as windows that can be moved, resized and hidden.
 
+  import { onDestroy } from "svelte";
   import ColourPicker from "../components/ColourPicker.svelte";
   import Dialog from "../components/Dialog.svelte";
   import Fader from "../components/Fader.svelte";
@@ -15,7 +16,7 @@
   import { attributeName, capabilityAt, fixtureColour, rgbCss, SWATCHES } from "../lib/format";
   import { loadLayout, saveLayout, type Grid, type Layout } from "../lib/layout";
   import { endSelectWindow, restartSelectWindow, tapMode } from "../lib/selection";
-  import { show } from "../lib/show.svelte";
+  import { attempt, show } from "../lib/show.svelte";
   import type { Attribute, Channel, Family } from "../lib/types";
 
   const selection = $derived(show.programmer.selection);
@@ -134,8 +135,38 @@
     return BEAM.filter((a) => found.has(a)).map((attribute) => ({ attribute, channel: found.get(attribute)! }));
   });
 
+  // --- Highlight -----------------------------------------------------------
+
+  // Puts the selection at full, white and tight with everything else out, to
+  // find fixtures or check focus. Nothing is recorded, and turning it off
+  // brings back whatever was on stage before.
+  const highlight = $derived(show.live.highlight);
+
+  function setHighlight(on: boolean) {
+    // Update the button straight away rather than on the next live poll.
+    show.live.highlight = on;
+    return attempt(() => api.setHighlight(on));
+  }
+
+  // H toggles highlight, unless typing or a dialog is open.
+  function keys(e: KeyboardEvent) {
+    if (e.key.toLowerCase() !== "h" || e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+    if (namingGroup || recordingCue) return;
+    const target = e.target as HTMLElement;
+    if (target.closest("input, textarea, select, [role=dialog]")) return;
+    e.preventDefault();
+    setHighlight(!highlight);
+  }
+
+  // Leaving it on would keep the rest of the rig dark from other screens.
+  onDestroy(() => {
+    if (show.live.highlight) setHighlight(false);
+  });
+
   const families: Record<string, Family> = { intensity: "intensity", colour: "colour", position: "position", beam: "beam" };
 </script>
+
+<svelte:window onkeydown={keys} />
 
 <div class="programmer">
   <header class="row">
@@ -153,6 +184,14 @@
       <button class="primary" onclick={() => (editing = false)}>Done</button>
     {:else}
       <button onclick={() => (editing = true)}>Edit layout</button>
+      <button
+        class="highlight"
+        aria-pressed={highlight}
+        title="Selected fixtures full, white and tight; everything else out (H)"
+        onclick={() => setHighlight(!highlight)}
+      >
+        {highlight ? "Highlight on" : "Highlight"}
+      </button>
       <button
         class="record"
         disabled={Object.keys(show.programmer.values).length === 0}
@@ -318,6 +357,12 @@
     grid-template-rows: auto 1fr;
     gap: var(--gap);
     min-height: 0;
+  }
+
+  .highlight[aria-pressed="true"] {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
   }
 
   .hint {

@@ -20,6 +20,7 @@ class ShowState {
     universe: Array(512).fill(0),
     status: { packetsSent: 0, lastError: null },
     blackout: false,
+    highlight: false,
     tested: [],
     playbacks: [],
     runningEffects: [],

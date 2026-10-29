@@ -100,6 +100,8 @@ export interface Live {
   universe: number[];
   status: OutputStatus;
   blackout: boolean;
+  /** Selected fixtures picked out, everything else out. */
+  highlight: boolean;
   tested: number[];
   playbacks: PlaybackStatus[];
   runningEffects: number[];
