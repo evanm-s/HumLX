@@ -23,10 +23,14 @@ class ShowState {
     tested: [],
     playbacks: [],
     runningEffects: [],
+    masters: [],
+    osc: { listening: false, error: null, received: 0, last: null },
   });
   playback = $state<PlaybackView>({ cueLists: [], effects: [], masters: [] });
   programmer = $state<ProgrammerView>({ selection: [], values: {}, groups: [], presets: [] });
   loaded = $state(false);
+  /** Bumped when a different show is loaded, so screens start afresh. */
+  revision = $state(0);
 
   async load() {
     const overview = await api.overview();
@@ -36,6 +40,7 @@ class ShowState {
     this.programmer = await api.programmer();
     this.playback = await api.playback();
     this.loaded = true;
+    this.revision++;
     for (const warning of overview.warnings) notify(warning, "warning");
   }
 

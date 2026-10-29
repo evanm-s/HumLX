@@ -14,6 +14,7 @@ use crate::artnet;
 use crate::dmx::Universe;
 use crate::error::{Error, Result};
 use crate::fixture::{Attribute, Library};
+use crate::osc::{OscSettings, OscStatus};
 use crate::patch::{mode_of, Patch};
 use crate::playback::{CueList, Effect, Playbacks, RunningEffects};
 use crate::programmer::{Group, Preset, Programmer};
@@ -80,6 +81,8 @@ pub struct State {
     pub effects: Vec<Effect>,
     pub playbacks: Playbacks,
     pub running_effects: RunningEffects,
+    pub osc_settings: OscSettings,
+    pub osc: OscStatus,
     /// Raw channel levels set from the channel test screen, by fixture
     /// number and channel index within the fixture.
     test_levels: HashMap<u32, HashMap<usize, u8>>,
@@ -225,6 +228,11 @@ impl Engine {
         })
     }
 
+    /// The shared state, for other threads such as the OSC listener.
+    pub fn shared(&self) -> Arc<Mutex<State>> {
+        Arc::clone(&self.state)
+    }
+
     /// Locks the state for a command. Keep the work done under the lock short.
     pub fn state(&self) -> MutexGuard<'_, State> {
         lock(&self.state)
@@ -240,7 +248,7 @@ impl Drop for Engine {
     }
 }
 
-fn lock(state: &Mutex<State>) -> MutexGuard<'_, State> {
+pub(crate) fn lock(state: &Mutex<State>) -> MutexGuard<'_, State> {
     // A panic elsewhere must not stop the lights, so recover a poisoned lock.
     state.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
 }

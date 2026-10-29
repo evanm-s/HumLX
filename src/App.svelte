@@ -1,8 +1,10 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import Toasts from "./components/Toasts.svelte";
+  import UpdateButton from "./components/UpdateButton.svelte";
   import { api, inApp } from "./lib/api";
   import { attempt, show } from "./lib/show.svelte";
+  import { updates } from "./lib/updates.svelte";
   import ChannelTest from "./screens/ChannelTest.svelte";
   import Patch from "./screens/Patch.svelte";
   import Playback from "./screens/Playback.svelte";
@@ -14,7 +16,7 @@
     { id: "playback", label: "Playback", icon: "▶" },
     { id: "patch", label: "Patch", icon: "▦" },
     { id: "test", label: "Channel test", icon: "☰" },
-    { id: "output", label: "Output", icon: "⇄" },
+    { id: "output", label: "Settings", icon: "⚙" },
   ] as const;
 
   type ScreenId = (typeof screens)[number]["id"];
@@ -26,6 +28,7 @@
       // A new show has nothing to program yet, so start on the patch.
       if (show.patch.fixtures.length === 0) screen = "patch";
     });
+    updates.start();
     return show.startLive();
   });
 
@@ -51,6 +54,7 @@
       </button>
     {/each}
     <span class="spacer"></span>
+    <UpdateButton />
     <button class="status {status.kind}" onclick={() => (screen = "output")} title={show.live.status.lastError ?? ""}>
       <span class="led"></span>{status.text}
     </button>
@@ -67,8 +71,10 @@
     {#if !inApp}<div class="preview">Preview mode in a browser. Run the desktop app to control lights.</div>{/if}
     <div class="screen">
       {#if show.loaded}
-        {#if screen === "programmer"}<Programmer />{:else if screen === "playback"}<Playback />{:else if screen === "patch"}<Patch />{:else if screen === "test"}<ChannelTest
-          />{:else}<Settings />{/if}
+        {#key show.revision}
+          {#if screen === "programmer"}<Programmer />{:else if screen === "playback"}<Playback />{:else if screen === "patch"}<Patch />{:else if screen === "test"}<ChannelTest
+            />{:else}<Settings />{/if}
+        {/key}
       {/if}
     </div>
   </main>

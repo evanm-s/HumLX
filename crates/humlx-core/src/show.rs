@@ -1,4 +1,4 @@
-//! Saving and loading the show: the patch and output settings.
+//! Saving and loading the show: the patch, programming and settings.
 
 use std::path::Path;
 
@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::engine::OutputSettings;
 use crate::error::{Error, Result};
+use crate::fixture::Profile;
+use crate::osc::OscSettings;
 use crate::patch::Patch;
 use crate::playback::{CueList, Effect};
 use crate::programmer::{Group, Preset};
@@ -28,6 +30,12 @@ pub struct Show {
     pub cue_lists: Vec<CueList>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub effects: Vec<Effect>,
+    #[serde(default)]
+    pub osc: OscSettings,
+    /// Fixture types the patch uses that aren't built in, so a show file
+    /// opens on another computer.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub profiles: Vec<Profile>,
 }
 
 impl Default for Show {
@@ -40,6 +48,8 @@ impl Default for Show {
             presets: Vec::new(),
             cue_lists: Vec::new(),
             effects: Vec::new(),
+            osc: OscSettings::default(),
+            profiles: Vec::new(),
         }
     }
 }

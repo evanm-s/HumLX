@@ -47,12 +47,16 @@ fn view(app: &App) -> PlaybackView {
     PlaybackView {
         cue_lists: state.cue_lists.clone(),
         effects: state.effects.clone(),
-        masters: state
-            .cue_lists
-            .iter()
-            .map(|l| (l.id, state.playbacks.master(l.id)))
-            .collect(),
+        masters: masters(&state),
     }
+}
+
+pub fn masters(state: &EngineState) -> Vec<(u32, f32)> {
+    state
+        .cue_lists
+        .iter()
+        .map(|l| (l.id, state.playbacks.master(l.id)))
+        .collect()
 }
 
 /// Runs a change, saves the show if `save`, and returns the new playback state.

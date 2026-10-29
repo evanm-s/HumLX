@@ -103,6 +103,21 @@ export interface Live {
   tested: number[];
   playbacks: PlaybackStatus[];
   runningEffects: number[];
+  /** Master level by cue list number. */
+  masters: [number, number][];
+  osc: OscStatus;
+}
+
+export interface OscSettings {
+  enabled: boolean;
+  port: number;
+}
+
+export interface OscStatus {
+  listening: boolean;
+  error: string | null;
+  received: number;
+  last: string | null;
 }
 
 export interface NewFixtures {

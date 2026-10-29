@@ -7,6 +7,7 @@ pub mod engine;
 pub mod error;
 pub mod fixture;
 pub mod ofl;
+pub mod osc;
 pub mod patch;
 pub mod playback;
 pub mod programmer;

@@ -40,6 +40,8 @@ pub enum Error {
     Unsupported(String),
     #[error("invalid show file: {0}")]
     InvalidShow(String),
+    #[error("{0}")]
+    InvalidOsc(String),
     #[error(transparent)]
     Io(#[from] std::io::Error),
 }

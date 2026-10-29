@@ -62,6 +62,9 @@ pub struct Live {
     tested: Vec<u32>,
     playbacks: Vec<crate::playback::PlaybackStatus>,
     running_effects: Vec<u32>,
+    /// Master levels by cue list, which OSC can change too.
+    masters: Vec<(u32, f32)>,
+    osc: humlx_core::osc::OscStatus,
 }
 
 fn patch_view(app: &App) -> PatchView {
@@ -206,6 +209,8 @@ pub fn live(app: State<'_, App>) -> Live {
         tested: state.tested_fixtures(),
         playbacks: crate::playback::statuses(&state),
         running_effects: state.running_effects.ids(),
+        masters: crate::playback::masters(&state),
+        osc: state.osc.clone(),
     }
 }
 

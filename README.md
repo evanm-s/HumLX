@@ -38,7 +38,20 @@ up quickly.
 - The patch, groups, presets, cue lists, effects and output settings save automatically after
   every change.
 
-OSC cue triggering, show files and a simple mode follow in the next step.
+- **OSC**: run cue lists from QLab, Companion, TouchOSC and the like, with
+  addresses such as `/humlx/cuelist/1/go` (the full list is on the Settings
+  screen). Off by default; turn it on and pick a port in Settings.
+- **Show files**: save the show to a file, open one, or start a new show.
+  Imported fixture types travel inside the file.
+- **Updates**: the app checks GitHub Releases and offers to update itself.
+
+## Releasing
+
+Push a version tag, such as `git tag v0.2.0 && git push origin v0.2.0`. The
+Release workflow builds signed installers and publishes them with the
+`latest.json` the app checks. It needs the repository secrets
+`TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`, which
+match the public key in `src-tauri/tauri.conf.json`.
 
 ## Project layout
 

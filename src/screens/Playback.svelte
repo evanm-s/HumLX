@@ -24,7 +24,9 @@
   });
 
   const status = (id: number) => show.live.playbacks.find((p) => p.list === id);
-  const master = (id: number) => show.playback.masters.find(([l]) => l === id)?.[1] ?? 1;
+  // Masters come from the live poll too, since OSC can move them.
+  const master = (id: number) =>
+    (show.live.masters.find(([l]) => l === id) ?? show.playback.masters.find(([l]) => l === id))?.[1] ?? 1;
   const programmed = $derived(Object.keys(show.programmer.values).length);
 
   // Dialogs
@@ -45,6 +47,17 @@
     if (!list || cueIndex == null) return;
     const ok = await play(() => api.editCue(list.id, cueIndex!, draftName, Math.max(0, draftFade ?? 0)));
     if (ok) dialog = null;
+  }
+
+  // Space is GO and Shift+Space is Back for the cue list on screen, unless
+  // typing or a dialog is open.
+  function keys(e: KeyboardEvent) {
+    if (e.key !== " " || dialog || !list || e.repeat) return;
+    const target = e.target as HTMLElement;
+    if (target.closest("input, textarea, select, [role=dialog]")) return;
+    e.preventDefault();
+    const id = list.id;
+    play(() => (e.shiftKey ? api.back(id) : api.go(id)));
   }
 
   function recorded(id: number, index: number) {
@@ -101,6 +114,8 @@
   }
 </script>
 
+<svelte:window onkeydown={keys} />
+
 <div class="playback">
   <header class="row">
     <h1>Playback</h1>
@@ -120,7 +135,9 @@
     <div class="row">
       <div class="segmented">
         {#each show.playback.cueLists as l (l.id)}
-          <button aria-pressed={l.id === listId} onclick={() => ((listId = l.id), (cueIndex = null))}>{l.name}</button>
+          <button aria-pressed={l.id === listId} onclick={() => ((listId = l.id), (cueIndex = null))}
+            ><span class="list-num">{l.id}</span> {l.name}</button
+          >
         {/each}
         <button
           class="ghost"
@@ -163,6 +180,8 @@
         <button class="danger" disabled={cueIndex == null} onclick={deleteCue}>
           {confirmDelete ? "Tap again to delete" : "Delete cue"}
         </button>
+        <span class="spacer"></span>
+        <span class="muted keys">Space: GO · Shift+Space: Back</span>
       </div>
     {:else}
       <div class="empty muted">
@@ -386,6 +405,16 @@
   .actions {
     flex-wrap: wrap;
     gap: 10px;
+  }
+
+  .keys {
+    font-size: 0.85rem;
+  }
+
+  .list-num {
+    opacity: 0.6;
+    font-variant-numeric: tabular-nums;
+    margin-right: 4px;
   }
 
   .effects {

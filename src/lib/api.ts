@@ -18,6 +18,7 @@ import type {
   PlaybackView,
   EffectSettings,
   RecordTarget,
+  OscSettings,
 } from "./types";
 
 /** True when running inside the desktop app rather than a plain browser. */
@@ -73,6 +74,13 @@ export const api = {
     invoke<ProgrammerView>("record_preset", { family, name, id }),
   applyPreset: (id: number) => invoke<ProgrammerView>("apply_preset", { id }),
   deletePreset: (id: number) => invoke<ProgrammerView>("delete_preset", { id }),
+
+  oscSettings: () => invoke<OscSettings>("osc_settings"),
+  setOsc: (settings: OscSettings) => invoke<OscSettings>("set_osc", { settings }),
+  showFile: () => invoke<string | null>("show_file"),
+  saveShowAs: (path: string) => invoke<string>("save_show_as", { path }),
+  openShow: (path: string) => invoke<string>("open_show", { path }),
+  newShow: () => invoke<void>("new_show"),
 
   playback: () => invoke<PlaybackView>("playback"),
   newCueList: (name: string) => invoke<PlaybackView>("new_cue_list", { name }),

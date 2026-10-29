@@ -18,6 +18,7 @@ import type {
   Profile,
   ProgrammerView,
   Values,
+  OscSettings,
 } from "./types";
 
 const files = import.meta.glob<Omit<Profile, "id">>("../../crates/humlx-core/fixtures/*.json", {
@@ -46,6 +47,7 @@ let values: Record<number, Values> = {};
 let groups: Group[] = [];
 let presets: Preset[] = [];
 let cueLists: CueList[] = [];
+let osc: OscSettings = { enabled: false, port: 8000 };
 let effects: Effect[] = [];
 const running = new Map<number, number>(); // cue list -> current cue
 const masters = new Map<number, number>();
@@ -244,7 +246,29 @@ const commands: Record<string, (args: Args) => unknown> = {
     tested: [...tests.keys()].sort((a, b) => a - b),
     playbacks: [...running].map(([list, current]) => ({ list, current, fading: false })),
     runningEffects: [...effectsOn],
+    masters: cueLists.map((l) => [l.id, masters.get(l.id) ?? 1]),
+    osc: { listening: osc.enabled, error: null, received: 0, last: null },
   }),
+  osc_settings: () => osc,
+  set_osc: ({ settings }) => (osc = settings),
+  show_file: () => null,
+  save_show_as: () => {
+    throw "Saving show files needs the desktop app";
+  },
+  open_show: () => {
+    throw "Opening show files needs the desktop app";
+  },
+  new_show: () => {
+    fixtures = [];
+    groups = [];
+    presets = [];
+    cueLists = [];
+    effects = [];
+    values = {};
+    selection = [];
+    running.clear();
+    effectsOn.clear();
+  },
   set_output: ({ settings }) => (output = settings),
   set_blackout: ({ on }) => (blackout = on),
   programmer,
