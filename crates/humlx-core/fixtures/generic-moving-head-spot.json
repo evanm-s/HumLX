@@ -1,0 +1,60 @@
+{
+  "manufacturer": "Generic",
+  "model": "Moving Head Spot",
+  "categories": ["Moving Head"],
+  "modes": [
+    {
+      "name": "12ch",
+      "channels": [
+        { "name": "Pan", "attribute": "pan", "default": 128 },
+        { "name": "Pan fine", "attribute": "pan", "fineOf": "Pan" },
+        { "name": "Tilt", "attribute": "tilt", "default": 128 },
+        { "name": "Tilt fine", "attribute": "tilt", "fineOf": "Tilt" },
+        { "name": "Pan/Tilt speed", "attribute": "pan_tilt_speed" },
+        { "name": "Dimmer", "attribute": "intensity" },
+        {
+          "name": "Shutter",
+          "attribute": "shutter",
+          "default": 255,
+          "capabilities": [
+            { "from": 0, "to": 7, "label": "Closed" },
+            { "from": 8, "to": 247, "label": "Strobe slow to fast" },
+            { "from": 248, "to": 255, "label": "Open" }
+          ]
+        },
+        {
+          "name": "Color wheel",
+          "attribute": "color_wheel",
+          "capabilities": [
+            { "from": 0, "to": 15, "label": "Open" },
+            { "from": 16, "to": 31, "label": "Red" },
+            { "from": 32, "to": 47, "label": "Orange" },
+            { "from": 48, "to": 63, "label": "Yellow" },
+            { "from": 64, "to": 79, "label": "Green" },
+            { "from": 80, "to": 95, "label": "Cyan" },
+            { "from": 96, "to": 111, "label": "Blue" },
+            { "from": 112, "to": 127, "label": "Magenta" },
+            { "from": 128, "to": 255, "label": "Rainbow slow to fast" }
+          ]
+        },
+        {
+          "name": "Gobo wheel",
+          "attribute": "gobo",
+          "capabilities": [
+            { "from": 0, "to": 15, "label": "Open" },
+            { "from": 16, "to": 31, "label": "Gobo 1" },
+            { "from": 32, "to": 47, "label": "Gobo 2" },
+            { "from": 48, "to": 63, "label": "Gobo 3" },
+            { "from": 64, "to": 79, "label": "Gobo 4" },
+            { "from": 80, "to": 95, "label": "Gobo 5" },
+            { "from": 96, "to": 127, "label": "Gobo 6" },
+            { "from": 128, "to": 255, "label": "Scroll slow to fast" }
+          ]
+        },
+        { "name": "Gobo rotation", "attribute": "gobo_rotation" },
+        { "name": "Prism", "attribute": "prism" },
+        { "name": "Focus", "attribute": "focus", "default": 128 }
+      ]
+    }
+  ]
+}

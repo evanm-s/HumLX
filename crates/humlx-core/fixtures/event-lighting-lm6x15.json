@@ -1,0 +1,639 @@
+{
+  "manufacturer": "Event Lighting",
+  "model": "LM6X15",
+  "categories": [
+    "Moving Head"
+  ],
+  "modes": [
+    {
+      "name": "15ch",
+      "channels": [
+        {
+          "name": "Dimmer",
+          "attribute": "intensity"
+        },
+        {
+          "name": "Shutter",
+          "attribute": "shutter",
+          "default": 255,
+          "capabilities": [
+            {
+              "from": 0,
+              "to": 31,
+              "label": "Closed"
+            },
+            {
+              "from": 32,
+              "to": 63,
+              "label": "Open"
+            },
+            {
+              "from": 64,
+              "to": 95,
+              "label": "Strobe slow to fast"
+            },
+            {
+              "from": 96,
+              "to": 127,
+              "label": "Open"
+            },
+            {
+              "from": 128,
+              "to": 159,
+              "label": "Pulse slow to fast"
+            },
+            {
+              "from": 160,
+              "to": 191,
+              "label": "Open"
+            },
+            {
+              "from": 192,
+              "to": 223,
+              "label": "Random strobe slow to fast"
+            },
+            {
+              "from": 224,
+              "to": 255,
+              "label": "Open"
+            }
+          ]
+        },
+        {
+          "name": "Pan",
+          "attribute": "pan",
+          "default": 128
+        },
+        {
+          "name": "Pan fine",
+          "attribute": "pan",
+          "fineOf": "Pan"
+        },
+        {
+          "name": "Tilt",
+          "attribute": "tilt",
+          "default": 128
+        },
+        {
+          "name": "Tilt fine",
+          "attribute": "tilt",
+          "fineOf": "Tilt"
+        },
+        {
+          "name": "Zoom",
+          "attribute": "zoom"
+        },
+        {
+          "name": "Pan/Tilt speed",
+          "attribute": "pan_tilt_speed",
+          "capabilities": [
+            {
+              "from": 0,
+              "to": 225,
+              "label": "Speed fast to slow"
+            },
+            {
+              "from": 226,
+              "to": 235,
+              "label": "Blackout while moving"
+            },
+            {
+              "from": 236,
+              "to": 255,
+              "label": "No function"
+            }
+          ]
+        },
+        {
+          "name": "Red",
+          "attribute": "red"
+        },
+        {
+          "name": "Green",
+          "attribute": "green"
+        },
+        {
+          "name": "Blue",
+          "attribute": "blue"
+        },
+        {
+          "name": "White",
+          "attribute": "white"
+        },
+        {
+          "name": "Macros",
+          "attribute": "effect",
+          "capabilities": [
+            {
+              "from": 0,
+              "to": 15,
+              "label": "No function"
+            },
+            {
+              "from": 16,
+              "to": 31,
+              "label": "Red"
+            },
+            {
+              "from": 32,
+              "to": 47,
+              "label": "Green"
+            },
+            {
+              "from": 48,
+              "to": 63,
+              "label": "Blue"
+            },
+            {
+              "from": 64,
+              "to": 79,
+              "label": "White"
+            },
+            {
+              "from": 80,
+              "to": 95,
+              "label": "Red + Green"
+            },
+            {
+              "from": 96,
+              "to": 111,
+              "label": "Red + Blue"
+            },
+            {
+              "from": 112,
+              "to": 127,
+              "label": "Red + White"
+            },
+            {
+              "from": 128,
+              "to": 143,
+              "label": "Green + Blue"
+            },
+            {
+              "from": 144,
+              "to": 159,
+              "label": "Green + White"
+            },
+            {
+              "from": 160,
+              "to": 175,
+              "label": "Blue + White"
+            },
+            {
+              "from": 176,
+              "to": 191,
+              "label": "Red + Green + Blue"
+            },
+            {
+              "from": 192,
+              "to": 207,
+              "label": "Red + Green + Blue + White"
+            },
+            {
+              "from": 208,
+              "to": 223,
+              "label": "Jump"
+            },
+            {
+              "from": 224,
+              "to": 239,
+              "label": "Fade"
+            },
+            {
+              "from": 240,
+              "to": 255,
+              "label": "Pulse slow to fast"
+            }
+          ]
+        },
+        {
+          "name": "Macro speed",
+          "attribute": "speed",
+          "capabilities": [
+            {
+              "from": 0,
+              "to": 255,
+              "label": "Slow to fast"
+            }
+          ]
+        },
+        {
+          "name": "Special functions",
+          "attribute": "control",
+          "capabilities": [
+            {
+              "from": 0,
+              "to": 84,
+              "label": "No function"
+            },
+            {
+              "from": 85,
+              "to": 87,
+              "label": "Reset all motors"
+            },
+            {
+              "from": 88,
+              "to": 96,
+              "label": "Reset pan/tilt"
+            },
+            {
+              "from": 97,
+              "to": 99,
+              "label": "No function"
+            },
+            {
+              "from": 100,
+              "to": 109,
+              "label": "Reset zoom"
+            },
+            {
+              "from": 110,
+              "to": 119,
+              "label": "Internal program 1"
+            },
+            {
+              "from": 120,
+              "to": 129,
+              "label": "Internal program 2"
+            },
+            {
+              "from": 130,
+              "to": 139,
+              "label": "Internal program 3"
+            },
+            {
+              "from": 140,
+              "to": 149,
+              "label": "Internal program 4"
+            },
+            {
+              "from": 150,
+              "to": 159,
+              "label": "Internal program 5"
+            },
+            {
+              "from": 160,
+              "to": 169,
+              "label": "Internal program 6"
+            },
+            {
+              "from": 170,
+              "to": 179,
+              "label": "Internal program 7"
+            },
+            {
+              "from": 180,
+              "to": 189,
+              "label": "Internal program 8"
+            },
+            {
+              "from": 190,
+              "to": 199,
+              "label": "Sound program 1"
+            },
+            {
+              "from": 200,
+              "to": 209,
+              "label": "Sound program 2"
+            },
+            {
+              "from": 210,
+              "to": 219,
+              "label": "Sound program 3"
+            },
+            {
+              "from": 220,
+              "to": 229,
+              "label": "Sound program 4"
+            },
+            {
+              "from": 230,
+              "to": 239,
+              "label": "Sound program 5"
+            },
+            {
+              "from": 240,
+              "to": 249,
+              "label": "Sound program 6"
+            },
+            {
+              "from": 250,
+              "to": 255,
+              "label": "Sound program 7"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "13ch",
+      "channels": [
+        {
+          "name": "Dimmer",
+          "attribute": "intensity"
+        },
+        {
+          "name": "Shutter",
+          "attribute": "shutter",
+          "default": 255,
+          "capabilities": [
+            {
+              "from": 0,
+              "to": 31,
+              "label": "Closed"
+            },
+            {
+              "from": 32,
+              "to": 63,
+              "label": "Open"
+            },
+            {
+              "from": 64,
+              "to": 95,
+              "label": "Strobe slow to fast"
+            },
+            {
+              "from": 96,
+              "to": 127,
+              "label": "Open"
+            },
+            {
+              "from": 128,
+              "to": 159,
+              "label": "Pulse slow to fast"
+            },
+            {
+              "from": 160,
+              "to": 191,
+              "label": "Open"
+            },
+            {
+              "from": 192,
+              "to": 223,
+              "label": "Random strobe slow to fast"
+            },
+            {
+              "from": 224,
+              "to": 255,
+              "label": "Open"
+            }
+          ]
+        },
+        {
+          "name": "Pan",
+          "attribute": "pan",
+          "default": 128
+        },
+        {
+          "name": "Tilt",
+          "attribute": "tilt",
+          "default": 128
+        },
+        {
+          "name": "Zoom",
+          "attribute": "zoom"
+        },
+        {
+          "name": "Pan/Tilt speed",
+          "attribute": "pan_tilt_speed",
+          "capabilities": [
+            {
+              "from": 0,
+              "to": 225,
+              "label": "Speed fast to slow"
+            },
+            {
+              "from": 226,
+              "to": 235,
+              "label": "Blackout while moving"
+            },
+            {
+              "from": 236,
+              "to": 255,
+              "label": "No function"
+            }
+          ]
+        },
+        {
+          "name": "Red",
+          "attribute": "red"
+        },
+        {
+          "name": "Green",
+          "attribute": "green"
+        },
+        {
+          "name": "Blue",
+          "attribute": "blue"
+        },
+        {
+          "name": "White",
+          "attribute": "white"
+        },
+        {
+          "name": "Macros",
+          "attribute": "effect",
+          "capabilities": [
+            {
+              "from": 0,
+              "to": 15,
+              "label": "No function"
+            },
+            {
+              "from": 16,
+              "to": 31,
+              "label": "Red"
+            },
+            {
+              "from": 32,
+              "to": 47,
+              "label": "Green"
+            },
+            {
+              "from": 48,
+              "to": 63,
+              "label": "Blue"
+            },
+            {
+              "from": 64,
+              "to": 79,
+              "label": "White"
+            },
+            {
+              "from": 80,
+              "to": 95,
+              "label": "Red + Green"
+            },
+            {
+              "from": 96,
+              "to": 111,
+              "label": "Red + Blue"
+            },
+            {
+              "from": 112,
+              "to": 127,
+              "label": "Red + White"
+            },
+            {
+              "from": 128,
+              "to": 143,
+              "label": "Green + Blue"
+            },
+            {
+              "from": 144,
+              "to": 159,
+              "label": "Green + White"
+            },
+            {
+              "from": 160,
+              "to": 175,
+              "label": "Blue + White"
+            },
+            {
+              "from": 176,
+              "to": 191,
+              "label": "Red + Green + Blue"
+            },
+            {
+              "from": 192,
+              "to": 207,
+              "label": "Red + Green + Blue + White"
+            },
+            {
+              "from": 208,
+              "to": 223,
+              "label": "Jump"
+            },
+            {
+              "from": 224,
+              "to": 239,
+              "label": "Fade"
+            },
+            {
+              "from": 240,
+              "to": 255,
+              "label": "Pulse slow to fast"
+            }
+          ]
+        },
+        {
+          "name": "Macro speed",
+          "attribute": "speed",
+          "capabilities": [
+            {
+              "from": 0,
+              "to": 255,
+              "label": "Slow to fast"
+            }
+          ]
+        },
+        {
+          "name": "Special functions",
+          "attribute": "control",
+          "capabilities": [
+            {
+              "from": 0,
+              "to": 84,
+              "label": "No function"
+            },
+            {
+              "from": 85,
+              "to": 87,
+              "label": "Reset all motors"
+            },
+            {
+              "from": 88,
+              "to": 96,
+              "label": "Reset pan/tilt"
+            },
+            {
+              "from": 97,
+              "to": 99,
+              "label": "No function"
+            },
+            {
+              "from": 100,
+              "to": 109,
+              "label": "Reset zoom"
+            },
+            {
+              "from": 110,
+              "to": 119,
+              "label": "Internal program 1"
+            },
+            {
+              "from": 120,
+              "to": 129,
+              "label": "Internal program 2"
+            },
+            {
+              "from": 130,
+              "to": 139,
+              "label": "Internal program 3"
+            },
+            {
+              "from": 140,
+              "to": 149,
+              "label": "Internal program 4"
+            },
+            {
+              "from": 150,
+              "to": 159,
+              "label": "Internal program 5"
+            },
+            {
+              "from": 160,
+              "to": 169,
+              "label": "Internal program 6"
+            },
+            {
+              "from": 170,
+              "to": 179,
+              "label": "Internal program 7"
+            },
+            {
+              "from": 180,
+              "to": 189,
+              "label": "Internal program 8"
+            },
+            {
+              "from": 190,
+              "to": 199,
+              "label": "Sound program 1"
+            },
+            {
+              "from": 200,
+              "to": 209,
+              "label": "Sound program 2"
+            },
+            {
+              "from": 210,
+              "to": 219,
+              "label": "Sound program 3"
+            },
+            {
+              "from": 220,
+              "to": 229,
+              "label": "Sound program 4"
+            },
+            {
+              "from": 230,
+              "to": 239,
+              "label": "Sound program 5"
+            },
+            {
+              "from": 240,
+              "to": 249,
+              "label": "Sound program 6"
+            },
+            {
+              "from": 250,
+              "to": 255,
+              "label": "Sound program 7"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

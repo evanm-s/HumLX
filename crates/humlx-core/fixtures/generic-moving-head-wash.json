@@ -1,0 +1,33 @@
+{
+  "manufacturer": "Generic",
+  "model": "Moving Head Wash",
+  "categories": ["Moving Head"],
+  "modes": [
+    {
+      "name": "12ch",
+      "channels": [
+        { "name": "Pan", "attribute": "pan", "default": 128 },
+        { "name": "Pan fine", "attribute": "pan", "fineOf": "Pan" },
+        { "name": "Tilt", "attribute": "tilt", "default": 128 },
+        { "name": "Tilt fine", "attribute": "tilt", "fineOf": "Tilt" },
+        { "name": "Pan/Tilt speed", "attribute": "pan_tilt_speed" },
+        { "name": "Dimmer", "attribute": "intensity" },
+        {
+          "name": "Shutter",
+          "attribute": "shutter",
+          "default": 255,
+          "capabilities": [
+            { "from": 0, "to": 7, "label": "Closed" },
+            { "from": 8, "to": 247, "label": "Strobe slow to fast" },
+            { "from": 248, "to": 255, "label": "Open" }
+          ]
+        },
+        { "name": "Red", "attribute": "red" },
+        { "name": "Green", "attribute": "green" },
+        { "name": "Blue", "attribute": "blue" },
+        { "name": "White", "attribute": "white" },
+        { "name": "Zoom", "attribute": "zoom", "default": 128 }
+      ]
+    }
+  ]
+}

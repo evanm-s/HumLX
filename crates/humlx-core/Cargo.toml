@@ -1,0 +1,13 @@
+[package]
+name = "humlx-core"
+description = "Lighting engine for HumLX: fixtures, patch and Art-Net output"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+roxmltree = "0.21.2"
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true

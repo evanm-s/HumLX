@@ -1,0 +1,24 @@
+{
+  "manufacturer": "Generic",
+  "model": "RGB Par",
+  "categories": ["Color Changer"],
+  "modes": [
+    {
+      "name": "3ch RGB",
+      "channels": [
+        { "name": "Red", "attribute": "red" },
+        { "name": "Green", "attribute": "green" },
+        { "name": "Blue", "attribute": "blue" }
+      ]
+    },
+    {
+      "name": "4ch DRGB",
+      "channels": [
+        { "name": "Dimmer", "attribute": "intensity" },
+        { "name": "Red", "attribute": "red" },
+        { "name": "Green", "attribute": "green" },
+        { "name": "Blue", "attribute": "blue" }
+      ]
+    }
+  ]
+}
