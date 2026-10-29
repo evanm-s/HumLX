@@ -1,0 +1,18 @@
+{
+  "manufacturer": "Generic",
+  "model": "Dimmer",
+  "categories": ["Dimmer"],
+  "modes": [
+    {
+      "name": "1ch",
+      "channels": [{ "name": "Dimmer", "attribute": "intensity" }]
+    },
+    {
+      "name": "2ch 16-bit",
+      "channels": [
+        { "name": "Dimmer", "attribute": "intensity" },
+        { "name": "Dimmer fine", "attribute": "intensity", "fineOf": "Dimmer" }
+      ]
+    }
+  ]
+}

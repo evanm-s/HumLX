@@ -1,0 +1,20 @@
+[package]
+name = "humlx"
+description = "Touch-first DMX lighting control over Art-Net"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lib]
+name = "humlx_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+humlx-core = { path = "../crates/humlx-core" }
+tauri = { version = "2", features = [] }
+serde.workspace = true
+serde_json.workspace = true

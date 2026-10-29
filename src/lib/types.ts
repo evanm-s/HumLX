@@ -1,0 +1,127 @@
+// Shapes of the data the Rust side sends. Keep in step with
+// `src-tauri/src/commands.rs` and `crates/humlx-core`.
+
+export type Attribute =
+  | "intensity"
+  | "red"
+  | "green"
+  | "blue"
+  | "white"
+  | "warm_white"
+  | "cool_white"
+  | "amber"
+  | "lime"
+  | "uv"
+  | "cyan"
+  | "magenta"
+  | "yellow"
+  | "color_wheel"
+  | "color_temperature"
+  | "pan"
+  | "tilt"
+  | "pan_tilt_speed"
+  | "shutter"
+  | "gobo"
+  | "gobo_rotation"
+  | "prism"
+  | "zoom"
+  | "focus"
+  | "iris"
+  | "frost"
+  | "effect"
+  | "speed"
+  | "control"
+  | "generic";
+
+export interface Capability {
+  from: number;
+  to: number;
+  label: string;
+}
+
+export interface Channel {
+  name: string;
+  attribute: Attribute;
+  fineOf?: string;
+  default: number;
+  highlight?: number;
+  capabilities?: Capability[];
+}
+
+export interface Mode {
+  name: string;
+  channels: Channel[];
+}
+
+export interface Profile {
+  id: string;
+  manufacturer: string;
+  model: string;
+  categories?: string[];
+  modes: Mode[];
+}
+
+export interface Fixture {
+  id: number;
+  name: string;
+  profile: string;
+  mode: string;
+  address: number;
+  footprint: number;
+  typeName: string;
+}
+
+export interface PatchView {
+  fixtures: Fixture[];
+  /** Owner of each channel; index 0 is address 1. */
+  occupancy: (number | null)[];
+}
+
+export interface OutputSettings {
+  enabled: boolean;
+  target: string;
+  universe: number;
+  rateHz: number;
+}
+
+export interface OutputStatus {
+  packetsSent: number;
+  lastError: string | null;
+}
+
+export interface Overview {
+  profiles: Profile[];
+  patch: PatchView;
+  output: OutputSettings;
+  warnings: string[];
+}
+
+export interface Live {
+  universe: number[];
+  status: OutputStatus;
+  blackout: boolean;
+  tested: number[];
+}
+
+export interface NewFixtures {
+  profile: string;
+  mode: string;
+  count: number;
+  firstId?: number | null;
+  address?: number | null;
+  name?: string | null;
+}
+
+export interface FixtureChanges {
+  id?: number;
+  name?: string;
+  mode?: string;
+  address?: number;
+}
+
+export interface Node {
+  ip: string;
+  shortName: string;
+  longName: string;
+  outputs: number[];
+}

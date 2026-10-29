@@ -1,0 +1,74 @@
+{
+  "$schema": "https://raw.githubusercontent.com/OpenLightingProject/open-fixture-library/master/schemas/fixture.json",
+  "name": "Test Spot 150",
+  "shortName": "TS150",
+  "categories": ["Moving Head", "Color Changer"],
+  "meta": { "authors": ["HumLX"], "createDate": "2026-10-29", "lastModifyDate": "2026-10-29" },
+  "physical": { "dimensions": [300, 400, 200], "weight": 9 },
+  "wheels": {
+    "Color Wheel": {
+      "slots": [
+        { "type": "Open" },
+        { "type": "Color", "name": "Red", "colors": ["#ff0000"] },
+        { "type": "Color", "name": "Blue", "colors": ["#0000ff"] }
+      ]
+    },
+    "Gobo Wheel": {
+      "slots": [{ "type": "Open" }, { "type": "Gobo", "name": "Dots" }]
+    }
+  },
+  "availableChannels": {
+    "Pan": {
+      "fineChannelAliases": ["Pan fine"],
+      "defaultValue": "50%",
+      "capability": { "type": "Pan", "angleStart": "0deg", "angleEnd": "540deg" }
+    },
+    "Tilt": {
+      "fineChannelAliases": ["Tilt fine"],
+      "defaultValue": 128,
+      "capability": { "type": "Tilt", "angleStart": "0deg", "angleEnd": "270deg" }
+    },
+    "Dimmer": {
+      "capability": { "type": "Intensity" }
+    },
+    "Shutter": {
+      "highlightValue": 255,
+      "capabilities": [
+        { "dmxRange": [0, 31], "type": "ShutterStrobe", "shutterEffect": "Closed" },
+        { "dmxRange": [32, 223], "type": "ShutterStrobe", "shutterEffect": "Strobe", "speedStart": "slow", "speedEnd": "fast" },
+        { "dmxRange": [224, 255], "type": "ShutterStrobe", "shutterEffect": "Open" }
+      ]
+    },
+    "Color Wheel": {
+      "capabilities": [
+        { "dmxRange": [0, 9], "type": "WheelSlot", "slotNumber": 1 },
+        { "dmxRange": [10, 19], "type": "WheelSlot", "slotNumber": 2 },
+        { "dmxRange": [20, 255], "type": "WheelRotation", "speedStart": "slow CW", "speedEnd": "fast CW", "comment": "Rainbow" }
+      ]
+    },
+    "Gobo": {
+      "capabilities": [
+        { "dmxRange": [0, 127], "type": "WheelSlot", "wheel": "Gobo Wheel", "slotNumber": 1 },
+        { "dmxRange": [128, 255], "type": "WheelSlot", "wheel": "Gobo Wheel", "slotNumber": 2 }
+      ]
+    },
+    "Red": {
+      "capability": { "type": "ColorIntensity", "color": "Red" }
+    },
+    "Program": {
+      "capability": { "type": "Effect", "effectName": "Auto" }
+    }
+  },
+  "modes": [
+    {
+      "name": "Basic",
+      "shortName": "8ch",
+      "channels": ["Pan", "Tilt", "Dimmer", "Shutter", "Color Wheel", "Gobo", null, "Program"]
+    },
+    {
+      "name": "Extended",
+      "shortName": "11ch",
+      "channels": ["Pan", "Pan fine", "Tilt", "Tilt fine", "Dimmer", "Shutter", "Color Wheel", "Gobo", "Red", "Program", "Mystery"]
+    }
+  ]
+}
