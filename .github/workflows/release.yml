@@ -53,12 +53,18 @@ jobs:
         shell: bash
         run: |
           tag="v${{ steps.check.outputs.version }}"
-          if ! gh release view "$tag" > /dev/null 2>&1; then
-            gh release create "$tag" --draft --target "$GITHUB_SHA" \
-              --title "HumLX $tag" \
-              --notes "Install on a new computer with the Windows installer below. Computers that already have HumLX offer the update themselves."
+          # Take the id straight from the create response: a just-made draft
+          # can be missing from the release list for a few seconds.
+          if id="$(gh release view "$tag" --json databaseId --jq .databaseId 2>/dev/null)" && [ -n "$id" ]; then
+            echo "Using the existing $tag release."
+          else
+            id="$(gh api -X POST "repos/$GITHUB_REPOSITORY/releases" \
+              -f tag_name="$tag" -f target_commitish="$GITHUB_SHA" -F draft=true \
+              -f name="HumLX $tag" \
+              -f body="Install on a new computer with the Windows installer below. Computers that already have HumLX offer the update themselves." \
+              --jq .id)"
           fi
-          id="$(gh api "repos/$GITHUB_REPOSITORY/releases" --jq "map(select(.tag_name == \"$tag\")) | first | .id")"
+          test -n "$id"
           echo "release_id=$id" >> "$GITHUB_OUTPUT"
 
   build:
@@ -102,6 +108,7 @@ jobs:
         with:
           releaseId: ${{ needs.prepare.outputs.release_id }}
           tagName: v${{ needs.prepare.outputs.version }}
+          releaseName: HumLX v${{ needs.prepare.outputs.version }}
           includeUpdaterJson: true
           args: --config src-tauri/tauri.release.conf.json ${{ matrix.args }}
 
@@ -114,4 +121,4 @@ jobs:
     steps:
       # Publishing creates the tag. The release stays a draft until every
       # installer and latest.json is attached, so the app never sees half a release.
-      - run: gh release edit "v${{ needs.prepare.outputs.version }}" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+      - run: gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/${{ needs.prepare.outputs.release_id }}" -F draft=false -f make_latest=true --jq .html_url
