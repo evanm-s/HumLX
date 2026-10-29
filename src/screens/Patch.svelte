@@ -279,14 +279,24 @@
 {#if importing}
   <Dialog title="Import fixture type" onclose={() => (importing = false)}>
     <p>
-      Find your fixture on <strong>open-fixture-library.org</strong>, choose <em>Download</em>, then
-      <em>Open Fixture Library JSON</em>, and pick the downloaded file here. HumLX fixture files work too.
+      Pick a fixture file. These work:
     </p>
+    <ul>
+      <li>
+        <strong>QLC+</strong> fixture definitions (<em>.qxf</em>), from QLC+'s library or ones you made in its
+        fixture editor.
+      </li>
+      <li>
+        <strong>Open Fixture Library</strong>: find the fixture on open-fixture-library.org, choose
+        <em>Download</em>, then <em>Open Fixture Library JSON</em>.
+      </li>
+      <li>HumLX fixture files.</li>
+    </ul>
     <label class="field">
-      Manufacturer (needed for Open Fixture Library files)
+      Manufacturer (needed for Open Fixture Library files, optional otherwise)
       <input bind:value={manufacturer} placeholder="e.g. Chauvet DJ" />
     </label>
-    <input bind:this={fileInput} type="file" accept=".json,application/json" hidden onchange={importFile} />
+    <input bind:this={fileInput} type="file" accept=".json,.qxf,application/json" hidden onchange={importFile} />
     {#snippet actions()}
       <button onclick={() => (importing = false)}>Cancel</button>
       <button class="primary" onclick={() => fileInput?.click()}>Choose file…</button>

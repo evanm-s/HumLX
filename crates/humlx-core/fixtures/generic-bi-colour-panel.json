@@ -1,0 +1,14 @@
+{
+  "manufacturer": "Generic",
+  "model": "Bi-colour LED Panel",
+  "categories": ["Panel"],
+  "modes": [
+    {
+      "name": "2ch",
+      "channels": [
+        { "name": "Dimmer", "attribute": "intensity" },
+        { "name": "White balance", "attribute": "color_temperature", "default": 128 }
+      ]
+    }
+  ]
+}

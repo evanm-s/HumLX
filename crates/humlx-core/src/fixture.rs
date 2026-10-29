@@ -194,6 +194,8 @@ pub fn bundled() -> Vec<Profile> {
         include_str!("../fixtures/generic-rgbw-par.json"),
         include_str!("../fixtures/generic-moving-head-spot.json"),
         include_str!("../fixtures/generic-moving-head-wash.json"),
+        include_str!("../fixtures/generic-bi-colour-panel.json"),
+        include_str!("../fixtures/event-lighting-lm6x15.json"),
     ];
     SOURCES
         .iter()
@@ -249,7 +251,7 @@ mod tests {
     #[test]
     fn bundled_profiles_load() {
         let library = Library::with_bundled();
-        assert_eq!(library.profiles().len(), 5);
+        assert_eq!(library.profiles().len(), 7);
         let par = library.get("generic/rgbw-par").expect("rgbw par");
         assert_eq!(par.mode("4ch RGBW").unwrap().channels.len(), 4);
     }
@@ -266,7 +268,7 @@ mod tests {
         let mut dimmer = library.get("generic/dimmer").unwrap().clone();
         dimmer.categories = vec!["Replaced".into()];
         library.insert(dimmer);
-        assert_eq!(library.profiles().len(), 5);
+        assert_eq!(library.profiles().len(), 7);
         assert_eq!(library.get("generic/dimmer").unwrap().categories, vec!["Replaced"]);
     }
 

@@ -10,6 +10,7 @@ pub mod ofl;
 pub mod patch;
 pub mod playback;
 pub mod programmer;
+pub mod qlc;
 pub mod show;
 
 pub use error::{Error, Result};

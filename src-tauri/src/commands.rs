@@ -8,7 +8,7 @@ use humlx_core::engine::{self, OutputSettings, OutputStatus};
 use humlx_core::fixture::{slug, Attribute, Family, Profile};
 use humlx_core::patch::{mode_of, FixtureChanges, NewFixtures};
 use humlx_core::programmer::{next_id, Group, Preset, Rgb, SelectMode, Values};
-use humlx_core::{ofl, Error, Result};
+use humlx_core::{ofl, qlc, Error, Result};
 use serde::Serialize;
 use tauri::State;
 
@@ -160,9 +160,14 @@ pub fn remove_fixtures(app: State<'_, App>, ids: Vec<u32>) -> Result<PatchView> 
 /// Fixture Library, and keeps a copy with the show's data.
 #[tauri::command]
 pub fn import_profile(app: State<'_, App>, json: String, manufacturer: Option<String>) -> Result<Vec<ProfileView>> {
-    let profile = match Profile::from_json(&json) {
-        Ok(profile) => profile,
-        Err(_) => ofl::import(&json, manufacturer.as_deref())?,
+    // QLC+ definitions are XML; otherwise a HumLX profile or an OFL export.
+    let profile = if json.trim_start().starts_with('<') {
+        qlc::import(&json, manufacturer.as_deref())?
+    } else {
+        match Profile::from_json(&json) {
+            Ok(profile) => profile,
+            Err(_) => ofl::import(&json, manufacturer.as_deref())?,
+        }
     };
     let file = app.paths.fixtures.join(format!(
         "{}--{}.json",

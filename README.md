@@ -25,8 +25,10 @@ up quickly.
   colour, position and beam presets that recall onto any selection.
 - **Patch** fixtures by type and mode, several at once, with automatic
   numbering and addressing, overlap checks and a live 512-channel address map.
-- **Fixture types**: generic dimmer, RGB and RGBW pars, and moving head spot
-  and wash profiles are built in. Real fixtures can be imported from the
+- **Fixture types**: generic dimmer, RGB and RGBW pars, a bi-colour LED panel,
+  moving head spot and wash profiles, and the Event Lighting LM6X15 are built
+  in. Real fixtures can be imported from QLC+ fixture definitions (`.qxf`, from its library or its
+  fixture editor) or from the
   [Open Fixture Library](https://open-fixture-library.org) (download a fixture
   as "Open Fixture Library JSON").
 - **Channel test**: a fader per channel to check every fixture against the rig,
