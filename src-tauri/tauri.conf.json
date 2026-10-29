@@ -45,7 +45,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDIxNjkwODVBMDA3MEQ1RTQKUldUazFYQUFXZ2hwSWJjb3NjU0Y2ZHdXR1k5d0ZkOUMyNER4cWx0cjFMK3p1K0JBUkZuOG1NSEMK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDE5NEEzNDRFMTgxREJBMzcKUldRM3VoMFlUalJLR1JVN012NHFiMjZiMVhEQzhaTEgzanJsK0FGdU9nRlJhMkdEUzc0aVF4QkYK",
       "endpoints": [
         "https://github.com/evanm-s/HumLX/releases/latest/download/latest.json"
       ],
