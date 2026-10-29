@@ -58,6 +58,7 @@ export const api = {
   live: () => invoke<Live>("live"),
   setOutput: (settings: OutputSettings) => invoke<OutputSettings>("set_output", { settings }),
   setBlackout: (on: boolean) => invoke<void>("set_blackout", { on }),
+  setHighlight: (on: boolean) => invoke<void>("set_highlight", { on }),
   discoverNodes: () => invoke<Node[]>("discover_nodes"),
 
   programmer: () => invoke<ProgrammerView>("programmer"),

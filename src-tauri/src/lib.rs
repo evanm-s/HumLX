@@ -133,6 +133,7 @@ fn apply_show(state: &mut State, show: Show) {
     state.playbacks.release_all();
     state.running_effects.stop_all();
     state.blackout = false;
+    state.highlight = false;
     state.release(None);
 }
 
@@ -177,6 +178,7 @@ pub fn run() {
             commands::live,
             commands::set_output,
             commands::set_blackout,
+            commands::set_highlight,
             commands::discover_nodes,
             commands::programmer,
             commands::select,
