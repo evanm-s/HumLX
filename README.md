@@ -8,7 +8,9 @@ up quickly.
 
 - **Programmer**: select fixtures or groups, then set intensity, colour (a
   colour disc and quick swatches), pan and tilt (a touch pad with a fine mode)
-  and beam controls. Colours work across RGB, RGBW, CMY and colour-wheel
+  and beam controls, all on screen at once. A programmer sheet lists every
+  value that's set. The screen is made of windows that can be moved, resized
+  and hidden with **Edit layout**, and the layout is remembered. Colours work across RGB, RGBW, CMY and colour-wheel
   fixtures alike.
 - **Cues and cue lists**: tap **Record cue** on the Programmer or Playback
   screen, then pick a cue list or name a new one. Cues track, so each

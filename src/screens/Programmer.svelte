@@ -1,67 +1,90 @@
 <script lang="ts">
   // Select fixtures, set their intensity, colour, position and beam, and
-  // record or recall presets. The main screen for operating the rig.
+  // record or recall presets. The main screen for operating the rig, laid out
+  // as windows that can be moved, resized and hidden.
 
   import ColourPicker from "../components/ColourPicker.svelte";
   import Dialog from "../components/Dialog.svelte";
   import Fader from "../components/Fader.svelte";
   import PositionPad from "../components/PositionPad.svelte";
   import RecordCue from "../components/RecordCue.svelte";
+  import Workspace from "../components/Workspace.svelte";
+  import PresetPool from "../components/programmer/PresetPool.svelte";
+  import ProgrammerSheet from "../components/programmer/ProgrammerSheet.svelte";
   import { api } from "../lib/api";
-  import { attributeName, capabilityAt, fixtureColour, rgbCss } from "../lib/format";
+  import { attributeName, capabilityAt, fixtureColour, rgbCss, SWATCHES } from "../lib/format";
+  import { loadLayout, saveLayout, type Grid, type Layout } from "../lib/layout";
   import { show } from "../lib/show.svelte";
-  import type { Attribute, Channel, Family, Preset, Rgb } from "../lib/types";
-
-  const tabs: { id: Family; label: string }[] = [
-    { id: "intensity", label: "Intensity" },
-    { id: "colour", label: "Colour" },
-    { id: "position", label: "Position" },
-    { id: "beam", label: "Beam" },
-  ];
-  let tab = $state<Family>("intensity");
+  import type { Attribute, Channel, Family } from "../lib/types";
 
   const selection = $derived(show.programmer.selection);
   const selected = $derived(new Set(selection));
   const current = $derived(show.current);
   const program = show.program.bind(show);
 
+  // --- Layout --------------------------------------------------------------
+
+  const windows = [
+    { id: "fixtures", title: "Fixtures" },
+    { id: "groups", title: "Groups" },
+    { id: "sheet", title: "Programmer" },
+    { id: "presets-intensity", title: "Intensity presets" },
+    { id: "presets-beam", title: "Beam presets" },
+    { id: "presets-position", title: "Position presets" },
+    { id: "presets-colour", title: "Colour presets" },
+    { id: "intensity", title: "Intensity" },
+    { id: "colour", title: "Colour" },
+    { id: "position", title: "Position" },
+    { id: "beam", title: "Beam" },
+  ];
+  const presetFamily = (id: string) => id.slice("presets-".length) as Family;
+
+  const GRID: Grid = { cols: 24, rows: 12 };
+  const DEFAULT: Layout = {
+    fixtures: { x: 0, y: 0, w: 8, h: 5 },
+    groups: { x: 8, y: 0, w: 5, h: 5 },
+    sheet: { x: 13, y: 0, w: 11, h: 5 },
+    "presets-intensity": { x: 0, y: 5, w: 2, h: 7 },
+    "presets-beam": { x: 2, y: 5, w: 2, h: 7 },
+    "presets-position": { x: 4, y: 5, w: 2, h: 7 },
+    "presets-colour": { x: 6, y: 5, w: 2, h: 7 },
+    intensity: { x: 8, y: 5, w: 3, h: 7 },
+    colour: { x: 11, y: 5, w: 4, h: 7 },
+    position: { x: 15, y: 5, w: 5, h: 7 },
+    beam: { x: 20, y: 5, w: 4, h: 7 },
+  };
+  const KEY = "humlx.layout.programmer.v1";
+
+  let layout = $state(loadLayout(KEY, DEFAULT, GRID));
+  let editing = $state(false);
+  let workspace: Workspace;
+  const hidden = $derived(windows.filter((w) => layout[w.id]?.hidden));
+
+  function setLayout(next: Layout) {
+    layout = next;
+    saveLayout(KEY, next);
+  }
+
   // --- Selection -----------------------------------------------------------
 
-  function tapFixture(id: number) {
-    program(() => api.select([id], "toggle"));
-  }
-
-  function selectAll() {
-    program(() => api.select(show.patch.fixtures.map((f) => f.id), "set"));
-  }
-
   let editingGroups = $state(false);
-  let naming = $state<null | { kind: "group" } | { kind: "preset"; family: Family; id: number }>(null);
-  let name = $state("");
+  let namingGroup = $state(false);
+  let groupName = $state("");
 
   function tapGroup(id: number) {
     if (editingGroups) program(() => api.deleteGroup(id));
     else program(() => api.selectGroup(id, "set"));
   }
 
+  async function saveGroup() {
+    const ok = await program(() => api.saveGroup(groupName.trim() || "Group", null));
+    if (ok) namingGroup = false;
+  }
+
   // --- Controls ------------------------------------------------------------
 
-  const swatches: { name: string; colour: Rgb }[] = [
-    { name: "Red", colour: { r: 1, g: 0, b: 0 } },
-    { name: "Orange", colour: { r: 1, g: 0.45, b: 0 } },
-    { name: "Amber", colour: { r: 1, g: 0.7, b: 0.1 } },
-    { name: "Yellow", colour: { r: 1, g: 1, b: 0 } },
-    { name: "Green", colour: { r: 0, g: 1, b: 0 } },
-    { name: "Cyan", colour: { r: 0, g: 1, b: 1 } },
-    { name: "Blue", colour: { r: 0, g: 0, b: 1 } },
-    { name: "Lavender", colour: { r: 0.6, g: 0.45, b: 1 } },
-    { name: "Magenta", colour: { r: 1, g: 0, b: 1 } },
-    { name: "Pink", colour: { r: 1, g: 0.4, b: 0.7 } },
-    { name: "Warm", colour: { r: 1, g: 0.85, b: 0.6 } },
-    { name: "White", colour: { r: 1, g: 1, b: 1 } },
-  ];
-
   let fine = $state(false);
+  let recordingCue = $state(false);
 
   const BEAM: Attribute[] = [
     "shutter",
@@ -96,59 +119,7 @@
     return BEAM.filter((a) => found.has(a)).map((attribute) => ({ attribute, channel: found.get(attribute)! }));
   });
 
-  // --- Presets ---------------------------------------------------------------
-
-  let recording = $state(false);
-  let deleting = $state(false);
-
-  const presets = $derived(show.programmer.presets.filter((p) => p.family === tab));
-  const nextSlot = $derived.by(() => {
-    const used = new Set(show.programmer.presets.map((p) => p.id));
-    let id = 1;
-    while (used.has(id)) id++;
-    return id;
-  });
-
-  function presetSample(preset: Preset) {
-    return preset.all ?? Object.values(preset.fixtures ?? {})[0] ?? {};
-  }
-
-  function defaultName(family: Family): string {
-    if (family === "intensity" && current.intensity != null) return `${Math.round(current.intensity * 100)}%`;
-    if (family === "colour" && current.colour) {
-      const c = current.colour;
-      const match = swatches.find((s) => Math.abs(s.colour.r - c.r) + Math.abs(s.colour.g - c.g) + Math.abs(s.colour.b - c.b) < 0.15);
-      if (match) return match.name;
-    }
-    return { intensity: "Level", colour: "Colour", position: "Position", beam: "Beam", control: "Control" }[family];
-  }
-
-  function tapPreset(preset: Preset | null, slot: number) {
-    if (deleting && preset) {
-      program(() => api.deletePreset(preset.id));
-    } else if (recording || !preset) {
-      name = preset?.name ?? defaultName(tab);
-      naming = { kind: "preset", family: tab, id: slot };
-    } else {
-      program(() => api.applyPreset(preset.id));
-    }
-  }
-
-  async function saveName() {
-    const target = naming;
-    if (!target) return;
-    const value = name.trim() || (target.kind === "group" ? `Group` : defaultName(target.family));
-    const ok =
-      target.kind === "group"
-        ? await program(() => api.saveGroup(value, null))
-        : await program(() => api.recordPreset(target.family, value, target.id));
-    if (ok) {
-      naming = null;
-      recording = false;
-    }
-  }
-
-  let recordingCue = $state(false);
+  const families: Record<string, Family> = { intensity: "intensity", colour: "colour", position: "position", beam: "beam" };
 </script>
 
 <div class="programmer">
@@ -158,23 +129,51 @@
       {selection.length === 0 ? "Nothing selected" : `${selection.length} selected`}
     </span>
     <span class="spacer"></span>
-    <button class="record" disabled={Object.keys(show.programmer.values).length === 0} onclick={() => (recordingCue = true)}>
-      ● Record cue
-    </button>
-    <button class="danger" onclick={() => program(() => api.clearProgrammer(null))}>Clear all</button>
+    {#if editing}
+      <span class="muted">Drag title bars to move, corners to resize.</span>
+      {#each hidden as w (w.id)}
+        <button onclick={() => workspace.restore(w.id)}>+ {w.title}</button>
+      {/each}
+      <button onclick={() => setLayout(structuredClone(DEFAULT))}>Reset layout</button>
+      <button class="primary" onclick={() => (editing = false)}>Done</button>
+    {:else}
+      <button onclick={() => (editing = true)}>Edit layout</button>
+      <button
+        class="record"
+        disabled={Object.keys(show.programmer.values).length === 0}
+        onclick={() => (recordingCue = true)}
+      >
+        ● Record cue
+      </button>
+      <button class="danger" onclick={() => program(() => api.clearProgrammer(null))}>Clear all</button>
+    {/if}
   </header>
 
-  <!-- Selection -->
-  <section class="panel select scroll" aria-label="Selection">
-    <div class="row">
-      <h2>Fixtures</h2>
-      <span class="spacer"></span>
-      <button onclick={selectAll}>All</button>
-      <button onclick={() => program(() => api.select([], "set"))}>None</button>
-    </div>
+  <Workspace bind:this={workspace} {windows} {layout} grid={GRID} {editing} onchange={setLayout} {body} {tools} />
+</div>
+
+{#snippet tools(id: string)}
+  {#if id === "fixtures"}
+    <button class="small" onclick={() => program(() => api.select(show.patch.fixtures.map((f) => f.id), "set"))}>All</button>
+    <button class="small" onclick={() => program(() => api.select([], "set"))}>None</button>
+  {:else if id === "groups" && show.programmer.groups.length > 0}
+    <button class="small" class:warn={editingGroups} onclick={() => (editingGroups = !editingGroups)}>
+      {editingGroups ? "Done" : "Edit"}
+    </button>
+  {:else if families[id]}
+    <button class="small" onclick={() => program(() => api.clearProgrammer(families[id]))}>Clear</button>
+  {/if}
+{/snippet}
+
+{#snippet noSelection()}
+  <p class="muted">Select fixtures or a group first.</p>
+{/snippet}
+
+{#snippet body(id: string)}
+  {#if id === "fixtures"}
     <div class="tiles">
       {#each show.patch.fixtures as f (f.id)}
-        <button class="tile" aria-pressed={selected.has(f.id)} onclick={() => tapFixture(f.id)}>
+        <button class="tile" aria-pressed={selected.has(f.id)} onclick={() => program(() => api.select([f.id], "toggle"))}>
           <span class="num" style:color={fixtureColour(f.id)}>{f.id}</span>
           <span class="name">{f.name}</span>
           {#if show.programmer.values[f.id]}<span class="dot" aria-label="Has programmer values"></span>{/if}
@@ -183,18 +182,9 @@
         <p class="muted">Patch some fixtures first.</p>
       {/each}
     </div>
-
-    <div class="row">
-      <h2>Groups</h2>
-      <span class="spacer"></span>
-      {#if show.programmer.groups.length > 0}
-        <button aria-pressed={editingGroups} class:warn={editingGroups} onclick={() => (editingGroups = !editingGroups)}>
-          {editingGroups ? "Done" : "Edit"}
-        </button>
-      {/if}
-    </div>
+  {:else if id === "groups"}
     {#if editingGroups}<p class="muted hint">Tap a group to delete it.</p>{/if}
-    <div class="groups">
+    <div class="tiles">
       {#each show.programmer.groups as g (g.id)}
         <button class="group" class:deleting={editingGroups} onclick={() => tapGroup(g.id)}>
           <span>{g.name}</span>
@@ -205,178 +195,99 @@
         class="group add"
         disabled={selection.length === 0}
         onclick={() => {
-          name = "";
-          naming = { kind: "group" };
+          groupName = "";
+          namingGroup = true;
         }}
       >
         + Save selection
       </button>
     </div>
-  </section>
-
-  <!-- Controls -->
-  <section class="panel controls">
-    <div class="row">
-      <div class="segmented tabs" role="tablist">
-        {#each tabs as t (t.id)}
-          <button role="tab" aria-selected={tab === t.id} onclick={() => (tab = t.id)}>
-            {t.label}
+  {:else if id === "sheet"}
+    <ProgrammerSheet />
+  {:else if id.startsWith("presets-")}
+    <PresetPool family={presetFamily(id)} />
+  {:else if selection.length === 0}
+    {@render noSelection()}
+  {:else if id === "intensity"}
+    <div class="intensity">
+      <Fader
+        wide
+        max={100}
+        value={Math.round((current.intensity ?? 0) * 100)}
+        label="Intensity"
+        detail={current.intensity == null ? "Not set" : `${Math.round(current.intensity * 100)}%`}
+        active={current.intensity != null}
+        onchange={(v) => program(() => api.setIntensity(v / 100))}
+      />
+      <div class="levels">
+        {#each [100, 75, 50, 25, 10, 0] as level (level)}
+          <button onclick={() => program(() => api.setIntensity(level / 100))}>
+            {level === 100 ? "Full" : level === 0 ? "Out" : `${level}%`}
           </button>
         {/each}
       </div>
-      <span class="spacer"></span>
-      <button onclick={() => program(() => api.clearProgrammer(tab))}>Clear {tab}</button>
     </div>
-
-    {#if selection.length === 0}
-      <div class="empty muted">Select fixtures or a group on the left to start.</div>
-    {:else if tab === "intensity"}
-      <div class="intensity">
-        <Fader
-          wide
-          max={100}
-          value={Math.round((current.intensity ?? 0) * 100)}
-          label="Intensity"
-          detail={current.intensity == null ? "Not set" : `${Math.round(current.intensity * 100)}%`}
-          active={current.intensity != null}
-          onchange={(v) => program(() => api.setIntensity(v / 100))}
-        />
-        <div class="levels">
-          {#each [100, 75, 50, 25, 10, 0] as level (level)}
-            <button onclick={() => program(() => api.setIntensity(level / 100))}>
-              {level === 100 ? "Full" : level === 0 ? "Out" : `${level}%`}
-            </button>
-          {/each}
-        </div>
-      </div>
-    {:else if tab === "colour"}
-      <div class="colour">
-        <ColourPicker colour={current.colour} onchange={(c) => program(() => api.setColour(c))} />
-        <div class="swatches">
-          {#each swatches as s (s.name)}
-            <button class="swatch" onclick={() => program(() => api.setColour(s.colour))}>
-              <span class="chip" style:background={rgbCss(s.colour)}></span>
-              {s.name}
-            </button>
-          {/each}
-        </div>
-      </div>
-    {:else if tab === "position"}
-      <div class="position">
-        <PositionPad
-          pan={current.pan}
-          tilt={current.tilt}
-          {fine}
-          onchange={(pan, tilt) => program(() => api.setPosition(pan, tilt))}
-        />
-        <div class="levels">
-          <button aria-pressed={fine} class:on={fine} onclick={() => (fine = !fine)}>Fine</button>
-          <button onclick={() => program(() => api.setPosition(0.5, 0.5))}>Centre</button>
-          <button onclick={() => program(() => api.setPosition(0.5, null))}>Centre pan</button>
-          <button onclick={() => program(() => api.setPosition(null, 0.5))}>Centre tilt</button>
-        </div>
-      </div>
-    {:else}
-      <div class="beam scroll-x">
-        {#each beamChannels as { attribute, channel } (attribute)}
-          {@const set = current.other?.[attribute]}
-          <!-- Unset channels show the level they are resting at. -->
-          {@const value = set == null ? channel.default : Math.round(set * 255)}
-          <Fader
-            {value}
-            label={attributeName(attribute)}
-            sublabel={set == null ? "Not set" : undefined}
-            detail={capabilityAt(channel.capabilities, value)}
-            active={set != null}
-            onchange={(v) => program(() => api.setAttribute(attribute, v / 255))}
-          />
-        {:else}
-          <p class="muted">The selected fixtures have no beam controls.</p>
+  {:else if id === "colour"}
+    <div class="colour">
+      <ColourPicker colour={current.colour} onchange={(c) => program(() => api.setColour(c))} />
+      <div class="swatches">
+        {#each SWATCHES as s (s.name)}
+          <button
+            class="swatch"
+            title={s.name}
+            aria-label={s.name}
+            style:background={rgbCss(s.colour)}
+            onclick={() => program(() => api.setColour(s.colour))}
+          ></button>
         {/each}
       </div>
-    {/if}
-  </section>
-
-  <!-- Presets -->
-  <section class="panel presets scroll">
-    <div class="row">
-      <h2>{tabs.find((t) => t.id === tab)?.label} presets</h2>
-      <span class="spacer"></span>
     </div>
-    <div class="row">
-      <button
-        class="record"
-        aria-pressed={recording}
-        class:on={recording}
-        onclick={() => {
-          recording = !recording;
-          deleting = false;
-        }}
-      >
-        ● Record
-      </button>
-      <button
-        aria-pressed={deleting}
-        class:warn={deleting}
-        onclick={() => {
-          deleting = !deleting;
-          recording = false;
-        }}
-      >
-        Delete
-      </button>
+  {:else if id === "position"}
+    <div class="position">
+      <PositionPad
+        pan={current.pan}
+        tilt={current.tilt}
+        {fine}
+        onchange={(pan, tilt) => program(() => api.setPosition(pan, tilt))}
+      />
+      <div class="pos-buttons">
+        <button aria-pressed={fine} class:on={fine} onclick={() => (fine = !fine)}>Fine</button>
+        <button onclick={() => program(() => api.setPosition(0.5, 0.5))}>Centre</button>
+        <button onclick={() => program(() => api.setPosition(0.5, null))}>Centre pan</button>
+        <button onclick={() => program(() => api.setPosition(null, 0.5))}>Centre tilt</button>
+      </div>
     </div>
-    <p class="muted hint">
-      {#if recording}Tap a slot to store the {tab} of the selected fixtures.
-      {:else if deleting}Tap a preset to delete it.
-      {:else}Tap a preset to apply it to the selection.{/if}
-    </p>
-    <div class="slots">
-      {#each presets as p (p.id)}
-        {@const sample = presetSample(p)}
-        <button
-          class="slot"
-          class:deleting
-          class:recording
-          disabled={!recording && !deleting && selection.length === 0}
-          onclick={() => tapPreset(p, p.id)}
-        >
-          {#if p.family === "colour"}
-            <span class="chip big" style:background={rgbCss(sample.colour, "var(--line)")}></span>
-          {:else if p.family === "intensity"}
-            <span class="bar"><span style:width="{(sample.intensity ?? 0) * 100}%"></span></span>
-          {:else if p.family === "position"}
-            <span class="mini-pad"
-              ><span style:left="{(sample.pan ?? 0.5) * 100}%" style:top="{(1 - (sample.tilt ?? 0.5)) * 100}%"></span></span
-            >
-          {/if}
-          <span class="slot-name">{p.name}</span>
-          <span class="slot-id muted">{p.id}</span>
-        </button>
+  {:else if id === "beam"}
+    <div class="beam">
+      {#each beamChannels as { attribute, channel } (attribute)}
+        {@const set = current.other?.[attribute]}
+        <!-- Unset channels show the level they are resting at. -->
+        {@const value = set == null ? channel.default : Math.round(set * 255)}
+        <Fader
+          {value}
+          label={attributeName(attribute)}
+          sublabel={set == null ? "Not set" : undefined}
+          detail={capabilityAt(channel.capabilities, value)}
+          active={set != null}
+          onchange={(v) => program(() => api.setAttribute(attribute, v / 255))}
+        />
+      {:else}
+        <p class="muted">The selected fixtures have no beam controls.</p>
       {/each}
-      {#if recording}
-        <button class="slot empty-slot" onclick={() => tapPreset(null, nextSlot)}>+ New</button>
-      {/if}
     </div>
-    {#if presets.length === 0 && !recording}
-      <p class="muted">No {tab} presets yet. Set some values, tap <strong>Record</strong>, then tap a slot.</p>
-    {/if}
-  </section>
-</div>
+  {/if}
+{/snippet}
 
-{#if naming}
-  <Dialog title={naming.kind === "group" ? "Save group" : "Record preset"} onclose={() => (naming = null)}>
+{#if namingGroup}
+  <Dialog title="Save group" onclose={() => (namingGroup = false)}>
     <label class="field">
       Name
-      <!-- svelte-ignore a11y_autofocus -->
-      <input bind:value={name} autofocus onkeydown={(e) => e.key === "Enter" && saveName()} />
+      <input bind:value={groupName} />
     </label>
-    {#if naming.kind === "group"}
-      <p class="muted">Saves the {selection.length} selected fixtures, in the order you picked them.</p>
-    {/if}
+    <p class="muted">Saves the {selection.length} selected fixtures, in the order you picked them.</p>
     {#snippet actions()}
-      <button onclick={() => (naming = null)}>Cancel</button>
-      <button class="primary" onclick={saveName}>Save</button>
+      <button onclick={() => (namingGroup = false)}>Cancel</button>
+      <button class="primary" onclick={saveGroup}>Save</button>
     {/snippet}
   </Dialog>
 {/if}
@@ -389,45 +300,29 @@
   .programmer {
     height: 100%;
     display: grid;
-    grid-template-columns: 480px 1fr 440px;
     grid-template-rows: auto 1fr;
     gap: var(--gap);
-  }
-
-  header {
-    grid-column: 1 / -1;
-  }
-
-  .panel {
-    padding: 20px;
     min-height: 0;
   }
 
-  .select,
-  .presets {
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-  }
-
   .hint {
-    margin: 0;
+    margin: 0 0 10px;
     font-size: 0.85rem;
   }
 
   .tiles {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
     gap: 8px;
   }
 
   .tile {
     display: grid;
-    grid-template-columns: 40px 1fr auto;
+    grid-template-columns: 36px 1fr auto;
     align-items: center;
     gap: 6px;
     padding: 0 12px;
-    min-height: 68px;
+    min-height: 64px;
     text-align: left;
   }
 
@@ -454,17 +349,11 @@
     background: var(--accent);
   }
 
-  .groups {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
-  }
-
   .group {
     display: grid;
     text-align: left;
     padding: 10px 14px;
-    min-height: 68px;
+    min-height: 64px;
     align-content: center;
   }
 
@@ -487,34 +376,18 @@
     color: var(--danger);
   }
 
-  .controls {
-    display: grid;
-    grid-template-rows: auto 1fr;
-    gap: 20px;
+  .on {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 15%, var(--panel-raised));
   }
 
-  .tabs button {
-    min-width: 150px;
-    font-size: 1.05rem;
-  }
-
-  .empty {
-    display: grid;
-    place-items: center;
-    font-size: 1.1rem;
-  }
-
-  .intensity,
-  .position {
+  /* Controls size themselves to their window (the window body is a size container). */
+  .intensity {
     display: flex;
-    gap: 40px;
-    min-height: 0;
+    gap: 12px;
+    height: 100cqh;
     justify-content: center;
-    align-items: stretch;
-  }
-
-  .position {
-    align-items: flex-start;
   }
 
   .intensity :global(.fader) {
@@ -524,158 +397,68 @@
   .levels {
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    width: 200px;
+    gap: 8px;
+    flex: 0 1 110px;
+    min-width: 72px;
   }
 
   .levels button {
-    min-height: 72px;
-    font-size: 1.1rem;
+    flex: 1;
+    min-height: 44px;
+    max-height: 80px;
+    padding: 0 6px;
   }
 
-  .on {
-    border-color: var(--accent);
-    color: var(--accent);
-    background: color-mix(in srgb, var(--accent) 15%, var(--panel-raised));
+  .colour,
+  .position {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
   }
 
-  .colour {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 260px;
-    gap: 32px;
-    align-items: start;
-    justify-items: center;
-    min-height: 0;
+  .colour :global(.disc) {
+    width: min(100cqw, 100cqh - 120px);
+    flex-shrink: 0;
   }
 
-  /* Keep the disc and pad square and inside the panel on any screen height. */
-  .colour :global(.disc),
   .position :global(.pad) {
-    width: min(640px, calc(100vh - 300px), 100%);
+    width: min(100cqw, 100cqh - 124px);
     flex-shrink: 0;
   }
 
   .swatches {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 6px;
     width: 100%;
   }
 
   .swatch {
-    display: flex;
-    gap: 10px;
-    align-items: center;
-    padding: 0 12px;
-    min-height: 64px;
-  }
-
-  .chip {
-    width: 28px;
-    height: 28px;
-    border-radius: 8px;
-    flex-shrink: 0;
+    min-height: 48px;
+    padding: 0;
     box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.15);
   }
 
-  .chip.big {
+  .pos-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
     width: 100%;
-    height: 44px;
+  }
+
+  .pos-buttons button {
+    min-height: 52px;
+    padding: 0 6px;
   }
 
   .beam {
     display: flex;
     gap: 12px;
-    min-height: 0;
-    overflow-x: auto;
+    height: 100cqh;
   }
 
-  .record.on {
-    border-color: var(--danger);
-    color: #fff;
-    background: var(--danger);
-  }
-
-  .slots {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
-  }
-
-  .slot {
-    position: relative;
-    display: grid;
-    gap: 8px;
-    align-content: end;
-    padding: 12px;
-    min-height: 110px;
-    text-align: left;
-  }
-
-  .slot.recording {
-    border-color: color-mix(in srgb, var(--danger) 60%, transparent);
-  }
-
-  .slot-name {
-    font-weight: 600;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .slot-id {
-    position: absolute;
-    top: 8px;
-    right: 10px;
-    font-size: 0.75rem;
-  }
-
-  .empty-slot {
-    border-style: dashed;
-    color: var(--muted);
-    align-content: center;
-    text-align: center;
-  }
-
-  .bar {
-    height: 14px;
-    border-radius: 7px;
-    background: var(--bg);
-    overflow: hidden;
-  }
-
-  .bar span {
-    display: block;
-    height: 100%;
-    background: var(--accent);
-  }
-
-  .mini-pad {
-    position: relative;
-    height: 44px;
-    border-radius: 8px;
-    background: var(--bg);
-  }
-
-  .mini-pad span {
-    position: absolute;
-    width: 12px;
-    height: 12px;
-    margin: -6px 0 0 -6px;
-    border-radius: 50%;
-    background: var(--accent);
-  }
-
-  /* Narrower side columns when the window is smaller than the studio screen. */
-  @media (max-width: 2000px) {
-    .programmer {
-      grid-template-columns: 360px 1fr 340px;
-    }
-    .tabs button {
-      min-width: 110px;
-    }
-    .slots {
-      grid-template-columns: repeat(2, 1fr);
-    }
+  .beam :global(.fader) {
+    flex-shrink: 0;
   }
 </style>

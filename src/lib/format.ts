@@ -103,3 +103,19 @@ export function rgbCss(c: { r: number; g: number; b: number } | undefined, fallb
   const byte = (x: number) => Math.round(Math.max(0, Math.min(1, x)) * 255);
   return `rgb(${byte(c.r)} ${byte(c.g)} ${byte(c.b)})`;
 }
+
+/** Quick colours for the colour picker, also used to name colour presets. */
+export const SWATCHES: { name: string; colour: { r: number; g: number; b: number } }[] = [
+  { name: "Red", colour: { r: 1, g: 0, b: 0 } },
+  { name: "Orange", colour: { r: 1, g: 0.45, b: 0 } },
+  { name: "Amber", colour: { r: 1, g: 0.7, b: 0.1 } },
+  { name: "Yellow", colour: { r: 1, g: 1, b: 0 } },
+  { name: "Green", colour: { r: 0, g: 1, b: 0 } },
+  { name: "Cyan", colour: { r: 0, g: 1, b: 1 } },
+  { name: "Blue", colour: { r: 0, g: 0, b: 1 } },
+  { name: "Lavender", colour: { r: 0.6, g: 0.45, b: 1 } },
+  { name: "Magenta", colour: { r: 1, g: 0, b: 1 } },
+  { name: "Pink", colour: { r: 1, g: 0.4, b: 0.7 } },
+  { name: "Warm", colour: { r: 1, g: 0.85, b: 0.6 } },
+  { name: "White", colour: { r: 1, g: 1, b: 1 } },
+];
