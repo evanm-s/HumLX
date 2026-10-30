@@ -95,6 +95,7 @@ impl App {
             cue_lists: state.cue_lists.clone(),
             effects: state.effects.clone(),
             osc: state.osc_settings.clone(),
+            highlight_colour: state.highlight_colour,
             profiles,
             ..Show::default()
         }
@@ -130,6 +131,7 @@ fn apply_show(state: &mut State, show: Show) {
     state.cue_lists = show.cue_lists;
     state.effects = show.effects;
     state.osc_settings = show.osc;
+    state.highlight_colour = show.highlight_colour;
     state.programmer = Default::default();
     state.playbacks.release_all();
     state.running_effects.stop_all();
@@ -181,6 +183,8 @@ pub fn run() {
             commands::set_output,
             commands::set_blackout,
             commands::set_highlight,
+            commands::highlight_colour,
+            commands::set_highlight_colour,
             commands::discover_nodes,
             commands::programmer,
             commands::select,

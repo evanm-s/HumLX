@@ -60,6 +60,8 @@ export const api = {
   setOutput: (settings: OutputSettings) => invoke<OutputSettings>("set_output", { settings }),
   setBlackout: (on: boolean) => invoke<void>("set_blackout", { on }),
   setHighlight: (on: boolean) => invoke<void>("set_highlight", { on }),
+  highlightColour: () => invoke<Rgb>("highlight_colour"),
+  setHighlightColour: (colour: Rgb) => invoke<Rgb>("set_highlight_colour", { colour }),
   discoverNodes: () => invoke<Node[]>("discover_nodes"),
 
   programmer: () => invoke<ProgrammerView>("programmer"),

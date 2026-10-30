@@ -10,7 +10,7 @@ use crate::fixture::Profile;
 use crate::osc::OscSettings;
 use crate::patch::Patch;
 use crate::playback::{CueList, Effect};
-use crate::programmer::{Group, Preset};
+use crate::programmer::{Group, Preset, Rgb};
 
 const FORMAT_VERSION: u32 = 1;
 
@@ -32,6 +32,9 @@ pub struct Show {
     pub effects: Vec<Effect>,
     #[serde(default)]
     pub osc: OscSettings,
+    /// Colour that Highlight turns the selected fixtures.
+    #[serde(default)]
+    pub highlight_colour: Rgb,
     /// Fixture types the patch uses that aren't built in, so a show file
     /// opens on another computer.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -49,6 +52,7 @@ impl Default for Show {
             cue_lists: Vec::new(),
             effects: Vec::new(),
             osc: OscSettings::default(),
+            highlight_colour: Rgb::WHITE,
             profiles: Vec::new(),
         }
     }

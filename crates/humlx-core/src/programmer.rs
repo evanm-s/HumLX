@@ -21,10 +21,17 @@ pub struct Rgb {
     pub b: f32,
 }
 
+impl Default for Rgb {
+    fn default() -> Self {
+        Self::WHITE
+    }
+}
+
 impl Rgb {
     pub const WHITE: Rgb = Rgb { r: 1.0, g: 1.0, b: 1.0 };
 
-    fn clamped(self) -> Self {
+    /// Keeps each component within 0 to 1.
+    pub fn clamped(self) -> Self {
         Self {
             r: self.r.clamp(0.0, 1.0),
             g: self.g.clamp(0.0, 1.0),
