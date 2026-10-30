@@ -278,7 +278,7 @@ const commands: Record<string, (args: Args) => unknown> = {
     blackout,
     highlight,
     tested: [...tests.keys()].sort((a, b) => a - b),
-    playbacks: [...running].map(([list, current]) => ({ list, current, fading: false })),
+    playbacks: [...running].map(([list, current]) => ({ list, current, fading: false, followIn: null })),
     runningEffects: [...effectsOn],
     masters: cueLists.map((l) => [l.id, masters.get(l.id) ?? 1]),
     osc: { listening: osc.enabled, error: null, received: 0, last: null },
@@ -379,7 +379,7 @@ const commands: Record<string, (args: Args) => unknown> = {
     const list = "list" in target ? target.list : addCueList(target.new);
     const l = cueLists.find((x) => x.id === list)!;
     const index = after == null ? l.cues.length : Math.min(after + 1, l.cues.length);
-    l.cues.splice(index, 0, { name: name.trim() || `Cue ${index + 1}`, fade, values: structuredClone(values) });
+    l.cues.splice(index, 0, { name: name.trim() || `Cue ${index + 1}`, fade, mode: "hold", follow: 0, values: structuredClone(values) });
     values = {};
     running.set(list, index);
     return playback();
@@ -390,10 +390,12 @@ const commands: Record<string, (args: Args) => unknown> = {
     values = {};
     return playback();
   },
-  edit_cue: ({ list, index, name, fade }) => {
+  edit_cue: ({ list, index, name, fade, mode, follow }) => {
     const cue = cueLists.find((x) => x.id === list)!.cues[index];
     if (name != null) cue.name = name;
     if (fade != null) cue.fade = fade;
+    if (mode != null) cue.mode = mode;
+    if (follow != null) cue.follow = follow;
     return playback();
   },
   delete_cue: ({ list, index }) => (cueLists.find((x) => x.id === list)!.cues.splice(index, 1), playback()),

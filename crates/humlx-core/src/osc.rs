@@ -428,6 +428,8 @@ mod tests {
         let cue = |name: &str| Cue {
             name: name.into(),
             fade: 0.0,
+            mode: Default::default(),
+            follow: 0.0,
             values: [(1, Values::default())].into(),
         };
         state.cue_lists.push(CueList {

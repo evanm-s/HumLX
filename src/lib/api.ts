@@ -2,6 +2,7 @@
 
 import { invoke as tauriInvoke } from "@tauri-apps/api/core";
 import type {
+  CueMode,
   FixtureChanges,
   FixtureUpdate,
   Live,
@@ -97,8 +98,14 @@ export const api = {
   recordCue: (target: RecordTarget, name: string, fade: number, after: number | null) =>
     invoke<PlaybackView>("record_cue", { target, name, fade, after }),
   updateCue: (list: number, index: number) => invoke<PlaybackView>("update_cue", { list, index }),
-  editCue: (list: number, index: number, name: string | null, fade: number | null) =>
-    invoke<PlaybackView>("edit_cue", { list, index, name, fade }),
+  editCue: (
+    list: number,
+    index: number,
+    name: string | null,
+    fade: number | null,
+    mode: CueMode | null = null,
+    follow: number | null = null,
+  ) => invoke<PlaybackView>("edit_cue", { list, index, name, fade, mode, follow }),
   deleteCue: (list: number, index: number) => invoke<PlaybackView>("delete_cue", { list, index }),
   go: (list: number) => invoke<PlaybackView>("go", { list }),
   back: (list: number) => invoke<PlaybackView>("back", { list }),
