@@ -1,6 +1,7 @@
 <script lang="ts">
   // Cue lists: record the programmer as cues, run them with GO, and mix them
-  // on playback faders. Effects run alongside on the fixtures they were made for.
+  // on playback faders. Effects are made in the Programmer's Intensity, Colour
+  // and Position windows.
 
   import Dialog from "../components/Dialog.svelte";
   import Fader from "../components/Fader.svelte";
@@ -9,7 +10,6 @@
   import { api } from "../lib/api";
   import { show } from "../lib/show.svelte";
   import { RECORD_EVENT, surface } from "../lib/surface.svelte";
-  import type { Effect, EffectKind, EffectSettings, Wave } from "../lib/types";
 
   const play = show.play.bind(show);
 
@@ -35,7 +35,7 @@
   const programmed = $derived(Object.keys(show.programmer.values).length);
 
   // Dialogs
-  let dialog = $state<null | "record" | "edit" | "list" | "effect">(null);
+  let dialog = $state<null | "record" | "edit" | "list">(null);
   let draftName = $state("");
   let draftFade = $state<number | null>(2);
   let confirmDelete = $state(false);
@@ -95,36 +95,6 @@
     }
     await play(() => api.deleteCue(list.id, cueIndex!));
     confirmDelete = false;
-  }
-
-  // Effects
-  const kinds: { id: EffectKind; label: string; hint: string }[] = [
-    { id: "dimmer", label: "Dimmer", hint: "Intensity rises and falls" },
-    { id: "rainbow", label: "Rainbow", hint: "Colour cycles round the wheel" },
-    { id: "circle", label: "Circle", hint: "Moving heads trace a circle" },
-  ];
-  const waves: Wave[] = ["sine", "square", "saw"];
-  let editingEffect = $state<number | null>(null);
-  let draft = $state<EffectSettings>({ name: "", kind: "dimmer", wave: "sine", rate: 1, size: 1, spread: 1 });
-
-  function openEffect(existing?: Effect) {
-    editingEffect = existing?.id ?? null;
-    draft = existing
-      ? { name: existing.name, kind: existing.kind, wave: existing.wave, rate: existing.rate, size: existing.size, spread: existing.spread }
-      : { name: "", kind: "dimmer", wave: "sine", rate: 1, size: 1, spread: 1 };
-    dialog = "effect";
-  }
-
-  async function saveEffect() {
-    const name = draft.name.trim() || kinds.find((k) => k.id === draft.kind)!.label;
-    const ok = await play(() => api.saveEffect({ ...draft, name }, editingEffect));
-    if (ok) dialog = null;
-  }
-
-  async function deleteEffect() {
-    if (editingEffect == null) return;
-    const ok = await play(() => api.deleteEffect(editingEffect!));
-    if (ok) dialog = null;
   }
 </script>
 
@@ -204,31 +174,6 @@
     {/if}
   </section>
 
-  <!-- Effects -->
-  <section class="panel effects scroll">
-    <div class="row">
-      <h2>Effects</h2>
-      <span class="spacer"></span>
-      <button disabled={show.programmer.selection.length === 0} onclick={() => openEffect()}>+ New effect</button>
-    </div>
-    {#if show.playback.effects.length === 0}
-      <p class="muted">Select fixtures in the Programmer, then tap <strong>New effect</strong> to make a chase, rainbow or circle.</p>
-    {/if}
-    {#each show.playback.effects as e (e.id)}
-      {@const on = show.live.runningEffects.includes(e.id)}
-      <div class="effect" class:on>
-        <button class="toggle" aria-pressed={on} onclick={() => play(() => api.setEffectRunning(e.id, !on))}>
-          {on ? "On" : "Off"}
-        </button>
-        <div class="effect-text">
-          <strong>{e.name}</strong>
-          <span class="muted">{kinds.find((k) => k.id === e.kind)?.label} · {e.fixtures.length} fixtures · {e.rate} per second</span>
-        </div>
-        <button onclick={() => openEffect(e)}>Edit</button>
-      </div>
-    {/each}
-  </section>
-
   <!-- Playback faders -->
   <section class="panel strips scroll-x">
     {#each show.playback.cueLists as l (l.id)}
@@ -284,62 +229,13 @@
       <button class="primary" onclick={newList}>Create</button>
     {/snippet}
   </Dialog>
-{:else if dialog === "effect"}
-  <Dialog title={editingEffect == null ? "New effect" : "Edit effect"} onclose={() => (dialog = null)}>
-    <div class="segmented">
-      {#each kinds as k (k.id)}
-        <button aria-pressed={draft.kind === k.id} onclick={() => (draft.kind = k.id)}>{k.label}</button>
-      {/each}
-    </div>
-    <p class="muted">{kinds.find((k) => k.id === draft.kind)?.hint}</p>
-    {#if draft.kind === "dimmer"}
-      <div class="field">
-        Shape
-        <div class="segmented">
-          {#each waves as w (w)}
-            <button aria-pressed={draft.wave === w} onclick={() => (draft.wave = w)}>
-              {w.charAt(0).toUpperCase() + w.slice(1)}
-            </button>
-          {/each}
-        </div>
-      </div>
-    {/if}
-    <label class="field">
-      Speed: {draft.rate.toFixed(2)} per second
-      <input type="range" min="0.05" max="4" step="0.05" bind:value={draft.rate} />
-    </label>
-    {#if draft.kind !== "rainbow"}
-      <label class="field">
-        Size: {Math.round(draft.size * 100)}%
-        <input type="range" min="0" max="1" step="0.01" bind:value={draft.size} />
-      </label>
-    {/if}
-    <label class="field">
-      Spread: {Math.round(draft.spread * 100)}% {draft.spread === 0 ? "(all together)" : ""}
-      <input type="range" min="0" max="1" step="0.01" bind:value={draft.spread} />
-    </label>
-    <label class="field">
-      Name
-      <input bind:value={draft.name} placeholder={kinds.find((k) => k.id === draft.kind)?.label} />
-    </label>
-    {#if editingEffect == null}
-      <p class="muted">Runs on the {show.programmer.selection.length} selected fixtures, in the order you picked them.</p>
-    {/if}
-    {#snippet actions()}
-      {#if editingEffect != null}<button class="danger" onclick={deleteEffect}>Delete</button>{/if}
-      <span class="spacer"></span>
-      <button onclick={() => (dialog = null)}>Cancel</button>
-      <button class="primary" onclick={saveEffect}>{editingEffect == null ? "Create and run" : "Save"}</button>
-    {/snippet}
-  </Dialog>
 {/if}
 
 <style>
   .playback {
     height: 100%;
     display: grid;
-    grid-template-columns: 1fr 440px;
-    grid-template-rows: auto minmax(0, 1fr) 400px;
+        grid-template-rows: auto minmax(0, 1fr) 400px;
     gap: var(--gap);
   }
 
@@ -431,48 +327,6 @@
     margin-right: 4px;
   }
 
-  .effects {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .effects p {
-    margin: 0;
-  }
-
-  .effect {
-    display: grid;
-    grid-template-columns: 96px 1fr auto;
-    gap: 14px;
-    align-items: center;
-    padding: 10px;
-    border-radius: var(--radius);
-    border: 1px solid var(--line);
-    flex-shrink: 0;
-  }
-
-  .effect.on {
-    border-color: var(--accent);
-  }
-
-  .toggle[aria-pressed="true"] {
-    background: var(--accent);
-    border-color: var(--accent);
-    color: var(--accent-text);
-    font-weight: 700;
-  }
-
-  .effect-text {
-    display: grid;
-    gap: 2px;
-    min-width: 0;
-  }
-
-  .effect-text span {
-    font-size: 0.85rem;
-  }
-
   .strips {
     grid-column: 1 / -1;
     display: flex;
@@ -531,7 +385,6 @@
 
   @media (max-width: 2000px) {
     .playback {
-      grid-template-columns: 1fr 400px;
       grid-template-rows: auto minmax(0, 1fr) 380px;
     }
   }

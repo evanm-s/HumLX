@@ -1,9 +1,11 @@
 <script lang="ts">
-  // Select fixtures, set their intensity, colour, position and beam, and
-  // record or recall presets. The main screen for operating the rig, laid out
+  // Select fixtures, set their intensity, colour, position and beam, add
+  // effects to them, and record or recall presets. The main screen for operating the rig, laid out
   // as windows that can be moved, resized and hidden.
 
   import { onDestroy } from "svelte";
+  import EffectList from "../components/programmer/EffectList.svelte";
+  import { EFFECT_WINDOWS } from "../components/programmer/effects";
   import ColourPicker from "../components/ColourPicker.svelte";
   import Dialog from "../components/Dialog.svelte";
   import Fader from "../components/Fader.svelte";
@@ -129,6 +131,14 @@
   const POSITION_STEPS = 1000;
   const positionPercent = (v: number) => `${(v / 10).toFixed(1)}%`;
   let recordingCue = $state(false);
+
+  // --- Effects -------------------------------------------------------------
+
+  // The Intensity, Colour and Position windows can swap their controls for
+  // the effects of their kind.
+  let effectsShown = $state<Record<string, boolean>>({});
+  const runningOfKind = (id: string) =>
+    show.playback.effects.filter((e) => e.kind === EFFECT_WINDOWS[id] && show.live.runningEffects.includes(e.id)).length;
 
   const BEAM: Attribute[] = [
     "shutter",
@@ -356,7 +366,19 @@
       {editingGroups ? "Done" : "Edit"}
     </button>
   {:else if families[id]}
-    {#if id === "colour"}
+    {#if EFFECT_WINDOWS[id]}
+      {@const running = runningOfKind(id)}
+      <button
+        class="small"
+        class:on={effectsShown[id]}
+        aria-pressed={effectsShown[id] ?? false}
+        title="Effects on {id}"
+        onclick={() => (effectsShown[id] = !effectsShown[id])}
+      >
+        FX{running > 0 ? ` ${running}` : ""}
+      </button>
+    {/if}
+    {#if id === "colour" && !effectsShown.colour}
       <button class="small" onclick={() => setColourFaders(!colourFaders)}>
         {colourFaders ? "Picker" : "Faders"}
       </button>
@@ -416,6 +438,8 @@
     <ProgrammerSheet />
   {:else if id.startsWith("presets-")}
     <PresetPool family={presetFamily(id)} />
+  {:else if EFFECT_WINDOWS[id] && effectsShown[id]}
+    <EffectList kind={EFFECT_WINDOWS[id]} />
   {:else if selection.length === 0}
     {@render noSelection()}
   {:else if id === "intensity"}
