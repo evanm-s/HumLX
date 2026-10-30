@@ -1,11 +1,13 @@
 <script lang="ts">
-  // A pool of presets for one family. Tap to apply; Record then tap a slot to
-  // store; Delete then tap to remove.
+  // A pool of presets for one family. Tap to apply. Record (on the control
+  // surface, or R) then tap a slot to store; Delete then tap a preset and
+  // Enter to remove it.
 
   import Dialog from "../Dialog.svelte";
   import { api } from "../../lib/api";
   import { rgbCss, SWATCHES } from "../../lib/format";
   import { show } from "../../lib/show.svelte";
+  import { surface } from "../../lib/surface.svelte";
   import type { Family, Preset } from "../../lib/types";
 
   interface Props {
@@ -18,8 +20,8 @@
   const presets = $derived(show.programmer.presets.filter((p) => p.family === family));
   const selection = $derived(show.programmer.selection);
 
-  let recording = $state(false);
-  let deleting = $state(false);
+  const recording = $derived(surface.mode === "record");
+  const deleting = $derived(surface.mode === "delete");
   let naming = $state<number | null>(null);
   let name = $state("");
 
@@ -49,8 +51,8 @@
   }
 
   function tap(preset: Preset | null, slot: number) {
-    if (deleting && preset) {
-      program(() => api.deletePreset(preset.id));
+    if (deleting) {
+      if (preset) surface.pendingDelete = surface.pendingDelete === preset.id ? null : preset.id;
     } else if (recording || !preset) {
       name = preset?.name ?? defaultName();
       naming = slot;
@@ -65,31 +67,26 @@
     const ok = await program(() => api.recordPreset(family, name.trim() || defaultName(), slot));
     if (ok) {
       naming = null;
-      recording = false;
+      surface.setMode(null);
     }
   }
 </script>
 
 <div class="pool">
-  <div class="modes">
-    <button
-      class="record"
-      class:on={recording}
-      aria-pressed={recording}
-      onclick={() => ((recording = !recording), (deleting = false))}>● Rec</button
-    >
-    <button class:warn={deleting} aria-pressed={deleting} onclick={() => ((deleting = !deleting), (recording = false))}
-      >Delete</button
-    >
-  </div>
-  {#if recording}<p class="hint">Tap a slot to store the {family} of the selection.</p>
-  {:else if deleting}<p class="hint">Tap a preset to delete it.</p>{/if}
+  {#if recording}<p class="hint rec">Tap a slot to store the {family} of the selection.</p>
+  {:else if deleting && presets.length > 0}
+    {@const doomed = presets.find((p) => p.id === surface.pendingDelete)}
+    <p class="hint del">
+      {#if doomed}Press <strong>Enter</strong> to delete {doomed.name}.{:else}Tap a preset to delete.{/if}
+    </p>
+  {/if}
   <div class="slots">
     {#each presets as p (p.id)}
       {@const s = sample(p)}
       <button
         class="slot"
         class:deleting
+        class:doomed={deleting && surface.pendingDelete === p.id}
         class:recording
         disabled={!recording && !deleting && selection.length === 0}
         onclick={() => tap(p, p.id)}
@@ -111,7 +108,7 @@
     {/if}
   </div>
   {#if presets.length === 0 && !recording}
-    <p class="hint">None yet. Set some {family}, tap <strong>Rec</strong>, then <strong>+ New</strong>.</p>
+    <p class="hint">None yet. Set some {family}, press <strong>Record</strong> (R), then tap <strong>+ New</strong>.</p>
   {/if}
 </div>
 
@@ -135,33 +132,15 @@
     gap: 10px;
   }
 
-  .modes {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 6px;
-  }
-
-  .modes button {
-    padding: 0 6px;
-    min-height: 40px;
-    font-size: 0.9rem;
-  }
-
-  .record.on {
-    border-color: var(--danger);
-    color: #fff;
-    background: var(--danger);
-  }
-
-  .warn {
-    border-color: var(--danger);
-    color: var(--danger);
-  }
-
   .hint {
     margin: 0;
     font-size: 0.8rem;
     color: var(--muted);
+  }
+
+  .hint.rec,
+  .hint.del {
+    color: var(--danger);
   }
 
   .slots {
@@ -184,7 +163,12 @@
   }
 
   .slot.deleting {
+    border-color: color-mix(in srgb, var(--danger) 45%, transparent);
+  }
+
+  .slot.doomed {
     border-color: var(--danger);
+    background: color-mix(in srgb, var(--danger) 25%, var(--panel-raised));
   }
 
   .slot-name {

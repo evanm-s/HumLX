@@ -17,7 +17,7 @@
   import { loadLayout, saveLayout, type Grid, type Layout } from "../lib/layout";
   import { endSelectWindow, restartSelectWindow, tapMode } from "../lib/selection";
   import { attempt, show } from "../lib/show.svelte";
-  import { RECORD_EVENT } from "../lib/surface.svelte";
+  import { RECORD_EVENT, surface } from "../lib/surface.svelte";
   import type { Attribute, Channel, Family } from "../lib/types";
 
   const selection = $derived(show.programmer.selection);
@@ -175,20 +175,32 @@
     return attempt(() => api.setHighlight(on));
   }
 
-  // H toggles highlight, unless typing or a dialog is open.
+  // Keys, unless typing or a dialog is open: H toggles highlight, and R and
+  // Delete work like the control surface's Record and Delete for presets.
   function keys(e: KeyboardEvent) {
-    if (e.key.toLowerCase() !== "h" || e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+    if (e.ctrlKey || e.metaKey || e.altKey || e.repeat || e.defaultPrevented) return;
     if (namingGroup || recordingCue) return;
     const target = e.target as HTMLElement;
     if (target.closest("input, textarea, select, [role=dialog]")) return;
+    const key = e.key.toLowerCase();
+    if (key === "h") setHighlight(!highlight);
+    else if (key === "r") surface.press("record");
+    else if (key === "delete") surface.press("delete");
+    else if (key === "enter" && surface.mode) surface.confirm();
+    else if (key === "escape" && surface.mode) surface.setMode(null);
+    else return;
     e.preventDefault();
-    setHighlight(!highlight);
   }
 
-  // Record on the control surface opens the same dialog as the Record button.
+  // Record (on the control surface, or R) arms record mode so a preset slot
+  // can be tapped; pressed again, or followed by Enter, it records a cue like
+  // the Record cue button.
   $effect(() => {
-    const record = () => {
-      if (!namingGroup && Object.keys(show.programmer.values).length > 0) recordingCue = true;
+    const record = (e: Event) => {
+      if (namingGroup || recordingCue) return;
+      if (!(e as CustomEvent<{ cue?: boolean }>).detail?.cue) return surface.setMode("record");
+      surface.setMode(null);
+      if (Object.keys(show.programmer.values).length > 0) recordingCue = true;
     };
     window.addEventListener(RECORD_EVENT, record);
     return () => window.removeEventListener(RECORD_EVENT, record);
@@ -196,6 +208,7 @@
 
   // Leaving it on would keep the rest of the rig dark from other screens.
   onDestroy(() => {
+    surface.setMode(null);
     if (show.live.highlight) setHighlight(false);
   });
 
@@ -210,6 +223,11 @@
     <span class="muted">
       {selection.length === 0 ? "Nothing selected" : `${selection.length} selected`}
     </span>
+    {#if surface.mode === "record"}
+      <span class="mode">Record: tap a preset slot, or Enter to record a cue. Esc cancels.</span>
+    {:else if surface.mode === "delete"}
+      <span class="mode">Delete: tap a preset, then Enter. Esc cancels.</span>
+    {/if}
     <span class="spacer"></span>
     {#if editing}
       <span class="muted">Drag title bars to move, corners to resize.</span>
@@ -428,6 +446,15 @@
     background: var(--accent);
     border-color: var(--accent);
     color: #fff;
+  }
+
+  .mode {
+    padding: 4px 12px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--danger) 18%, var(--panel));
+    border: 1px solid var(--danger);
+    color: var(--danger);
+    font-size: 0.85rem;
   }
 
   .hint {
