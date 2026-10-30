@@ -249,3 +249,6 @@ export interface SurfaceStatus {
   /** Why it can't be used, when it is plugged in but not working. */
   problem: string | null;
 }
+
+/** How an NX-K key LED is lit. */
+export type Led = "off" | "on" | "blink";

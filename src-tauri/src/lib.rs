@@ -212,6 +212,7 @@ pub fn run() {
             shows::open_show,
             shows::new_show,
             surface::surface_status,
+            surface::set_surface_leds,
             playback::update_cue,
             playback::edit_cue,
             playback::delete_cue,

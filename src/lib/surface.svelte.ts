@@ -6,7 +6,7 @@ import { listen } from "@tauri-apps/api/event";
 import { api, inApp } from "./api";
 import { backspace, parse, typeDigit, type Token } from "./command";
 import { attempt, notify, show } from "./show.svelte";
-import type { Attribute, SurfaceStatus } from "./types";
+import type { Attribute, Led, SurfaceStatus } from "./types";
 
 type SurfaceEvent = { kind: "key"; key: string; down: boolean } | { kind: "encoder"; index: number; delta: number };
 
@@ -62,7 +62,28 @@ class Surface {
       listen<SurfaceStatus>("surface-status", (e) => (this.status = e.payload)),
       listen<SurfaceEvent>("surface", (e) => this.handle(e.payload)),
     ]);
-    return () => stops.forEach((stop) => stop());
+    const stopLeds = $effect.root(() => {
+      $effect(() => {
+        const leds = this.leds();
+        if (this.status.connected) api.setSurfaceLeds(leds).catch(() => {});
+      });
+    });
+    return () => {
+      stops.forEach((stop) => stop());
+      stopLeds();
+    };
+  }
+
+  /** Key LEDs showing what's going on, as Onyx lights them. */
+  private leds(): Record<string, Led> {
+    const leds: Record<string, Led> = {};
+    if (show.live.highlight) leds.highlight = "blink";
+    if (this.mode === "record") leds.record = "on";
+    if (this.mode === "delete") leds.delete = "on";
+    // Clear has something to clear.
+    if (this.line.length > 0 || Object.keys(show.programmer.values).length > 0) leds.clear = "on";
+    if (this.fine) for (let i = 1; i <= 4; i++) leds[`encoder${i}`] = "on";
+    return leds;
   }
 
   private handle(event: SurfaceEvent) {

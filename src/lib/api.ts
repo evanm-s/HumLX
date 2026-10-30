@@ -22,6 +22,7 @@ import type {
   RecordTarget,
   OscSettings,
   SurfaceStatus,
+  Led,
 } from "./types";
 
 /** True when running inside the desktop app rather than a plain browser. */
@@ -89,6 +90,7 @@ export const api = {
   openShow: (path: string) => invoke<string>("open_show", { path }),
   newShow: () => invoke<void>("new_show"),
   surfaceStatus: () => invoke<SurfaceStatus>("surface_status"),
+  setSurfaceLeds: (leds: Record<string, Led>) => invoke<void>("set_surface_leds", { leds }),
 
   playback: () => invoke<PlaybackView>("playback"),
   newCueList: (name: string) => invoke<PlaybackView>("new_cue_list", { name }),

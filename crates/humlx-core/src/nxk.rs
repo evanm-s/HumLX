@@ -11,10 +11,15 @@
 //!
 //! Encoders are `02`, `12`, `22` and `32` from left to right. Empty packets
 //! arrive between real ones and mean nothing.
+//!
+//! Key LEDs are set with a vendor control request (`40 80`), one per key:
+//! `wIndex` is the key's code without its first byte (`b c` as low, high)
+//! and `wValue` is how it lights, see [`Led`]. Worked out from a capture of
+//! Onyx driving them.
 
 use std::time::{Duration, Instant};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 pub const VENDOR_ID: u16 = 0x11be;
 pub const PRODUCT_ID: u16 = 0xe102;
@@ -71,6 +76,76 @@ const KEYS: &[([u8; 3], &str)] = &[
     ([0x02, 0x21, 0x59], "encoder3"),
     ([0x02, 0x31, 0x59], "encoder4"),
 ];
+
+/// Keys with an LED.
+pub const LED_KEYS: &[&str] = &[
+    "macro",
+    "preview",
+    "menu",
+    "fade",
+    "delay",
+    "snapshot",
+    "bank",
+    "edit",
+    "undo",
+    "clear",
+    "copy",
+    "move",
+    "delete",
+    "record",
+    "update",
+    "load",
+    "group",
+    "cue",
+    "highlight",
+    "link",
+    "last",
+    "next",
+    "swap",
+    "encoder1",
+    "encoder2",
+    "encoder3",
+    "encoder4",
+];
+
+/// Request that sets one key's LED.
+pub const LED_REQUEST: u8 = 0x80;
+
+/// Requests Onyx sends once before setting LEDs, as (request, value, index).
+/// What they do isn't known; they are sent the same way to be safe.
+pub const LED_SETUP: [(u8, u16, u16); 2] = [(0x40, 0, 0x0010), (0x41, 1, 0)];
+
+/// How a key's LED is lit.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Led {
+    #[default]
+    Off,
+    On,
+    /// Flashing, as Onyx shows Highlight.
+    Blink,
+}
+
+impl Led {
+    /// The request's `wValue`, as Onyx sends it.
+    pub fn value(self) -> u16 {
+        match self {
+            Led::Off => 0,
+            Led::On => 0x0103,
+            Led::Blink => 0x1153,
+        }
+    }
+}
+
+/// The request's `wIndex` for a key with an LED.
+pub fn led_index(key: &str) -> Option<u16> {
+    if !LED_KEYS.contains(&key) {
+        return None;
+    }
+    KEYS.iter()
+        .find(|(_, name)| *name == key)
+        .map(|(code, _)| u16::from_le_bytes([code[1], code[2]]))
+}
 
 const ENCODERS: [u8; 4] = [0x02, 0x12, 0x22, 0x32];
 
@@ -165,6 +240,21 @@ mod tests {
         assert_eq!(parse(&[]), None);
         assert_eq!(parse(&[0x03, 0x00]), None);
         assert_eq!(parse(&[0x02, 0x42, 0x09, 0x59, 0x01, 0x00, 0x00]), None);
+    }
+
+    #[test]
+    fn led_requests_match_onyx() {
+        // Values seen in the capture of Onyx.
+        assert_eq!(led_index("highlight"), Some(0x6001));
+        assert_eq!(led_index("record"), Some(0x5401));
+        assert_eq!(led_index("cue"), Some(0x5413));
+        assert_eq!(led_index("encoder4"), Some(0x5931));
+        assert_eq!(led_index("7"), None);
+        assert_eq!(Led::On.value().to_le_bytes(), [0x03, 0x01]);
+        assert_eq!(Led::Blink.value().to_le_bytes(), [0x53, 0x11]);
+        for key in LED_KEYS {
+            assert!(led_index(key).is_some(), "{key}");
+        }
     }
 
     #[test]
