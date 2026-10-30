@@ -10,6 +10,7 @@
   import { api } from "../lib/api";
   import { show } from "../lib/show.svelte";
   import { RECORD_EVENT, surface } from "../lib/surface.svelte";
+  import type { CueMode } from "../lib/types";
 
   const play = show.play.bind(show);
 
@@ -38,6 +39,8 @@
   let dialog = $state<null | "record" | "edit" | "list">(null);
   let draftName = $state("");
   let draftFade = $state<number | null>(2);
+  let draftMode = $state<CueMode>("hold");
+  let draftFollow = $state<number | null>(5);
   let confirmDelete = $state(false);
 
   function openEdit() {
@@ -45,12 +48,17 @@
     const cue = list.cues[cueIndex];
     draftName = cue.name;
     draftFade = cue.fade;
+    draftMode = cue.mode;
+    // A new follow cue starts with its fade time, so it moves on once the fade is done.
+    draftFollow = cue.follow > 0 ? cue.follow : cue.fade > 0 ? cue.fade : 5;
     dialog = "edit";
   }
 
   async function saveCue() {
     if (!list || cueIndex == null) return;
-    const ok = await play(() => api.editCue(list.id, cueIndex!, draftName, Math.max(0, draftFade ?? 0)));
+    const fade = Math.max(0, draftFade ?? 0);
+    const follow = draftMode === "follow" ? Math.max(0, draftFollow ?? 0) : null;
+    const ok = await play(() => api.editCue(list.id, cueIndex!, draftName, fade, draftMode, follow));
     if (ok) dialog = null;
   }
 
@@ -147,6 +155,13 @@
             <span class="num">{i + 1}</span>
             <span class="name">{cue.name}</span>
             <span class="muted">{Object.keys(cue.values).length} fixtures</span>
+            <span class="mode" class:follow={cue.mode === "follow"}>
+              {#if cue.mode === "follow"}
+                Follow {live?.current === i && live.followIn != null ? `in ${live.followIn.toFixed(1)}` : cue.follow}s
+              {:else}
+                Hold
+              {/if}
+            </span>
             <span class="fade">{cue.fade}s</span>
           </button>
         {:else}
@@ -160,7 +175,7 @@
           Update cue
         </button>
         <button disabled={cueIndex == null} onclick={() => play(() => api.goTo(list.id, cueIndex!))}>Go to cue</button>
-        <button disabled={cueIndex == null} onclick={openEdit}>Name and fade</button>
+        <button disabled={cueIndex == null} onclick={openEdit}>Edit cue</button>
         <button class="danger" disabled={cueIndex == null} onclick={deleteCue}>
           {confirmDelete ? "Tap again to delete" : "Delete cue"}
         </button>
@@ -207,12 +222,28 @@
 {#if dialog === "record"}
   <RecordCue list={listId} after={cueIndex} onclose={() => (dialog = null)} onrecorded={recorded} />
 {:else if dialog === "edit"}
-  <Dialog title="Name and fade" onclose={() => (dialog = null)}>
+  <Dialog title="Edit cue" onclose={() => (dialog = null)}>
     <label class="field">
       Name
       <input bind:value={draftName} placeholder="e.g. Walk in" />
     </label>
     <NumberField label="Fade time (seconds)" fractional bind:value={draftFade} min={0} max={600} />
+    <div class="field">
+      Type
+      <div class="segmented">
+        <button aria-pressed={draftMode === "hold"} onclick={() => (draftMode = "hold")}>Hold</button>
+        <button aria-pressed={draftMode === "follow"} onclick={() => (draftMode = "follow")}>Follow</button>
+      </div>
+    </div>
+    {#if draftMode === "follow"}
+      <NumberField label="Follow after (seconds)" fractional bind:value={draftFollow} min={0} max={3600} />
+      <p class="muted">
+        Counted from GO, so it includes the fade. The next cue starts by itself; a follow on the last cue loops back to
+        the first.
+      </p>
+    {:else}
+      <p class="muted">Stays on this cue until the next GO.</p>
+    {/if}
     {#snippet actions()}
       <button onclick={() => (dialog = null)}>Cancel</button>
       <button class="primary" onclick={saveCue}>Save</button>
@@ -267,7 +298,7 @@
 
   .cue {
     display: grid;
-    grid-template-columns: 32px 56px 1fr auto 90px;
+    grid-template-columns: 32px 56px 1fr auto 130px 90px;
     gap: 12px;
     align-items: center;
     text-align: left;
@@ -299,6 +330,16 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .mode {
+    font-size: 0.9rem;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .mode.follow {
+    color: var(--accent);
   }
 
   .fade {

@@ -170,6 +170,8 @@ impl State {
 
     /// Works out the universe as it should be at `now`, which drives fades and effects.
     pub fn compose_at(&mut self, now: Instant) -> &Universe {
+        // Follow cues move on first, so this frame shows the cue they went to.
+        self.playbacks.follow(&self.cue_lists, now);
         // Playbacks, then the programmer on top, then effects moving whatever results.
         let mut look = self.playbacks.output(now);
         for (fixture, values) in &self.programmer.values {
@@ -482,6 +484,8 @@ mod tests {
             cues: vec![Cue {
                 name: "Warm".into(),
                 fade: 2.0,
+                mode: Default::default(),
+                follow: 0.0,
                 values: [(
                     1,
                     Values {
