@@ -184,9 +184,15 @@ export interface ProgrammerView {
 
 export type SelectMode = "set" | "toggle" | "add";
 
+/** Hold waits for GO; follow goes to the next cue by itself. */
+export type CueMode = "hold" | "follow";
+
 export interface Cue {
   name: string;
   fade: number;
+  mode: CueMode;
+  /** For a follow cue, seconds from GO until the next cue starts. */
+  follow: number;
   values: Record<string, Values>;
 }
 
@@ -227,6 +233,8 @@ export interface PlaybackStatus {
   list: number;
   current: number;
   fading: boolean;
+  /** Seconds until the next cue follows, when the current cue is a follow cue. */
+  followIn: number | null;
 }
 
 /** Whether the NX-K control surface is plugged in and usable. */

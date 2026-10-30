@@ -23,8 +23,46 @@ pub struct Cue {
     /// Seconds to fade into this cue.
     #[serde(default = "default_fade")]
     pub fade: f32,
+    /// What happens once the cue has been gone to.
+    #[serde(default)]
+    pub mode: CueMode,
+    /// For a follow cue, seconds from when the cue is gone to until the list
+    /// goes to the next cue by itself. The clock starts with the cue's fade,
+    /// so a follow time shorter than the fade cuts into it.
+    #[serde(default)]
+    pub follow: f32,
     #[serde(default)]
     pub values: Look,
+}
+
+impl Default for Cue {
+    fn default() -> Self {
+        Self {
+            name: String::new(),
+            fade: default_fade(),
+            mode: CueMode::Hold,
+            follow: 0.0,
+            values: Look::new(),
+        }
+    }
+}
+
+impl Cue {
+    /// How long after this cue is gone to that the next cue follows, if it does.
+    pub fn follow_time(&self) -> Option<Duration> {
+        (self.mode == CueMode::Follow).then(|| Duration::from_secs_f32(self.follow.max(0.0)))
+    }
+}
+
+/// Whether a cue waits for GO or moves on by itself.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CueMode {
+    /// Stays until the next GO.
+    #[default]
+    Hold,
+    /// Goes to the next cue by itself after the cue's follow time.
+    Follow,
 }
 
 fn default_fade() -> f32 {
@@ -114,6 +152,10 @@ pub struct Playback {
     to: Look,
     started: Instant,
     fade: Duration,
+    /// When the current cue was gone to, kept when the list is refreshed.
+    entered: Instant,
+    /// When the next cue follows, for a follow cue gone to with GO.
+    follow_at: Option<Instant>,
 }
 
 impl Playback {
@@ -137,6 +179,11 @@ impl Playback {
     /// True while a fade is running.
     pub fn fading(&self, now: Instant) -> bool {
         self.progress(now) < 1.0
+    }
+
+    /// Seconds until the next cue follows, if one will.
+    pub fn follow_in(&self, now: Instant) -> Option<f32> {
+        self.follow_at.map(|at| at.saturating_duration_since(now).as_secs_f32())
     }
 }
 
@@ -179,6 +226,8 @@ impl Playbacks {
             to: list.look_at(index),
             started: now,
             fade: Duration::from_secs_f32(cue.fade.max(0.0)),
+            entered: now,
+            follow_at: cue.follow_time().map(|t| now + t),
         };
         self.active.insert(list.id, playback);
         Ok(())
@@ -197,7 +246,29 @@ impl Playbacks {
         self.go_to(list, next, now)
     }
 
-    /// Goes back to the previous cue, quickly.
+    /// Goes to the next cue of every list whose follow time is up. The next
+    /// cue starts when the follow was due, so timing holds between frames.
+    /// A follow on the last cue loops round to the first, which makes a chase.
+    pub fn follow(&mut self, lists: &[CueList], now: Instant) {
+        let due: Vec<(u32, Instant)> = self
+            .active
+            .iter()
+            .filter_map(|(id, p)| p.follow_at.filter(|at| *at <= now).map(|at| (*id, at)))
+            .collect();
+        for (id, at) in due {
+            let Some(list) = lists.iter().find(|l| l.id == id) else {
+                continue;
+            };
+            if self.go(list, at).is_err() {
+                if let Some(p) = self.active.get_mut(&id) {
+                    p.follow_at = None;
+                }
+            }
+        }
+    }
+
+    /// Goes back to the previous cue, quickly. Follows don't run after Back,
+    /// so it stays on the cue it went back to.
     pub fn back(&mut self, list: &CueList, now: Instant) -> Result<()> {
         let Some(playback) = self.active.get(&list.id) else {
             return Ok(());
@@ -206,6 +277,7 @@ impl Playbacks {
         self.go_to(list, previous, now)?;
         if let Some(p) = self.active.get_mut(&list.id) {
             p.fade = Duration::from_millis(500);
+            p.follow_at = None;
         }
         Ok(())
     }
@@ -218,13 +290,20 @@ impl Playbacks {
         self.active.clear();
     }
 
-    /// Re-reads a running list after its cues were edited.
+    /// Re-reads a running list after its cues were edited. A pending follow
+    /// keeps counting from when the cue was gone to, with the edited time.
     pub fn refresh(&mut self, list: &CueList, now: Instant) {
-        if let Some(index) = self.active.get(&list.id).map(|p| p.current) {
+        if let Some((index, entered, armed)) = self
+            .active
+            .get(&list.id)
+            .map(|p| (p.current, p.entered, p.follow_at.is_some()))
+        {
             if index < list.cues.len() {
                 let _ = self.go_to(list, index, now);
                 if let Some(p) = self.active.get_mut(&list.id) {
                     p.fade = Duration::ZERO;
+                    p.entered = entered;
+                    p.follow_at = list.cues[index].follow_time().filter(|_| armed).map(|t| entered + t);
                 }
             } else {
                 self.release(list.id);
@@ -423,11 +502,15 @@ mod tests {
                 Cue {
                     name: "Red".into(),
                     fade: 0.0,
+                    mode: Default::default(),
+                    follow: 0.0,
                     values: [(1, red)].into(),
                 },
                 Cue {
                     name: "Half".into(),
                     fade: 2.0,
+                    mode: Default::default(),
+                    follow: 0.0,
                     values: [(1, values(0.5)), (2, values(1.0))].into(),
                 },
             ],
@@ -483,6 +566,55 @@ mod tests {
     }
 
     #[test]
+    fn follow_cues_move_on_by_themselves() {
+        let mut list = list();
+        list.cues[0].mode = CueMode::Follow;
+        list.cues[0].follow = 1.0;
+        let lists = [list.clone()];
+        let mut playbacks = Playbacks::default();
+        let start = Instant::now();
+        playbacks.go(&list, start).unwrap();
+        assert_eq!(playbacks.get(1).unwrap().follow_in(start), Some(1.0));
+
+        playbacks.follow(&lists, start + Duration::from_millis(900));
+        assert_eq!(playbacks.get(1).unwrap().current, 0);
+        // The next cue's fade starts when the follow was due, not when it was noticed.
+        playbacks.follow(&lists, start + Duration::from_secs(2));
+        let p = playbacks.get(1).unwrap();
+        assert_eq!(p.current, 1);
+        assert_eq!(p.follow_in(start), None); // cue 2 holds
+        assert_eq!(
+            playbacks.output(start + Duration::from_secs(2))[&2].intensity,
+            Some(0.5)
+        );
+
+        // Back lands on the follow cue without it moving on again.
+        playbacks.back(&list, start + Duration::from_secs(3)).unwrap();
+        playbacks.follow(&lists, start + Duration::from_secs(10));
+        assert_eq!(playbacks.get(1).unwrap().current, 0);
+    }
+
+    #[test]
+    fn follow_on_last_cue_loops() {
+        let mut list = list();
+        list.cues[1].mode = CueMode::Follow;
+        list.cues[1].follow = 0.5;
+        let lists = [list.clone()];
+        let mut playbacks = Playbacks::default();
+        let start = Instant::now();
+        playbacks.go_to(&list, 1, start).unwrap();
+        playbacks.follow(&lists, start + Duration::from_secs(1));
+        assert_eq!(playbacks.get(1).unwrap().current, 0);
+    }
+
+    #[test]
+    fn hold_is_the_default() {
+        let cue: Cue = serde_json::from_str(r#"{"name":"Old","fade":1}"#).unwrap();
+        assert_eq!(cue.mode, CueMode::Hold);
+        assert_eq!(cue.follow_time(), None);
+    }
+
+    #[test]
     fn back_and_release() {
         let list = list();
         let mut playbacks = Playbacks::default();
@@ -503,6 +635,8 @@ mod tests {
             cues: vec![Cue {
                 name: "".into(),
                 fade: 0.0,
+                mode: Default::default(),
+                follow: 0.0,
                 values: [(1, values(0.8))].into(),
             }],
         };

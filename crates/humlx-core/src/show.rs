@@ -125,6 +125,8 @@ mod tests {
             cues: vec![crate::playback::Cue {
                 name: "Preset".into(),
                 fade: 3.0,
+                mode: Default::default(),
+                follow: 0.0,
                 values: programmer.values.clone(),
             }],
         });

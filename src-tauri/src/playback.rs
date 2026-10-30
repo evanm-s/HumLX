@@ -3,7 +3,7 @@
 use std::time::Instant;
 
 use humlx_core::engine::State as EngineState;
-use humlx_core::playback::{Cue, CueList, Effect, EffectKind, Wave};
+use humlx_core::playback::{Cue, CueList, CueMode, Effect, EffectKind, Wave};
 use humlx_core::programmer::next_id;
 use humlx_core::{Error, Result};
 use serde::{Deserialize, Serialize};
@@ -18,6 +18,8 @@ pub struct PlaybackStatus {
     list: u32,
     current: usize,
     fading: bool,
+    /// Seconds until the next cue follows, when the current cue is a follow cue.
+    follow_in: Option<f32>,
 }
 
 pub fn statuses(state: &EngineState) -> Vec<PlaybackStatus> {
@@ -29,6 +31,7 @@ pub fn statuses(state: &EngineState) -> Vec<PlaybackStatus> {
             list: *list,
             current: playback.current,
             fading: playback.fading(now),
+            follow_in: playback.follow_in(now),
         })
         .collect()
 }
@@ -164,6 +167,7 @@ pub fn record_cue(
                 name,
                 fade: fade.max(0.0),
                 values,
+                ..Default::default()
             },
         );
         let snapshot = cue_list.clone();
@@ -202,6 +206,8 @@ pub fn edit_cue(
     index: usize,
     name: Option<String>,
     fade: Option<f32>,
+    mode: Option<CueMode>,
+    follow: Option<f32>,
 ) -> Result<PlaybackView> {
     change(&app, true, |state| {
         let cue = list_mut(state, list)?
@@ -213,6 +219,17 @@ pub fn edit_cue(
         }
         if let Some(fade) = fade {
             cue.fade = fade.clamp(0.0, 600.0);
+        }
+        let timing = mode.is_some() || follow.is_some();
+        if let Some(mode) = mode {
+            cue.mode = mode;
+        }
+        if let Some(follow) = follow {
+            cue.follow = follow.clamp(0.0, 3600.0);
+        }
+        // A running follow picks up the new time straight away.
+        if timing {
+            refresh(state, list);
         }
         Ok(())
     })
