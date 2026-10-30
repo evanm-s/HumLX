@@ -327,9 +327,9 @@
   }
 
   .card {
-    padding: 24px;
+    padding: 16px;
     display: grid;
-    gap: 20px;
+    gap: 14px;
     align-content: start;
   }
 
@@ -356,10 +356,10 @@
   .node {
     display: grid;
     grid-template-columns: 1fr auto auto;
-    gap: 20px;
+    gap: 14px;
     align-items: center;
     text-align: left;
-    min-height: 72px;
+    min-height: 52px;
   }
 
   .use {

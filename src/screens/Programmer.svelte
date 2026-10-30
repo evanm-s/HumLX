@@ -237,7 +237,7 @@
   {#if id === "fixtures"}
     <div class="tiles">
       {#each show.patch.fixtures as f (f.id)}
-        <button class="tile" aria-pressed={selected.has(f.id)} onclick={() => tapFixture(f.id)}>
+        <button class="tile" title={f.name} aria-pressed={selected.has(f.id)} onclick={() => tapFixture(f.id)}>
           <span class="num" style:color={fixtureColour(f.id)}>{f.id}</span>
           <span class="name">{f.name}</span>
           {#if show.programmer.values[f.id]}<span class="dot" aria-label="Has programmer values"></span>{/if}
@@ -382,17 +382,17 @@
 
   .tiles {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
-    gap: 8px;
+    grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+    gap: 6px;
   }
 
   .tile {
     display: grid;
-    grid-template-columns: 36px 1fr auto;
+    grid-template-columns: 2ch 1fr auto;
     align-items: center;
     gap: 6px;
-    padding: 0 12px;
-    min-height: 64px;
+    padding: 0 10px;
+    min-height: 40px;
     text-align: left;
   }
 
@@ -413,8 +413,8 @@
   }
 
   .dot {
-    width: 10px;
-    height: 10px;
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
     background: var(--accent);
   }
@@ -422,8 +422,8 @@
   .group {
     display: grid;
     text-align: left;
-    padding: 10px 14px;
-    min-height: 64px;
+    padding: 6px 10px;
+    min-height: 48px;
     align-content: center;
   }
 
@@ -474,8 +474,8 @@
 
   .levels button {
     flex: 1;
-    min-height: 44px;
-    max-height: 80px;
+    min-height: 36px;
+    max-height: 64px;
     padding: 0 6px;
   }
 
@@ -488,12 +488,12 @@
   }
 
   .colour :global(.disc) {
-    width: min(100cqw, 100cqh - 120px);
+    width: min(100cqw, 100cqh - 96px);
     flex-shrink: 0;
   }
 
   .position :global(.pad) {
-    width: min(100cqw, 100cqh - 124px);
+    width: min(100cqw, 100cqh - 100px);
     flex-shrink: 0;
   }
 
@@ -505,7 +505,7 @@
   }
 
   .swatch {
-    min-height: 48px;
+    min-height: 36px;
     padding: 0;
     box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.15);
   }
@@ -518,7 +518,7 @@
   }
 
   .pos-buttons button {
-    min-height: 52px;
+    min-height: 40px;
     padding: 0 6px;
   }
 

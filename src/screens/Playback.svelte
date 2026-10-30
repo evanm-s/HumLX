@@ -199,7 +199,7 @@
       </div>
     {:else}
       <div class="empty muted">
-        No cue lists yet. Set a look in the Programmer, then tap <strong>Record cue</strong> to start one.
+        <p>No cue lists yet. Set a look in the Programmer, then tap <strong>Record cue</strong> to start one.</p>
       </div>
     {/if}
   </section>
@@ -338,8 +338,8 @@
   .playback {
     height: 100%;
     display: grid;
-    grid-template-columns: 1fr 520px;
-    grid-template-rows: auto minmax(0, 1fr) 460px;
+    grid-template-columns: 1fr 440px;
+    grid-template-rows: auto minmax(0, 1fr) 400px;
     gap: var(--gap);
   }
 
@@ -353,14 +353,14 @@
   }
 
   .panel {
-    padding: 20px;
+    padding: 14px;
     min-height: 0;
   }
 
   .cues {
     display: grid;
     grid-template-rows: auto 1fr auto;
-    gap: 16px;
+    gap: 10px;
   }
 
   .table {
@@ -372,10 +372,10 @@
   .cue {
     display: grid;
     grid-template-columns: 32px 56px 1fr auto 90px;
-    gap: 16px;
+    gap: 12px;
     align-items: center;
     text-align: left;
-    min-height: 60px;
+    min-height: 44px;
     flex-shrink: 0;
     border-color: transparent;
     background: transparent;

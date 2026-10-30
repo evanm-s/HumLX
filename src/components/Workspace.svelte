@@ -187,8 +187,8 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    min-height: 52px;
-    padding: 4px 8px 4px 16px;
+    min-height: 40px;
+    padding: 3px 6px 3px 12px;
     border-bottom: 1px solid var(--line);
   }
 
@@ -207,15 +207,15 @@
   }
 
   .bar :global(button.small) {
-    min-height: 40px;
-    padding: 0 12px;
+    min-height: 32px;
+    padding: 0 10px;
     font-size: 0.9rem;
   }
 
   .body {
     flex: 1;
     min-height: 0;
-    padding: 14px;
+    padding: 8px;
     overflow: auto;
     container-type: size;
   }
@@ -224,8 +224,8 @@
     position: absolute;
     right: 0;
     bottom: 0;
-    width: 48px;
-    height: 48px;
+    width: 40px;
+    height: 40px;
     cursor: nwse-resize;
     touch-action: none;
     background: linear-gradient(135deg, transparent 50%, var(--accent) 50%);

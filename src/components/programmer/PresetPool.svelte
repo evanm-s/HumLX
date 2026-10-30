@@ -143,7 +143,7 @@
 
   .modes button {
     padding: 0 6px;
-    min-height: 48px;
+    min-height: 40px;
     font-size: 0.9rem;
   }
 
@@ -166,16 +166,16 @@
 
   .slots {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-    gap: 8px;
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 6px;
   }
 
   .slot {
     display: grid;
     gap: 6px;
     align-content: end;
-    padding: 10px;
-    min-height: 84px;
+    padding: 8px;
+    min-height: 64px;
     text-align: left;
   }
 
@@ -202,7 +202,7 @@
   }
 
   .chip {
-    height: 32px;
+    height: 24px;
     border-radius: 8px;
     box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.15);
   }
@@ -222,7 +222,7 @@
 
   .mini-pad {
     position: relative;
-    height: 36px;
+    height: 28px;
     border-radius: 8px;
     background: var(--bg);
   }
