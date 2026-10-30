@@ -37,8 +37,7 @@ const profiles: Profile[] = Object.values(files).map((p) => ({
   id: `${slug(p.manufacturer)}/${slug(p.model)}`,
 }));
 
-const pick = (m: string) => profiles.find((p) => p.model.includes(m))!;
-let fixtures: Fixture[] = [1,2,3,4].map((id) => { const p = pick(id <= 2 ? "Bi-colour" : "RGBW"); return { id, name: id <= 2 ? `Panel ${id}` : `Par ${id}`, profile: p.id, mode: p.modes[0].name, address: id * 10, footprint: 1, typeName: "x" }; });
+let fixtures: Fixture[] = [1,2,3,4,5,6].map((id) => ({ id, name: `F${id}`, profile: profiles[0].id, mode: profiles[0].modes[0].name, address: id, footprint: 1, typeName: "x" }));
 let output: OutputSettings = { enabled: true, target: "255.255.255.255", universe: 0, rateHz: 40 };
 let blackout = false;
 let highlight = false;
