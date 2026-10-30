@@ -386,9 +386,19 @@
     {#if editingGroups}<p class="muted hint">Tap a group to delete it.</p>{/if}
     <div class="tiles">
       {#each show.programmer.groups as g (g.id)}
-        <button class="group" class:deleting={editingGroups} onclick={() => tapGroup(g.id)}>
+        {@const picked = g.fixtures.filter((f) => selected.has(f)).length}
+        <button
+          class="group"
+          class:deleting={editingGroups}
+          aria-pressed={picked === 0 ? false : picked === g.fixtures.length ? true : "mixed"}
+          onclick={() => tapGroup(g.id)}
+        >
           <span>{g.name}</span>
-          <span class="muted">{g.fixtures.length} fixtures</span>
+          <span class="muted">
+            {picked > 0 && picked < g.fixtures.length
+              ? `${picked} of ${g.fixtures.length} selected`
+              : `${g.fixtures.length} fixtures`}
+          </span>
         </button>
       {/each}
       <button
@@ -627,6 +637,19 @@
     padding: 6px 10px;
     min-height: 48px;
     align-content: center;
+  }
+
+  /* Selected like a fixture tile when all its fixtures are selected, and
+     with a dashed outline when only some are. */
+  .group[aria-pressed="true"] {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 22%, var(--panel-raised));
+  }
+
+  .group[aria-pressed="mixed"] {
+    border-color: var(--accent);
+    border-style: dashed;
+    background: color-mix(in srgb, var(--accent) 8%, var(--panel-raised));
   }
 
   .group span:last-child {
