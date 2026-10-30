@@ -187,6 +187,26 @@ impl Values {
             }
         }
 
+        // A bi-colour fixture with separate warm and cool emitters has no white
+        // balance channel, so the balance (0 warm, 1 cool) cross-fades the two,
+        // keeping both at full through the middle.
+        if let Some(&balance) = self.other.get(&Attribute::ColorTemperature) {
+            let bi_colour = has(Attribute::WarmWhite)
+                && has(Attribute::CoolWhite)
+                && !has(Attribute::ColorTemperature)
+                && !has_any(&[Attribute::Red, Attribute::Green, Attribute::Blue]);
+            if bi_colour {
+                let level = if has_dimmer {
+                    1.0
+                } else {
+                    mix.map(Rgb::clamped).map_or(0.0, |c| c.r.max(c.g).max(c.b))
+                };
+                let balance = balance.clamp(0.0, 1.0);
+                set(&mut out, Attribute::WarmWhite, level * (2.0 * (1.0 - balance)).min(1.0));
+                set(&mut out, Attribute::CoolWhite, level * (2.0 * balance).min(1.0));
+            }
+        }
+
         if let Some(pan) = self.pan {
             set(&mut out, Attribute::Pan, pan);
         }
@@ -431,6 +451,59 @@ mod tests {
     }
 
     const ORANGE: Rgb = Rgb { r: 1.0, g: 0.5, b: 0.0 };
+
+    fn warm_cool(attributes: &[Attribute]) -> Mode {
+        Mode {
+            name: "test".into(),
+            channels: attributes
+                .iter()
+                .map(|attribute| Channel {
+                    name: format!("{attribute:?}"),
+                    attribute: *attribute,
+                    fine_of: None,
+                    default: 0,
+                    highlight: None,
+                    capabilities: Vec::new(),
+                })
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn white_balance_cross_fades_warm_and_cool() {
+        let with_dimmer = warm_cool(&[Attribute::Intensity, Attribute::WarmWhite, Attribute::CoolWhite]);
+        let balanced = |balance: f32, intensity: Option<f32>| Values {
+            intensity,
+            other: [(Attribute::ColorTemperature, balance)].into(),
+            ..Default::default()
+        };
+        assert_eq!(
+            balanced(0.0, Some(1.0)).render(&with_dimmer),
+            vec![Some(255), Some(255), Some(0)]
+        );
+        assert_eq!(
+            balanced(0.5, Some(1.0)).render(&with_dimmer),
+            vec![Some(255), Some(255), Some(255)]
+        );
+        assert_eq!(
+            balanced(0.75, Some(1.0)).render(&with_dimmer),
+            vec![Some(255), Some(128), Some(255)]
+        );
+
+        // Without a dimmer the intensity scales both emitters.
+        let no_dimmer = warm_cool(&[Attribute::WarmWhite, Attribute::CoolWhite]);
+        assert_eq!(balanced(1.0, Some(0.5)).render(&no_dimmer), vec![Some(0), Some(128)]);
+    }
+
+    #[test]
+    fn white_balance_channel_is_set_directly() {
+        let values = Values {
+            other: [(Attribute::ColorTemperature, 1.0)].into(),
+            ..Default::default()
+        };
+        let out = render(&values, "generic/bi-colour-led-panel", "2ch");
+        assert_eq!(out, vec![None, Some(255)]);
+    }
 
     #[test]
     fn rgbw_takes_white_from_the_mix() {

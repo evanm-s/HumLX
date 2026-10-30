@@ -9,11 +9,12 @@
   import Fader from "../components/Fader.svelte";
   import PositionPad from "../components/PositionPad.svelte";
   import RecordCue from "../components/RecordCue.svelte";
+  import WhiteBalance from "../components/WhiteBalance.svelte";
   import Workspace from "../components/Workspace.svelte";
   import PresetPool from "../components/programmer/PresetPool.svelte";
   import ProgrammerSheet from "../components/programmer/ProgrammerSheet.svelte";
   import { api } from "../lib/api";
-  import { attributeName, capabilityAt, fixtureColour, rgbCss, SWATCHES } from "../lib/format";
+  import { attributeColour, attributeName, capabilityAt, fixtureColour, rgbCss, SWATCHES } from "../lib/format";
   import { loadLayout, saveLayout, type Grid, type Layout } from "../lib/layout";
   import { endSelectWindow, restartSelectWindow, tapMode } from "../lib/selection";
   import { attempt, show } from "../lib/show.svelte";
@@ -139,7 +140,6 @@
     "gobo_rotation",
     "prism",
     "color_wheel",
-    "color_temperature",
     "pan_tilt_speed",
     "speed",
     "effect",
@@ -161,6 +161,93 @@
     }
     return BEAM.filter((a) => found.has(a)).map((attribute) => ({ attribute, channel: found.get(attribute)! }));
   });
+
+  // --- Colour ------------------------------------------------------------
+
+  // The colour window shows either the picker or a fader per emitter.
+  const COLOUR_MODE_KEY = "humlx.programmer.colourFaders";
+  let colourFaders = $state(readColourFaders());
+
+  function readColourFaders() {
+    try {
+      return localStorage.getItem(COLOUR_MODE_KEY) === "true";
+    } catch {
+      return false;
+    }
+  }
+
+  function setColourFaders(on: boolean) {
+    colourFaders = on;
+    try {
+      localStorage.setItem(COLOUR_MODE_KEY, String(on));
+    } catch {
+      // Only a convenience; the toggle still works for this session.
+    }
+  }
+
+  const EMITTERS: Attribute[] = [
+    "red",
+    "green",
+    "blue",
+    "white",
+    "warm_white",
+    "cool_white",
+    "amber",
+    "lime",
+    "uv",
+    "cyan",
+    "magenta",
+    "yellow",
+  ];
+  const WHITES: Attribute[] = ["white", "warm_white", "cool_white"];
+
+  // Colour channels the selected fixtures have, with the first fixture's
+  // channel for each, for its resting level and labelled ranges.
+  const colourChannels = $derived.by(() => {
+    const found = new Map<Attribute, Channel>();
+    for (const id of selection) {
+      const fixture = show.fixture(id);
+      if (!fixture) continue;
+      for (const channel of show.channels(fixture)) {
+        if (!channel.fineOf && !found.has(channel.attribute)) found.set(channel.attribute, channel);
+      }
+    }
+    return found;
+  });
+  const colourHas = (attribute: Attribute) => colourChannels.has(attribute);
+  // Anything that can make a colour other than white uses the colour disc.
+  const canMix = $derived(
+    (["red", "green", "blue", "cyan", "magenta", "yellow", "color_wheel"] as Attribute[]).some(colourHas),
+  );
+  // Bi-colour fixtures: a white balance channel, or warm and cool emitters.
+  const canBalance = $derived(
+    colourHas("color_temperature") || (colourHas("warm_white") && colourHas("cool_white") && !colourHas("red")),
+  );
+  const colourFaderList = $derived(
+    [...EMITTERS, "color_temperature" as Attribute]
+      .filter(colourHas)
+      .map((attribute) => ({ attribute, channel: colourChannels.get(attribute)! })),
+  );
+
+  // The level the first selected fixture's emitter gets from the picked
+  // colour, mirroring how the engine splits a colour into its channels.
+  function emitterFromColour(attribute: Attribute): number | undefined {
+    const colour = current.colour;
+    const fixture = show.fixture(selection[0] ?? null);
+    if (!colour || !fixture) return undefined;
+    const own = new Set(show.channels(fixture).map((c) => c.attribute));
+    const scale = own.has("intensity") ? 1 : (current.intensity ?? 0);
+    const [r, g, b] = [colour.r * scale, colour.g * scale, colour.b * scale];
+    if (own.has("red") || own.has("green") || own.has("blue")) {
+      const white = WHITES.some((a) => own.has(a)) ? Math.min(r, g, b) : 0;
+      const levels: Partial<Record<Attribute, number>> = { red: r - white, green: g - white, blue: b - white };
+      return WHITES.includes(attribute) ? white : (levels[attribute] ?? 0);
+    }
+    if (attribute === "cyan") return 1 - r;
+    if (attribute === "magenta") return 1 - g;
+    if (attribute === "yellow") return 1 - b;
+    return undefined;
+  }
 
   // --- Highlight -----------------------------------------------------------
 
@@ -251,6 +338,11 @@
       {editingGroups ? "Done" : "Edit"}
     </button>
   {:else if families[id]}
+    {#if id === "colour"}
+      <button class="small" onclick={() => setColourFaders(!colourFaders)}>
+        {colourFaders ? "Picker" : "Faders"}
+      </button>
+    {/if}
     <button class="small" onclick={() => program(() => api.clearProgrammer(families[id]))}>Clear</button>
   {/if}
 {/snippet}
@@ -317,20 +409,48 @@
         {/each}
       </div>
     </div>
+  {:else if id === "colour" && colourFaders}
+    <div class="faders">
+      {#each colourFaderList as { attribute, channel } (attribute)}
+        {@const set = current.other?.[attribute]}
+        {@const derived = attribute === "color_temperature" ? undefined : emitterFromColour(attribute)}
+        <!-- Emitters not set directly show what the picked colour gives them. -->
+        {@const value = Math.round(set != null ? set * 255 : derived != null ? derived * 255 : (channel.default ?? 0))}
+        <Fader
+          {value}
+          label={attributeName(attribute)}
+          sublabel={set != null ? undefined : derived != null ? "From colour" : "Not set"}
+          detail={capabilityAt(channel.capabilities, value)}
+          colour={attributeColour(attribute)}
+          active={set != null}
+          onchange={(v) => program(() => api.setAttribute(attribute, v / 255))}
+        />
+      {:else}
+        <p class="muted">The selected fixtures have no colour channels.</p>
+      {/each}
+    </div>
   {:else if id === "colour"}
-    <div class="colour">
-      <ColourPicker colour={current.colour} onchange={(c) => program(() => api.setColour(c))} />
-      <div class="swatches">
-        {#each SWATCHES as s (s.name)}
-          <button
-            class="swatch"
-            title={s.name}
-            aria-label={s.name}
-            style:background={rgbCss(s.colour)}
-            onclick={() => program(() => api.setColour(s.colour))}
-          ></button>
-        {/each}
-      </div>
+    <div class="colour" class:with-balance={canMix && canBalance}>
+      {#if canMix || !canBalance}
+        <ColourPicker colour={current.colour} onchange={(c) => program(() => api.setColour(c))} />
+        <div class="swatches">
+          {#each SWATCHES as s (s.name)}
+            <button
+              class="swatch"
+              title={s.name}
+              aria-label={s.name}
+              style:background={rgbCss(s.colour)}
+              onclick={() => program(() => api.setColour(s.colour))}
+            ></button>
+          {/each}
+        </div>
+      {/if}
+      {#if canBalance}
+        <WhiteBalance
+          value={current.other?.color_temperature}
+          onchange={(v) => program(() => api.setAttribute("color_temperature", v))}
+        />
+      {/if}
     </div>
   {:else if id === "position"}
     <div class="position">
@@ -547,6 +667,10 @@
     flex-shrink: 0;
   }
 
+  .colour.with-balance :global(.disc) {
+    width: min(100cqw, 100cqh - 290px);
+  }
+
   .position :global(.pad) {
     width: min(100cqw, 100cqh - 170px);
     flex-shrink: 0;
@@ -597,13 +721,29 @@
     padding: 0 6px;
   }
 
-  .beam {
+  .beam,
+  .faders {
     display: flex;
     gap: 12px;
     height: 100cqh;
   }
 
-  .beam :global(.fader) {
+  .beam :global(.fader),
+  .faders :global(.fader) {
     flex-shrink: 0;
+  }
+
+  /* Narrower faders so RGBW and white balance fit the colour window. */
+  .faders {
+    gap: 8px;
+    overflow-x: auto;
+  }
+
+  .faders :global(.fader) {
+    width: 64px;
+  }
+
+  .faders :global(.track) {
+    width: 50px;
   }
 </style>

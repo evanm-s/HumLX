@@ -326,8 +326,9 @@ pub fn set_colour(app: State<'_, App>, colour: Rgb) -> ProgrammerView {
     change_programmer(&app, |state| {
         state.programmer.update(|v| {
             v.colour = Some(colour);
-            // A picked colour replaces a colour wheel value set directly.
-            v.other.remove(&Attribute::ColorWheel);
+            // A picked colour replaces a colour wheel or emitter levels set directly.
+            v.other
+                .retain(|attribute, _| *attribute != Attribute::ColorWheel && !attribute.is_colour_mix());
         })
     })
 }
