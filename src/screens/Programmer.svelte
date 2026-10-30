@@ -101,6 +101,32 @@
   // --- Controls ------------------------------------------------------------
 
   let fine = $state(false);
+
+  // The Position window shows either the XY pad or separate pan and tilt
+  // faders; remembered per machine.
+  const POSITION_MODE_KEY = "humlx.position.mode";
+  let positionFaders = $state(readPositionMode());
+
+  function readPositionMode() {
+    try {
+      return localStorage.getItem(POSITION_MODE_KEY) === "faders";
+    } catch {
+      return false;
+    }
+  }
+
+  function setPositionFaders(on: boolean) {
+    positionFaders = on;
+    try {
+      localStorage.setItem(POSITION_MODE_KEY, on ? "faders" : "pad");
+    } catch {
+      // Storage unavailable: the choice just lasts for this session.
+    }
+  }
+
+  // Position faders run 0 to 1000 so each step is 0.1%.
+  const POSITION_STEPS = 1000;
+  const positionPercent = (v: number) => `${(v / 10).toFixed(1)}%`;
   let recordingCue = $state(false);
 
   const BEAM: Attribute[] = [
@@ -308,12 +334,41 @@
     </div>
   {:else if id === "position"}
     <div class="position">
-      <PositionPad
-        pan={current.pan}
-        tilt={current.tilt}
-        {fine}
-        onchange={(pan, tilt) => program(() => api.setPosition(pan, tilt))}
-      />
+      <div class="segmented" role="group" aria-label="Position control">
+        <button aria-pressed={!positionFaders} class:on={!positionFaders} onclick={() => setPositionFaders(false)}>
+          Pad
+        </button>
+        <button aria-pressed={positionFaders} class:on={positionFaders} onclick={() => setPositionFaders(true)}>
+          Faders
+        </button>
+      </div>
+      {#if positionFaders}
+        <div class="pos-faders">
+          {#each [{ axis: "pan", label: "Pan", level: current.pan }, { axis: "tilt", label: "Tilt", level: current.tilt }] as f (f.axis)}
+            <Fader
+              wide
+              {fine}
+              max={POSITION_STEPS}
+              format={positionPercent}
+              value={Math.round((f.level ?? 0.5) * POSITION_STEPS)}
+              label={f.label}
+              detail={f.level == null ? "Not set" : undefined}
+              active={f.level != null}
+              onchange={(v) =>
+                program(() =>
+                  f.axis === "pan" ? api.setPosition(v / POSITION_STEPS, null) : api.setPosition(null, v / POSITION_STEPS),
+                )}
+            />
+          {/each}
+        </div>
+      {:else}
+        <PositionPad
+          pan={current.pan}
+          tilt={current.tilt}
+          {fine}
+          onchange={(pan, tilt) => program(() => api.setPosition(pan, tilt))}
+        />
+      {/if}
       <div class="pos-buttons">
         <button aria-pressed={fine} class:on={fine} onclick={() => (fine = !fine)}>Fine</button>
         <button onclick={() => program(() => api.setPosition(0.5, 0.5))}>Centre</button>
@@ -493,7 +548,7 @@
   }
 
   .position :global(.pad) {
-    width: min(100cqw, 100cqh - 124px);
+    width: min(100cqw, 100cqh - 170px);
     flex-shrink: 0;
   }
 
@@ -508,6 +563,26 @@
     min-height: 48px;
     padding: 0;
     box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.15);
+  }
+
+  .segmented {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    width: 100%;
+  }
+
+  .segmented button {
+    min-height: 40px;
+  }
+
+  .pos-faders {
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    width: 100%;
+    height: calc(100cqh - 176px);
+    min-height: 0;
   }
 
   .pos-buttons {
