@@ -308,7 +308,7 @@
   .patch {
     height: 100%;
     display: grid;
-    grid-template-columns: 1fr minmax(460px, 600px);
+    grid-template-columns: 1fr minmax(400px, 520px);
     grid-template-rows: auto 1fr auto;
     gap: var(--gap);
   }
@@ -332,20 +332,20 @@
   .head,
   .fixture {
     display: grid;
-    grid-template-columns: 72px 1.2fr 1.6fr 120px;
-    gap: 16px;
+    grid-template-columns: 56px 1.2fr 1.6fr 100px;
+    gap: 12px;
     align-items: center;
-    padding: 0 16px;
+    padding: 0 12px;
     text-align: left;
   }
 
   .head {
-    min-height: 40px;
+    min-height: 32px;
     font-size: 0.85rem;
   }
 
   .fixture {
-    min-height: 64px;
+    min-height: 44px;
     border-color: transparent;
     background: transparent;
   }
@@ -363,8 +363,8 @@
   .fixture .num {
     display: inline-grid;
     place-items: center;
-    width: 52px;
-    height: 40px;
+    width: 44px;
+    height: 32px;
     border-radius: 8px;
     background: color-mix(in srgb, var(--colour) 25%, transparent);
     color: var(--colour);
@@ -383,10 +383,10 @@
   }
 
   .side {
-    padding: 24px;
+    padding: 16px;
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 14px;
   }
 
   .side p {
@@ -408,8 +408,8 @@
   .type-option {
     display: grid;
     text-align: left;
-    padding: 10px 16px;
-    min-height: 68px;
+    padding: 6px 12px;
+    min-height: 52px;
     align-content: center;
   }
 

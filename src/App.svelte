@@ -106,14 +106,14 @@
   .shell {
     height: 100%;
     display: grid;
-    grid-template-columns: 148px 1fr;
+    grid-template-columns: 112px 1fr;
   }
 
   .rail {
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    padding: 20px 12px;
+    gap: 6px;
+    padding: 14px 8px;
     background: var(--panel);
     border-right: 1px solid var(--line);
   }
@@ -123,7 +123,7 @@
     font-weight: 800;
     letter-spacing: -0.02em;
     text-align: center;
-    padding-bottom: 12px;
+    padding-bottom: 8px;
   }
 
   .brand span {
@@ -134,15 +134,15 @@
     display: grid;
     justify-items: center;
     gap: 4px;
-    padding: 14px 8px;
-    min-height: 96px;
+    padding: 8px 6px;
+    min-height: 68px;
     border-color: transparent;
     background: transparent;
     font-size: 0.9rem;
   }
 
   .nav .icon {
-    font-size: 1.8rem;
+    font-size: 1.5rem;
     line-height: 1;
   }
 
@@ -180,7 +180,7 @@
   }
 
   .blackout {
-    min-height: 88px;
+    min-height: 64px;
     font-weight: 700;
   }
 
@@ -191,12 +191,12 @@
   }
 
   main {
-    padding: 24px;
+    padding: 14px;
     min-width: 0;
     min-height: 0;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 10px;
   }
 
   .screen {
@@ -208,7 +208,7 @@
     display: flex;
     align-items: center;
     gap: 14px;
-    padding: 8px 14px;
+    padding: 6px 12px;
     border-radius: var(--radius);
     background: var(--panel);
     border: 1px solid var(--line);
@@ -249,7 +249,7 @@
   }
 
   .preview {
-    padding: 10px 16px;
+    padding: 8px 14px;
     border-radius: var(--radius);
     background: color-mix(in srgb, var(--warning) 15%, var(--panel));
     color: var(--warning);

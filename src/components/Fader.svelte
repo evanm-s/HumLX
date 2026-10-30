@@ -100,16 +100,16 @@
     grid-template-rows: auto 1fr auto auto auto;
     justify-items: center;
     gap: 8px;
-    width: 104px;
+    width: 88px;
     min-height: 0;
   }
 
   .wide {
-    width: 180px;
+    width: 140px;
   }
 
   .wide .track {
-    width: 150px;
+    width: 116px;
     border-radius: 20px;
   }
 
@@ -125,10 +125,10 @@
 
   .track {
     position: relative;
-    width: 76px;
+    width: 64px;
     height: 100%;
-    min-height: 200px;
-    border-radius: 14px;
+    min-height: 160px;
+    border-radius: 12px;
     background: var(--bg);
     border: 1px solid var(--line);
     overflow: hidden;

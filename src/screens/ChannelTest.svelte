@@ -104,16 +104,16 @@
   }
 
   .pad {
-    padding: 16px;
+    padding: 10px;
   }
 
   .tile {
     display: grid;
-    grid-template-columns: 48px 1fr auto;
+    grid-template-columns: 2.5ch 1fr auto;
     align-items: center;
     gap: 8px;
     text-align: left;
-    min-height: 64px;
+    min-height: 44px;
     flex-shrink: 0;
   }
 
@@ -141,10 +141,10 @@
   }
 
   .channels {
-    padding: 20px 24px;
+    padding: 14px 16px;
     display: grid;
     grid-template-rows: auto 1fr;
-    gap: 20px;
+    gap: 14px;
     min-height: 0;
   }
 
