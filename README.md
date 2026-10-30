@@ -64,7 +64,11 @@ connected.
 | Clear | Clears the command line, or the programmer when the line is empty |
 | Encoders 1 to 4 | Intensity, pan, tilt and zoom of the selection; press any to toggle fine |
 
-Other keys do nothing yet. The key LEDs are not driven yet either.
+Other keys do nothing yet.
+
+Key LEDs show what is going on: Highlight flashes while it is on, Record and
+Delete light while armed, Clear lights while there is something to clear,
+and the encoder LEDs light in fine mode.
 
 **Linux** needs permission to use the device. As root:
 

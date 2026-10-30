@@ -285,6 +285,7 @@ const commands: Record<string, (args: Args) => unknown> = {
   }),
   osc_settings: () => osc,
   surface_status: () => ({ connected: false, problem: null }),
+  set_surface_leds: () => undefined,
   set_osc: ({ settings }) => (osc = settings),
   show_file: () => null,
   save_show_as: () => {
