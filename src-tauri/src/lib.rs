@@ -174,6 +174,7 @@ pub fn run() {
             commands::overview,
             commands::add_fixtures,
             commands::update_fixture,
+            commands::update_fixtures,
             commands::remove_fixtures,
             commands::import_profile,
             commands::set_test_level,
