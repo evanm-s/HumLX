@@ -235,6 +235,19 @@ pub fn set_highlight(app: State<'_, App>, on: bool) {
 }
 
 #[tauri::command]
+pub fn highlight_colour(app: State<'_, App>) -> Rgb {
+    app.engine.state().highlight_colour
+}
+
+#[tauri::command]
+pub fn set_highlight_colour(app: State<'_, App>, colour: Rgb) -> Result<Rgb> {
+    let colour = colour.clamped();
+    app.engine.state().highlight_colour = colour;
+    app.save()?;
+    Ok(colour)
+}
+
+#[tauri::command]
 pub async fn discover_nodes() -> Result<Vec<Node>> {
     tauri::async_runtime::spawn_blocking(|| engine::discover(Duration::from_millis(1500)))
         .await

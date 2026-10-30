@@ -74,9 +74,12 @@ pub struct State {
     pub output: OutputSettings,
     pub status: OutputStatus,
     pub blackout: bool,
-    /// Picks out the selected fixtures: full, white and tight, with every
-    /// other fixture out. A temporary override that is never recorded.
+    /// Picks out the selected fixtures: full, in the highlight colour and
+    /// tight, with every other fixture out. A temporary override that is never
+    /// recorded.
     pub highlight: bool,
+    /// Colour that highlighted fixtures turn, white unless changed in Settings.
+    pub highlight_colour: Rgb,
     pub programmer: Programmer,
     pub groups: Vec<Group>,
     pub presets: Vec<Preset>,
@@ -180,7 +183,7 @@ impl State {
                     let tight = mode_of(&self.library, fixture).map_or(0.0, tightest_zoom);
                     values.merge(&Values {
                         intensity: Some(1.0),
-                        colour: Some(Rgb::WHITE),
+                        colour: Some(self.highlight_colour),
                         other: [(Attribute::Zoom, tight)].into(),
                         ..Default::default()
                     });
@@ -569,6 +572,12 @@ mod tests {
         assert_eq!(&wash(&state, 1)[5..8], &[128, 128, 255]);
         assert_eq!(state.universe().get(25), 128);
         assert_eq!(state.programmer.values[&1].intensity, Some(0.5));
+
+        // A highlight colour set in Settings replaces white.
+        state.highlight_colour = Rgb { r: 1.0, g: 0.0, b: 1.0 };
+        state.highlight = true;
+        state.compose();
+        assert_eq!(&wash(&state, 1)[5..], &[255, 255, 255, 0, 255, 0, 0]);
     }
 
     #[test]

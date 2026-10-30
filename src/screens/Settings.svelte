@@ -1,13 +1,14 @@
 <script lang="ts">
   import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
+  import ColourPicker from "../components/ColourPicker.svelte";
   import Dialog from "../components/Dialog.svelte";
   import NumberField from "../components/NumberField.svelte";
   import { api, inApp } from "../lib/api";
-  import { isIPv4, portAddressParts } from "../lib/format";
+  import { isIPv4, portAddressParts, rgbCss, SWATCHES } from "../lib/format";
   import { formKeys } from "../lib/keys";
   import { attempt, notify, show } from "../lib/show.svelte";
   import { updates } from "../lib/updates.svelte";
-  import type { Node } from "../lib/types";
+  import type { Node, Rgb } from "../lib/types";
 
   let draft = $state({ ...show.output, universe: show.output.universe as number | null, rateHz: show.output.rateHz as number | null });
   let nodes = $state<Node[] | null>(null);
@@ -106,6 +107,22 @@
       notify(saved.enabled ? `Listening for OSC on port ${saved.port}` : "OSC off");
     }
   }
+
+  // --- Highlight -------------------------------------------------------------
+
+  let highlightColour = $state<Rgb | undefined>();
+  attempt(() => api.highlightColour()).then((c) => (highlightColour = c ?? undefined));
+  let pendingHighlight: ReturnType<typeof setTimeout> | undefined;
+
+  // Shows the colour straight away, but only saves once dragging on the disc pauses.
+  function setHighlightColour(colour: Rgb, wait = 150) {
+    highlightColour = colour;
+    clearTimeout(pendingHighlight);
+    pendingHighlight = setTimeout(() => attempt(() => api.setHighlightColour(colour)), wait);
+  }
+
+  const sameColour = (a: Rgb | undefined, b: Rgb) =>
+    !!a && Math.abs(a.r - b.r) < 0.01 && Math.abs(a.g - b.g) < 0.01 && Math.abs(a.b - b.b) < 0.01;
 
   const status = $derived(show.live.osc);
   const example = $derived(show.playback.cueLists[0]?.id ?? 1);
@@ -221,6 +238,35 @@
 
   <section class="panel card">
     <div class="row">
+      <h2>Highlight colour</h2>
+      <span class="spacer"></span>
+      {#if highlightColour}<span class="current" style:background={rgbCss(highlightColour)}></span>{/if}
+    </div>
+    <p class="muted">
+      The colour that <strong>Highlight</strong> turns the selected fixtures. Pick one that stands out from what's
+      already on stage. Fixtures without colour mixing still go to full.
+    </p>
+    {#if highlightColour}
+      <div class="highlight-colour">
+        <ColourPicker colour={highlightColour} onchange={(c) => setHighlightColour(c)} />
+        <div class="swatches">
+          {#each SWATCHES as s (s.name)}
+            <button
+              class="swatch"
+              title={s.name}
+              aria-label={s.name}
+              aria-pressed={sameColour(highlightColour, s.colour)}
+              style:background={rgbCss(s.colour)}
+              onclick={() => setHighlightColour(s.colour, 0)}
+            ></button>
+          {/each}
+        </div>
+      </div>
+    {/if}
+  </section>
+
+  <section class="panel card">
+    <div class="row">
       <h2>Find nodes</h2>
       <span class="spacer"></span>
       <button onclick={search} disabled={searching}>{searching ? "Searching…" : "Search network"}</button>
@@ -302,6 +348,38 @@
 
   .good {
     color: var(--ok);
+  }
+
+  .current {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px var(--line);
+  }
+
+  .highlight-colour {
+    display: grid;
+    grid-template-columns: minmax(0, 240px) 1fr;
+    gap: var(--gap);
+    align-items: start;
+  }
+
+  .swatches {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+  }
+
+  .swatch {
+    min-height: 48px;
+    padding: 0;
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.15);
+  }
+
+  .swatch[aria-pressed="true"] {
+    box-shadow:
+      inset 0 0 0 3px #000,
+      0 0 0 3px var(--accent);
   }
 
   .addresses {

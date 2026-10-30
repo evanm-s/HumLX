@@ -67,7 +67,7 @@ pub fn open_show(app: State<'_, App>, path: String) -> Result<String> {
     Ok(shown)
 }
 
-/// Starts an empty show, keeping the output and OSC settings for this studio.
+/// Starts an empty show, keeping the output, OSC and highlight settings for this studio.
 #[tauri::command]
 pub fn new_show(app: State<'_, App>) -> Result<()> {
     {
@@ -75,6 +75,7 @@ pub fn new_show(app: State<'_, App>) -> Result<()> {
         let show = Show {
             output: state.output.clone(),
             osc: state.osc_settings.clone(),
+            highlight_colour: state.highlight_colour,
             ..Show::default()
         };
         apply_show(&mut state, show);

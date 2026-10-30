@@ -17,6 +17,7 @@ import type {
   Preset,
   Profile,
   ProgrammerView,
+  Rgb,
   Values,
   OscSettings,
 } from "./types";
@@ -41,6 +42,7 @@ let fixtures: Fixture[] = [1,2,3,4,5,6].map((id) => ({ id, name: `F${id}`, profi
 let output: OutputSettings = { enabled: true, target: "255.255.255.255", universe: 0, rateHz: 40 };
 let blackout = false;
 let highlight = false;
+let highlightColour: Rgb = { r: 1, g: 1, b: 1 };
 const tests = new Map<number, Map<number, number>>();
 let packets = 0;
 let selection: number[] = [];
@@ -76,7 +78,7 @@ function combined(): Record<number, Values> {
   if (highlight)
     for (const f of fixtures)
       out[f.id] = selection.includes(f.id)
-        ? { ...out[f.id], intensity: 1, colour: { r: 1, g: 1, b: 1 }, other: { ...out[f.id]?.other, zoom: 0 } }
+        ? { ...out[f.id], intensity: 1, colour: highlightColour, other: { ...out[f.id]?.other, zoom: 0 } }
         : { ...out[f.id], intensity: 0 };
   return out;
 }
@@ -281,6 +283,8 @@ const commands: Record<string, (args: Args) => unknown> = {
   set_output: ({ settings }) => (output = settings),
   set_blackout: ({ on }) => (blackout = on),
   set_highlight: ({ on }) => (highlight = on),
+  highlight_colour: () => highlightColour,
+  set_highlight_colour: ({ colour }) => (highlightColour = colour),
   programmer,
   select: ({ fixtures, mode }) => {
     if (mode === "set") selection = [...fixtures];
