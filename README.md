@@ -44,6 +44,38 @@ up quickly.
 - **Show files**: save the show to a file, open one, or start a new show.
   Imported fixture types travel inside the file.
 - **Updates**: the app checks GitHub Releases and offers to update itself.
+- **Obsidian NX-K control surface** over USB, found automatically when
+  plugged in (see below).
+
+## NX-K control surface
+
+A bar above the screen shows the keypad's command line while the NX-K is
+connected.
+
+| Keys | Does |
+| --- | --- |
+| `1 Thru 4 - 2 @ 5 Enter` | Selects fixtures 1, 3 and 4 at 50% (`@ 5` is 50%, `@ 05` is 5%) |
+| `Group 2 + 3 @ Full` | Selects groups 2 and 3 at full (Full finishes the command) |
+| `@ 75 Enter` | Sets the selection to 75% |
+| `Cue 4 Enter` | Goes to cue 4 of the cue list chosen on the Playback screen |
+| Next / Last | GO / Back on that cue list |
+| Record | Opens Record cue |
+| Highlight | Highlight on or off |
+| Clear | Clears the command line, or the programmer when the line is empty |
+| Encoders 1 to 4 | Intensity, pan, tilt and zoom of the selection; press any to toggle fine |
+
+Other keys do nothing yet. The key LEDs are not driven yet either.
+
+**Linux** needs permission to use the device. As root:
+
+```sh
+echo 'SUBSYSTEM=="usb", ATTR{idVendor}=="11be", ATTR{idProduct}=="e102", MODE="0666"' > /etc/udev/rules.d/70-nx-k.rules
+udevadm control --reload && udevadm trigger
+```
+
+**Windows** opens the NX-K through the WinUSB driver. If the bar says it
+needs WinUSB, install it for the NX-K with [Zadig](https://zadig.akeo.ie/).
+Only one program can use the NX-K at a time, so close Onyx first.
 
 ## Releasing
 

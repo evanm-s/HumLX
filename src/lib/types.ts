@@ -228,3 +228,10 @@ export interface PlaybackStatus {
   current: number;
   fading: boolean;
 }
+
+/** Whether the NX-K control surface is plugged in and usable. */
+export interface SurfaceStatus {
+  connected: boolean;
+  /** Why it can't be used, when it is plugged in but not working. */
+  problem: string | null;
+}

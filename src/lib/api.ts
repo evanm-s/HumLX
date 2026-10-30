@@ -19,6 +19,7 @@ import type {
   EffectSettings,
   RecordTarget,
   OscSettings,
+  SurfaceStatus,
 } from "./types";
 
 /** True when running inside the desktop app rather than a plain browser. */
@@ -82,6 +83,7 @@ export const api = {
   saveShowAs: (path: string) => invoke<string>("save_show_as", { path }),
   openShow: (path: string) => invoke<string>("open_show", { path }),
   newShow: () => invoke<void>("new_show"),
+  surfaceStatus: () => invoke<SurfaceStatus>("surface_status"),
 
   playback: () => invoke<PlaybackView>("playback"),
   newCueList: (name: string) => invoke<PlaybackView>("new_cue_list", { name }),

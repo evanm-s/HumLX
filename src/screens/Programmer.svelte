@@ -17,6 +17,7 @@
   import { loadLayout, saveLayout, type Grid, type Layout } from "../lib/layout";
   import { endSelectWindow, restartSelectWindow, tapMode } from "../lib/selection";
   import { attempt, show } from "../lib/show.svelte";
+  import { RECORD_EVENT } from "../lib/surface.svelte";
   import type { Attribute, Channel, Family } from "../lib/types";
 
   const selection = $derived(show.programmer.selection);
@@ -157,6 +158,15 @@
     e.preventDefault();
     setHighlight(!highlight);
   }
+
+  // Record on the control surface opens the same dialog as the Record button.
+  $effect(() => {
+    const record = () => {
+      if (!namingGroup && Object.keys(show.programmer.values).length > 0) recordingCue = true;
+    };
+    window.addEventListener(RECORD_EVENT, record);
+    return () => window.removeEventListener(RECORD_EVENT, record);
+  });
 
   // Leaving it on would keep the rest of the rig dark from other screens.
   onDestroy(() => {

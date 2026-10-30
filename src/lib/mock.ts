@@ -257,6 +257,7 @@ const commands: Record<string, (args: Args) => unknown> = {
     osc: { listening: osc.enabled, error: null, received: 0, last: null },
   }),
   osc_settings: () => osc,
+  surface_status: () => ({ connected: false, problem: null }),
   set_osc: ({ settings }) => (osc = settings),
   show_file: () => null,
   save_show_as: () => {
