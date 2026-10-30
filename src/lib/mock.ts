@@ -37,7 +37,8 @@ const profiles: Profile[] = Object.values(files).map((p) => ({
   id: `${slug(p.manufacturer)}/${slug(p.model)}`,
 }));
 
-let fixtures: Fixture[] = [1,2,3,4,5,6].map((id) => ({ id, name: `F${id}`, profile: profiles[0].id, mode: profiles[0].modes[0].name, address: id, footprint: 1, typeName: "x" }));
+const pick = (m: string) => profiles.find((p) => p.model.includes(m))!;
+let fixtures: Fixture[] = [1,2,3,4].map((id) => { const p = pick(id <= 2 ? "Bi-colour" : "RGBW"); return { id, name: id <= 2 ? `Panel ${id}` : `Par ${id}`, profile: p.id, mode: p.modes[0].name, address: id * 10, footprint: 1, typeName: "x" }; });
 let output: OutputSettings = { enabled: true, target: "255.255.255.255", universe: 0, rateHz: 40 };
 let blackout = false;
 let highlight = false;
@@ -81,6 +82,21 @@ function combined(): Record<number, Values> {
   return out;
 }
 
+const COLOUR_ATTRIBUTES: Attribute[] = [
+  "red",
+  "green",
+  "blue",
+  "white",
+  "warm_white",
+  "cool_white",
+  "amber",
+  "lime",
+  "uv",
+  "cyan",
+  "magenta",
+  "yellow",
+  "color_wheel",
+];
 const FAMILY: Record<string, Family> = { intensity: "intensity", colour: "colour", pan: "position", tilt: "position" };
 
 function only(v: Values, family: Family): Values {
@@ -292,7 +308,11 @@ const commands: Record<string, (args: Args) => unknown> = {
   },
   select_group: ({ id, mode }) => commands.select({ fixtures: groups.find((g) => g.id === id)?.fixtures ?? [], mode }),
   set_intensity: ({ value }) => update((v) => (v.intensity = value)),
-  set_colour: ({ colour }) => update((v) => (v.colour = colour)),
+  set_colour: ({ colour }) =>
+    update((v) => {
+      v.colour = colour;
+      for (const a of COLOUR_ATTRIBUTES) delete v.other?.[a];
+    }),
   set_position: ({ pan, tilt }) =>
     update((v) => {
       if (pan != null) v.pan = pan;
@@ -305,6 +325,7 @@ const commands: Record<string, (args: Args) => unknown> = {
       for (const v of Object.values(values)) {
         for (const key of Object.keys(FAMILY)) if (FAMILY[key] === family) delete v[key as keyof Values];
         if (family === "beam") delete v.other;
+        if (family === "colour") for (const a of [...COLOUR_ATTRIBUTES, "color_temperature" as const]) delete v.other?.[a];
       }
     return programmer();
   },

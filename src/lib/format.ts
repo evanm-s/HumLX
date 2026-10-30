@@ -24,7 +24,7 @@ export function capabilityAt(capabilities: Capability[] | undefined, value: numb
 const ATTRIBUTE_NAMES: Partial<Record<Attribute, string>> = {
   uv: "UV",
   color_wheel: "Colour wheel",
-  color_temperature: "Colour temp",
+  color_temperature: "White balance",
   pan_tilt_speed: "P/T speed",
   warm_white: "Warm white",
   cool_white: "Cool white",
@@ -61,6 +61,8 @@ export function attributeColour(attribute: Attribute): string {
       return "#ff4dd2";
     case "yellow":
       return "#ffe14d";
+    case "color_temperature":
+      return "#ffd2a1";
     case "intensity":
       return "#ffb547";
     default:
