@@ -73,9 +73,9 @@ echo 'SUBSYSTEM=="usb", ATTR{idVendor}=="11be", ATTR{idProduct}=="e102", MODE="0
 udevadm control --reload && udevadm trigger
 ```
 
-**Windows** opens the NX-K through the WinUSB driver. If the bar says it
-needs WinUSB, install it for the NX-K with [Zadig](https://zadig.akeo.ie/).
-Only one program can use the NX-K at a time, so close Onyx first.
+**Windows** needs nothing extra: Obsidian's driver for the NX-K (installed
+with Onyx) uses WinUSB, which HumLX opens directly. Only one program can use
+the NX-K at a time, so close Onyx first.
 
 ## Releasing
 
