@@ -6,7 +6,7 @@ use std::time::Duration;
 use humlx_core::artnet::Node;
 use humlx_core::engine::{self, OutputSettings, OutputStatus};
 use humlx_core::fixture::{slug, Attribute, Family, Profile};
-use humlx_core::patch::{mode_of, FixtureChanges, NewFixtures};
+use humlx_core::patch::{mode_of, FixtureChanges, FixtureUpdate, NewFixtures};
 use humlx_core::programmer::{next_id, Group, Preset, Rgb, SelectMode, Values};
 use humlx_core::{ofl, qlc, Error, Result};
 use serde::Serialize;
@@ -140,6 +140,22 @@ pub fn update_fixture(app: State<'_, App>, id: u32, changes: FixtureChanges) -> 
         // Test levels belong to the old channel layout.
         if changes.mode.is_some() || changes.id.is_some() {
             state.release(Some(id));
+        }
+    }
+    app.save()?;
+    Ok(patch_view(&app))
+}
+
+#[tauri::command]
+pub fn update_fixtures(app: State<'_, App>, updates: Vec<FixtureUpdate>) -> Result<PatchView> {
+    {
+        let mut state = app.engine.state();
+        let state = &mut *state;
+        state.patch.update_many(&state.library, &updates)?;
+        for update in &updates {
+            if update.changes.mode.is_some() || update.changes.id.is_some() {
+                state.release(Some(update.id));
+            }
         }
     }
     app.save()?;

@@ -5,12 +5,14 @@
 
   interface Props {
     occupancy: (number | null)[];
-    selected?: number | null;
+    /** The selected fixture, or several. */
+    selected?: number | null | number[];
     levels?: number[];
     onselect?: (fixture: number | null, address: number) => void;
   }
 
   let { occupancy, selected = null, levels, onselect }: Props = $props();
+  const isSelected = $derived((owner: number) => (Array.isArray(selected) ? selected.includes(owner) : owner === selected));
 </script>
 
 <div class="map" role="grid" aria-label="DMX address map">
@@ -20,7 +22,7 @@
       class="cell"
       class:used={owner != null}
       class:start
-      class:selected={owner != null && owner === selected}
+      class:selected={owner != null && isSelected(owner)}
       style:--colour={owner != null ? fixtureColour(owner) : undefined}
       style:--level={levels ? levels[index] / 255 : 0}
       title={owner != null ? `Address ${index + 1}: fixture ${owner}` : `Address ${index + 1}: free`}

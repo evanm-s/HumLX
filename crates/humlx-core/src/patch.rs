@@ -47,6 +47,13 @@ pub struct FixtureChanges {
     pub address: Option<Address>,
 }
 
+/// Changes to the fixture currently numbered `id`, as part of a bulk edit.
+#[derive(Debug, Clone, Deserialize)]
+pub struct FixtureUpdate {
+    pub id: u32,
+    pub changes: FixtureChanges,
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Patch {
     fixtures: Vec<PatchedFixture>,
@@ -134,6 +141,46 @@ impl Patch {
             *slot = updated;
         }
         self.sort();
+        Ok(())
+    }
+
+    /// Applies changes to several fixtures at once, keyed by their current
+    /// numbers. The changes are checked together, so fixtures can swap
+    /// numbers or shuffle addresses; nothing changes if any would clash.
+    pub fn update_many(&mut self, library: &Library, updates: &[FixtureUpdate]) -> Result<()> {
+        let mut candidate = self.clone();
+        let mut changed = Vec::with_capacity(updates.len());
+        for update in updates {
+            let index = self
+                .fixtures
+                .iter()
+                .position(|f| f.id == update.id)
+                .ok_or(Error::UnknownFixture(update.id))?;
+            let fixture = &mut candidate.fixtures[index];
+            let changes = &update.changes;
+            if let Some(new_id) = changes.id {
+                fixture.id = new_id;
+            }
+            if let Some(name) = &changes.name {
+                fixture.name = name.trim().to_string();
+            }
+            if let Some(mode) = &changes.mode {
+                fixture.mode = mode.clone();
+            }
+            if let Some(address) = changes.address {
+                fixture.address = address;
+            }
+            changed.push(index);
+        }
+        for &index in &changed {
+            let fixture = &candidate.fixtures[index];
+            if candidate.fixtures.iter().filter(|f| f.id == fixture.id).count() > 1 {
+                return Err(Error::DuplicateFixtureId(fixture.id));
+            }
+            candidate.check(library, fixture, Some(fixture.id))?;
+        }
+        candidate.sort();
+        *self = candidate;
         Ok(())
     }
 
@@ -304,6 +351,41 @@ mod tests {
         assert_eq!(fixture.name, "Front left");
         assert_eq!(fixture.mode, "4ch RGBW");
         assert_eq!(patch.fixtures().last().unwrap().id, 10);
+    }
+
+    #[test]
+    fn updates_many_together() {
+        let library = Library::with_bundled();
+        let mut patch = Patch::default();
+        patch.add(&library, &request(3, Some(1))).unwrap();
+        let update = |id, new_id, address| FixtureUpdate {
+            id,
+            changes: FixtureChanges {
+                id: Some(new_id),
+                address: Some(address),
+                ..Default::default()
+            },
+        };
+
+        // Swapping numbers and addresses only works when checked together.
+        patch
+            .update_many(&library, &[update(1, 2, 7), update(2, 1, 1)])
+            .unwrap();
+        assert_eq!(patch.get(1).unwrap().name, "RGBW Par 2");
+        assert_eq!(patch.get(1).unwrap().address, 1);
+        assert_eq!(patch.get(2).unwrap().address, 7);
+
+        // A clash with a fixture outside the edit leaves the patch unchanged.
+        let before = patch.clone();
+        let err = patch
+            .update_many(&library, &[update(1, 3, 100), update(2, 4, 200)])
+            .unwrap_err();
+        assert!(matches!(err, Error::DuplicateFixtureId(3)), "{err}");
+        let err = patch
+            .update_many(&library, &[update(1, 10, 13), update(2, 11, 50)])
+            .unwrap_err();
+        assert!(matches!(err, Error::AddressOverlap { other: 3, .. }), "{err}");
+        assert_eq!(patch, before);
     }
 
     #[test]

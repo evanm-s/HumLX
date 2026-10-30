@@ -3,6 +3,7 @@
 import { invoke as tauriInvoke } from "@tauri-apps/api/core";
 import type {
   FixtureChanges,
+  FixtureUpdate,
   Live,
   NewFixtures,
   Node,
@@ -49,6 +50,7 @@ export const api = {
   addFixtures: (request: NewFixtures) => invoke<PatchView>("add_fixtures", { request }),
   updateFixture: (id: number, changes: FixtureChanges) =>
     invoke<PatchView>("update_fixture", { id, changes }),
+  updateFixtures: (updates: FixtureUpdate[]) => invoke<PatchView>("update_fixtures", { updates }),
   removeFixtures: (ids: number[]) => invoke<PatchView>("remove_fixtures", { ids }),
   importProfile: (json: string, manufacturer: string | null) =>
     invoke<Profile[]>("import_profile", { json, manufacturer }),

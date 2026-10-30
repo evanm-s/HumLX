@@ -138,6 +138,12 @@ export interface FixtureChanges {
   address?: number;
 }
 
+export interface FixtureUpdate {
+  /** The fixture's current number. */
+  id: number;
+  changes: FixtureChanges;
+}
+
 export interface Node {
   ip: string;
   shortName: string;

@@ -6,10 +6,56 @@
   import { fixtureColour, range } from "../lib/format";
   import { formKeys } from "../lib/keys";
   import { attempt, notify, show } from "../lib/show.svelte";
-  import type { Fixture } from "../lib/types";
+  import type { Fixture, FixtureChanges } from "../lib/types";
 
-  let selectedId = $state<number | null>(null);
+  // Selected fixture numbers. One opens the edit form; more open bulk edit.
+  let selectedIds = $state<number[]>([]);
+  // In multi-select, taps add and remove fixtures instead of replacing.
+  let multi = $state(false);
+  // Where a Shift+click range starts.
+  let anchor: number | null = null;
+  const selectedId = $derived(selectedIds.length === 1 ? selectedIds[0] : null);
   const selected = $derived(show.fixture(selectedId));
+  const selection = $derived(show.patch.fixtures.filter((f) => selectedIds.includes(f.id)));
+
+  function clearSelection() {
+    selectedIds = [];
+    anchor = null;
+  }
+
+  function selectOnly(id: number | null) {
+    selectedIds = id == null ? [] : [id];
+    anchor = id;
+  }
+
+  function toggle(id: number) {
+    selectedIds = selectedIds.includes(id) ? selectedIds.filter((x) => x !== id) : [...selectedIds, id];
+    anchor = id;
+  }
+
+  function tap(id: number, event?: MouseEvent) {
+    if (event?.shiftKey && anchor != null) {
+      const ids = show.patch.fixtures.map((f) => f.id);
+      const [a, b] = [ids.indexOf(anchor), ids.indexOf(id)].sort((x, y) => x - y);
+      if (a >= 0) {
+        selectedIds = [...new Set([...selectedIds, ...ids.slice(a, b + 1)])];
+        return;
+      }
+    }
+    if (multi || event?.ctrlKey || event?.metaKey) toggle(id);
+    else selectOnly(selectedIds.length === 1 && selectedIds[0] === id ? null : id);
+  }
+
+  function selectAll() {
+    selectedIds = show.patch.fixtures.map((f) => f.id);
+    multi = true;
+  }
+
+  // Drop numbers that no longer exist, e.g. after a remove or show load.
+  $effect(() => {
+    const ids = show.patch.fixtures.map((f) => f.id);
+    if (selectedIds.some((id) => !ids.includes(id))) selectedIds = selectedIds.filter((id) => ids.includes(id));
+  });
 
   // Add form
   let profileId = $state<string | null>(null);
@@ -98,7 +144,7 @@
     );
     if (patch) {
       show.patch = patch;
-      selectedId = edit.id;
+      selectOnly(edit.id);
     }
   }
 
@@ -111,7 +157,78 @@
     const patch = await attempt(() => api.removeFixtures([selected.id]));
     if (patch) {
       show.patch = patch;
-      selectedId = null;
+      clearSelection();
+    }
+  }
+
+  // Bulk edit. Blank fields leave that property as it is.
+  let bulk = $state({ firstId: null as number | null, address: null as number | null, name: "", mode: null as string | null });
+  let confirmBulkRemove = $state(false);
+  const selectionKey = $derived(selectedIds.join(","));
+
+  $effect(() => {
+    void selectionKey;
+    bulk = { firstId: null, address: null, name: "", mode: null };
+    confirmBulkRemove = false;
+  });
+
+  // Mode can change together only when every selected fixture is the same type.
+  const bulkModes = $derived(
+    selection.length > 0 && selection.every((f) => f.profile === selection[0].profile)
+      ? (show.profile(selection[0].profile)?.modes ?? [])
+      : [],
+  );
+  const bulkFootprints = $derived(
+    selection.map((f) =>
+      bulk.mode ? (bulkModes.find((m) => m.name === bulk.mode)?.channels.length ?? f.footprint) : f.footprint,
+    ),
+  );
+  const bulkSpan = $derived(bulkFootprints.reduce((a, b) => a + b, 0));
+  const bulkDirty = $derived(bulk.firstId != null || bulk.address != null || bulk.name.trim() !== "" || bulk.mode != null);
+  const bulkLocated = $derived(selection.length > 0 && selection.every((f) => show.live.tested.includes(f.id)));
+
+  async function saveBulk() {
+    if (!bulkDirty) return;
+    const baseName = bulk.name.trim();
+    let address = bulk.address;
+    const updates = selection.map((f, i) => {
+      const changes: FixtureChanges = {};
+      if (bulk.firstId != null) changes.id = bulk.firstId + i;
+      if (baseName) changes.name = `${baseName} ${i + 1}`;
+      if (bulk.mode) changes.mode = bulk.mode;
+      if (address != null) {
+        changes.address = address;
+        address += bulkFootprints[i];
+      }
+      return { id: f.id, changes };
+    });
+    const patch = await attempt(() => api.updateFixtures(updates));
+    if (patch) {
+      show.patch = patch;
+      selectedIds = updates.map((u) => u.changes.id ?? u.id);
+      notify(`Updated ${updates.length} fixtures`);
+    }
+  }
+
+  async function removeBulk() {
+    if (!confirmBulkRemove) {
+      confirmBulkRemove = true;
+      return;
+    }
+    const count = selectedIds.length;
+    const patch = await attempt(() => api.removeFixtures(selectedIds));
+    if (patch) {
+      show.patch = patch;
+      clearSelection();
+      notify(`Removed ${count} fixtures`);
+    }
+  }
+
+  async function toggleLocateAll() {
+    const located = bulkLocated;
+    for (const f of selection) {
+      if (located) await attempt(() => api.release(f.id));
+      else if (!show.live.tested.includes(f.id)) await attempt(() => api.locate(f.id));
     }
   }
 
@@ -143,8 +260,15 @@
     <h1>Patch</h1>
     <span class="muted">{show.patch.fixtures.length} fixtures · {show.patch.occupancy.filter((o) => o != null).length} of 512 channels used</span>
     <span class="spacer"></span>
+    <button
+      aria-pressed={multi}
+      class:on={multi}
+      title="Tap fixtures to add or remove them. Ctrl+click and Shift+click also work."
+      onclick={() => (multi = !multi)}>Multi-select</button
+    >
+    <button onclick={selectAll} disabled={show.patch.fixtures.length === 0}>All</button>
     <button onclick={() => (importing = true)}>Import fixture type</button>
-    <button class="primary" onclick={() => (selectedId = null)} disabled={selectedId == null}>Add fixtures</button>
+    <button class="primary" onclick={clearSelection} disabled={selectedIds.length === 0}>Add fixtures</button>
   </header>
 
   <section class="list panel scroll" aria-label="Patched fixtures">
@@ -162,8 +286,9 @@
       {#each show.patch.fixtures as fixture (fixture.id)}
         <button
           class="fixture"
-          class:selected={fixture.id === selectedId}
-          onclick={() => (selectedId = fixture.id === selectedId ? null : fixture.id)}
+          class:selected={selectedIds.includes(fixture.id)}
+          aria-pressed={selectedIds.includes(fixture.id)}
+          onclick={(e) => tap(fixture.id, e)}
         >
           <span class="num" style:--colour={fixtureColour(fixture.id)}>{fixture.id}</span>
           <span class="name">{fixture.name}</span>
@@ -174,8 +299,64 @@
     {/if}
   </section>
 
-  <aside class="side panel scroll" use:formKeys={{ onescape: selected ? () => (selectedId = null) : undefined }}>
-    {#if selected}
+  <aside class="side panel scroll" use:formKeys={{ onescape: selectedIds.length ? clearSelection : undefined }}>
+    {#if selection.length > 1}
+      <div class="row">
+        <h2>{selection.length} fixtures</h2>
+        <span class="spacer"></span>
+        <button aria-pressed={bulkLocated} class:locating={bulkLocated} onclick={toggleLocateAll}>
+          {bulkLocated ? "Release all" : "Locate all"}
+        </button>
+      </div>
+      <p class="muted">
+        {[...new Set(selection.map((f) => f.typeName))].join(", ")}. Changes apply in fixture number order; leave a
+        field blank to keep it.
+      </p>
+      <div class="pair">
+        <NumberField
+          label="Renumber from"
+          bind:value={bulk.firstId}
+          min={1}
+          placeholder={`Keep (${selection[0].id}…)`}
+        />
+        <NumberField label="Re-address from" bind:value={bulk.address} min={1} max={512} placeholder="Keep" />
+      </div>
+      <label class="field">
+        Name
+        <input bind:value={bulk.name} placeholder="Keep names" />
+      </label>
+      {#if bulkModes.length > 1}
+        <div class="field">
+          Mode
+          <div class="segmented">
+            {#each bulkModes as m (m.name)}
+              <button
+                aria-pressed={bulk.mode === m.name}
+                onclick={() => (bulk.mode = bulk.mode === m.name ? null : m.name)}
+              >
+                {m.name} <span class="muted">· {m.channels.length}ch</span>
+              </button>
+            {/each}
+          </div>
+        </div>
+      {/if}
+      {#if bulkDirty}
+        <p class="muted summary">
+          {#if bulk.firstId != null}Numbers {bulk.firstId}–{bulk.firstId + selection.length - 1}.{/if}
+          {#if bulk.address != null}Back to back at {range(bulk.address, bulkSpan)}.{/if}
+          {#if bulk.name.trim()}Named {bulk.name.trim()} 1 to {selection.length}.{/if}
+          {#if bulk.mode}All set to {bulk.mode}.{/if}
+        </p>
+      {/if}
+      <div class="row actions">
+        <button class="danger" onclick={removeBulk}>
+          {confirmBulkRemove ? `Tap again to remove ${selection.length}` : `Remove ${selection.length}`}
+        </button>
+        <span class="spacer"></span>
+        <button onclick={clearSelection}>Done</button>
+        <button class="primary" disabled={!bulkDirty} onclick={saveBulk}>Save changes</button>
+      </div>
+    {:else if selected}
       <div class="row">
         <h2>Fixture {selected.id}</h2>
         <span class="spacer"></span>
@@ -208,7 +389,7 @@
       <div class="row actions">
         <button class="danger" onclick={remove}>{confirmRemove ? "Tap again to remove" : "Remove"}</button>
         <span class="spacer"></span>
-        <button onclick={() => (selectedId = null)}>Done</button>
+        <button onclick={clearSelection}>Done</button>
         <button class="primary" disabled={!dirty} onclick={save}>Save changes</button>
       </div>
     {:else}
@@ -269,9 +450,9 @@
   <section class="map panel">
     <AddressMap
       occupancy={show.patch.occupancy}
-      selected={selectedId}
+      selected={selectedIds}
       levels={show.live.universe}
-      onselect={(owner) => owner != null && (selectedId = owner)}
+      onselect={(owner) => owner != null && (multi ? toggle(owner) : selectOnly(owner))}
     />
   </section>
 </div>
@@ -432,6 +613,11 @@
 
   .actions {
     margin-top: auto;
+  }
+
+  .on {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 15%, var(--panel-raised));
   }
 
   .locating {

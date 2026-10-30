@@ -11,6 +11,7 @@ import type {
   Fixture,
   Group,
   Live,
+  FixtureUpdate,
   NewFixtures,
   OutputSettings,
   PatchView,
@@ -239,6 +240,15 @@ const commands: Record<string, (args: Args) => unknown> = {
     const f = fixtures.find((x) => x.id === id)!;
     Object.assign(f, Object.fromEntries(Object.entries(changes).filter(([, v]) => v !== undefined)));
     f.footprint = modeOf(f)?.channels.length ?? 0;
+    return view();
+  },
+  update_fixtures: ({ updates }: Args & { updates?: FixtureUpdate[] }) => {
+    const targets = (updates ?? []).map((u) => [fixtures.find((x) => x.id === u.id)!, u.changes] as const);
+    for (const [f, changes] of targets) {
+      Object.assign(f, Object.fromEntries(Object.entries(changes).filter(([, v]) => v !== undefined)));
+      f.footprint = modeOf(f)?.channels.length ?? 0;
+    }
+    fixtures.sort((a, b) => a.id - b.id);
     return view();
   },
   remove_fixtures: ({ ids }) => {
