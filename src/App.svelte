@@ -4,6 +4,7 @@
   import UpdateButton from "./components/UpdateButton.svelte";
   import { api, inApp } from "./lib/api";
   import { attempt, show } from "./lib/show.svelte";
+  import { lineText, surface } from "./lib/surface.svelte";
   import { updates } from "./lib/updates.svelte";
   import ChannelTest from "./screens/ChannelTest.svelte";
   import Patch from "./screens/Patch.svelte";
@@ -29,7 +30,12 @@
       if (show.patch.fixtures.length === 0) screen = "patch";
     });
     updates.start();
-    return show.startLive();
+    const stopSurface = surface.start();
+    const stopLive = show.startLive();
+    return () => {
+      stopLive();
+      stopSurface.then((stop) => stop());
+    };
   });
 
   const status = $derived(
@@ -69,6 +75,20 @@
 
   <main>
     {#if !inApp}<div class="preview">Preview mode in a browser. Run the desktop app to control lights.</div>{/if}
+    {#if surface.status.connected || surface.status.problem}
+      <div class="surface" class:bad={surface.status.problem}>
+        <span class="tag">NX-K</span>
+        {#if surface.status.problem}
+          <span>{surface.status.problem}</span>
+        {:else}
+          <span class="line" class:empty={surface.line.length === 0}
+            >{lineText(surface.line) || "Type on the keypad, e.g. 1 Thru 4 @ 5 Enter"}</span
+          >
+          {#if surface.fine}<span class="fine">Fine</span>{/if}
+          <span class="muted">Encoders: {surface.encoders.map((e) => e.label).join(" · ")}</span>
+        {/if}
+      </div>
+    {/if}
     <div class="screen">
       {#if show.loaded}
         {#key show.revision}
@@ -182,6 +202,50 @@
   .screen {
     flex: 1;
     min-height: 0;
+  }
+
+  .surface {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 8px 14px;
+    border-radius: var(--radius);
+    background: var(--panel);
+    border: 1px solid var(--line);
+    font-size: 0.9rem;
+  }
+
+  .surface.bad {
+    color: var(--warning);
+  }
+
+  .surface .tag {
+    font-weight: 700;
+    color: var(--accent);
+  }
+
+  .surface .line {
+    flex: 1;
+    font-family: ui-monospace, monospace;
+    font-size: 1.1rem;
+  }
+
+  .surface .line.empty {
+    color: var(--muted);
+    font-family: inherit;
+    font-size: 0.9rem;
+  }
+
+  .surface .fine {
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--accent);
+    color: var(--bg, #000);
+    font-weight: 700;
+  }
+
+  .surface .muted {
+    color: var(--muted);
   }
 
   .preview {

@@ -6,6 +6,7 @@ pub mod dmx;
 pub mod engine;
 pub mod error;
 pub mod fixture;
+pub mod nxk;
 pub mod ofl;
 pub mod osc;
 pub mod patch;

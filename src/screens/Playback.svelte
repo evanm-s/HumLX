@@ -8,6 +8,7 @@
   import RecordCue from "../components/RecordCue.svelte";
   import { api } from "../lib/api";
   import { show } from "../lib/show.svelte";
+  import { RECORD_EVENT, surface } from "../lib/surface.svelte";
   import type { Effect, EffectKind, EffectSettings, Wave } from "../lib/types";
 
   const play = show.play.bind(show);
@@ -17,6 +18,10 @@
     if (!show.playback.cueLists.some((l) => l.id === listId)) listId = show.playback.cueLists[0]?.id ?? null;
   });
   const list = $derived(show.playback.cueLists.find((l) => l.id === listId));
+  // Next and Last on the control surface run the list chosen here.
+  $effect(() => {
+    surface.cueList = listId;
+  });
 
   let cueIndex = $state<number | null>(null);
   $effect(() => {
@@ -59,6 +64,15 @@
     const id = list.id;
     play(() => (e.shiftKey ? api.back(id) : api.go(id)));
   }
+
+  // Record on the control surface opens the same dialog as the Record button.
+  $effect(() => {
+    const record = () => {
+      if (!dialog && programmed > 0) dialog = "record";
+    };
+    window.addEventListener(RECORD_EVENT, record);
+    return () => window.removeEventListener(RECORD_EVENT, record);
+  });
 
   function recorded(id: number, index: number) {
     listId = id;

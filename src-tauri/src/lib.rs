@@ -4,6 +4,7 @@
 mod commands;
 mod playback;
 mod shows;
+mod surface;
 
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
@@ -164,6 +165,7 @@ pub fn run() {
         .setup(|app| {
             let data_dir = app.path().app_data_dir()?;
             app.manage(App::load(&data_dir)?);
+            app.manage(surface::start(app.handle().clone()));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -204,6 +206,7 @@ pub fn run() {
             shows::save_show_as,
             shows::open_show,
             shows::new_show,
+            surface::surface_status,
             playback::update_cue,
             playback::edit_cue,
             playback::delete_cue,
