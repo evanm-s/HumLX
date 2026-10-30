@@ -12,10 +12,14 @@
     active?: boolean;
     /** A wider fader, for the main intensity control. */
     wide?: boolean;
+    /** Slows dragging to a tenth of the speed, for precise moves. */
+    fine?: boolean;
+    /** How to show the level above the fader; defaults to the raw value. */
+    format?: (value: number) => string;
     onchange: (value: number) => void;
   }
 
-  let { value, label, sublabel, detail, colour = "var(--accent)", max = 255, active = false, wide = false, onchange }: Props =
+  let { value, label, sublabel, detail, colour = "var(--accent)", max = 255, active = false, wide = false, fine = false, format, onchange }: Props =
     $props();
 
   let track: HTMLDivElement;
@@ -39,7 +43,8 @@
   function move(event: PointerEvent) {
     if (!dragging) return;
     const height = track.clientHeight;
-    const next = Math.round(startValue + ((startY - event.clientY) / height) * max);
+    const scale = fine ? 0.1 : 1;
+    const next = Math.round(startValue + ((startY - event.clientY) / height) * max * scale);
     const clamped = Math.max(0, Math.min(max, next));
     if (clamped !== local) {
       local = clamped;
@@ -64,7 +69,7 @@
 </script>
 
 <div class="fader" class:active class:wide>
-  <div class="value">{shown}</div>
+  <div class="value">{format ? format(shown) : shown}</div>
   <div
     class="track"
     bind:this={track}
