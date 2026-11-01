@@ -81,7 +81,7 @@ class Surface {
     if (this.mode === "record") leds.record = "on";
     if (this.mode === "delete") leds.delete = "on";
     // Clear has something to clear.
-    if (this.line.length > 0 || Object.keys(show.programmer.values).length > 0) leds.clear = "on";
+    if (this.line.length > 0 || Object.keys(show.programmer.values).length > 0 || show.programmer.effects.length > 0) leds.clear = "on";
     if (this.fine) for (let i = 1; i <= 4; i++) leds[`encoder${i}`] = "on";
     return leds;
   }

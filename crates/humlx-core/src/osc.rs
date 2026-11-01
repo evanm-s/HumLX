@@ -280,7 +280,6 @@ pub fn apply(state: &mut State, command: &Command, now: Instant) -> Result<()> {
         }
         Command::ReleaseAll => {
             state.playbacks.release_all();
-            state.running_effects.stop_all();
             Ok(())
         }
         Command::Blackout(on) => {
@@ -431,6 +430,7 @@ mod tests {
             mode: Default::default(),
             follow: 0.0,
             values: [(1, Values::default())].into(),
+            effects: Vec::new(),
         };
         state.cue_lists.push(CueList {
             id: 3,

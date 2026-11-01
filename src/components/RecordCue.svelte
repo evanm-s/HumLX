@@ -20,6 +20,7 @@
 
   const lists = $derived(show.playback.cueLists);
   const programmed = $derived(Object.keys(show.programmer.values).length);
+  const effects = $derived(show.programmer.effects.length);
 
   // The suggested list, else the newest one; null means a new cue list.
   function suggested() {
@@ -77,12 +78,14 @@
     {:else}
       Starts a new cue list with this as its first cue.
     {/if}
-    It stores what the Programmer is setting on {programmed} fixtures. The Programmer is then cleared and the cue list
+    It stores what the Programmer is setting on {programmed} fixtures{effects
+      ? `, and ${effects} ${effects === 1 ? "effect" : "effects"}, which run on into later cues until a cue sets those fixtures again`
+      : ""}. The Programmer is then cleared and the cue list
     goes to the new cue, so the stage stays the same.
   </p>
   {#snippet actions()}
     <button onclick={onclose}>Cancel</button>
-    <button class="primary" disabled={programmed === 0} onclick={record}>Record</button>
+    <button class="primary" disabled={programmed === 0 && effects === 0} onclick={record}>Record</button>
   {/snippet}
 </Dialog>
 

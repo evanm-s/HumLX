@@ -301,6 +301,8 @@ pub struct Programmer {
     pub selection: Vec<u32>,
     /// Values set on each fixture, including fixtures no longer selected.
     pub values: BTreeMap<u32, Values>,
+    /// Effects being built, which run on top of the values and record into cues.
+    pub effects: Vec<crate::effect::Effect>,
 }
 
 impl Programmer {
@@ -341,8 +343,12 @@ impl Programmer {
     /// Clears one family from every fixture, or everything when `None`.
     pub fn clear(&mut self, family: Option<Family>) {
         match family {
-            None => self.values.clear(),
+            None => {
+                self.values.clear();
+                self.effects.clear();
+            }
             Some(family) => {
+                self.effects.retain(|e| e.family() != family);
                 for values in self.values.values_mut() {
                     values.clear(family);
                 }
@@ -355,6 +361,10 @@ impl Programmer {
     pub fn retain(&mut self, patched: impl Fn(u32) -> bool) {
         self.selection.retain(|id| patched(*id));
         self.values.retain(|id, _| patched(*id));
+        for effect in &mut self.effects {
+            effect.fixtures.retain(|id| patched(*id));
+        }
+        self.effects.retain(|e| !e.fixtures.is_empty());
     }
 }
 

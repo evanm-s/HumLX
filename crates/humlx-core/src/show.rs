@@ -28,7 +28,9 @@ pub struct Show {
     pub presets: Vec<Preset>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub cue_lists: Vec<CueList>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Effects from before effects lived in cues. Loading turns each into a
+    /// cue list of its own, so it can still be run from a fader.
+    #[serde(default, skip_serializing)]
     pub effects: Vec<Effect>,
     #[serde(default)]
     pub osc: OscSettings,
@@ -60,12 +62,25 @@ impl Default for Show {
 
 impl Show {
     pub fn from_json(json: &str) -> Result<Self> {
-        let show: Show = serde_json::from_str(json).map_err(|e| Error::InvalidShow(e.to_string()))?;
+        let mut show: Show = serde_json::from_str(json).map_err(|e| Error::InvalidShow(e.to_string()))?;
         if show.version > FORMAT_VERSION {
             return Err(Error::InvalidShow(format!(
                 "this show was saved by a newer version of HumLX (format {})",
                 show.version
             )));
+        }
+        for effect in std::mem::take(&mut show.effects) {
+            let id = crate::programmer::next_id(show.cue_lists.iter().map(|l| l.id));
+            show.cue_lists.push(CueList {
+                id,
+                name: effect.name.clone(),
+                cues: vec![crate::playback::Cue {
+                    name: effect.name.clone(),
+                    fade: 0.0,
+                    effects: vec![effect],
+                    ..Default::default()
+                }],
+            });
         }
         Ok(show)
     }
@@ -128,9 +143,10 @@ mod tests {
                 mode: Default::default(),
                 follow: 0.0,
                 values: programmer.values.clone(),
+                effects: Vec::new(),
             }],
         });
-        show.effects.push(crate::effect::Effect::new(
+        show.cue_lists[0].cues[0].effects.push(crate::effect::Effect::new(
             1,
             "Rainbow".into(),
             crate::effect::Shape::Rainbow,
@@ -147,6 +163,20 @@ mod tests {
         show.save(&path).unwrap();
         assert_eq!(Show::load(&path).unwrap(), show);
         std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn old_effects_become_cue_lists() {
+        let json = r#"{"version": 1, "cueLists": [{"id": 1, "name": "Main"}],
+            "effects": [{"id": 1, "name": "Wash pulse", "kind": "dimmer", "wave": "sine",
+                         "fixtures": [3, 4], "rate": 1, "size": 1, "spread": 0.5}]}"#;
+        let show = Show::from_json(json).unwrap();
+        assert!(show.effects.is_empty());
+        let list = &show.cue_lists[1];
+        assert_eq!((list.id, list.name.as_str()), (2, "Wash pulse"));
+        let effect = &list.cues[0].effects[0];
+        assert_eq!(effect.shape, crate::effect::Shape::Pulse);
+        assert_eq!(effect.fixtures, vec![3, 4]);
     }
 
     #[test]

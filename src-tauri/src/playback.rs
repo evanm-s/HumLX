@@ -2,7 +2,7 @@
 
 use std::time::Instant;
 
-use humlx_core::effect::{Direction, Effect, Pattern, Shape};
+use humlx_core::effect::{lay_over, Direction, Effect, EffectSize, Pattern, Shape};
 use humlx_core::engine::State as EngineState;
 use humlx_core::playback::{Cue, CueList, CueMode};
 use humlx_core::programmer::next_id;
@@ -42,7 +42,8 @@ pub fn statuses(state: &EngineState) -> Vec<PlaybackStatus> {
 #[serde(rename_all = "camelCase")]
 pub struct PlaybackView {
     cue_lists: Vec<CueList>,
-    effects: Vec<Effect>,
+    /// The master that scales every effect, 0 to 1.
+    effect_size: f32,
     /// Fader level of each cue list, by id.
     masters: Vec<(u32, f32)>,
 }
@@ -51,7 +52,7 @@ fn view(app: &App) -> PlaybackView {
     let state = app.engine.state();
     PlaybackView {
         cue_lists: state.cue_lists.clone(),
-        effects: state.effects.clone(),
+        effect_size: state.effect_size.0,
         masters: masters(&state),
     }
 }
@@ -149,10 +150,11 @@ pub fn record_cue(
     after: Option<usize>,
 ) -> Result<PlaybackView> {
     change(&app, true, |state| {
-        if state.programmer.values.is_empty() {
+        if state.programmer.values.is_empty() && state.programmer.effects.is_empty() {
             return Err(Error::NothingToRecord);
         }
         let values = state.programmer.values.clone();
+        let effects = state.programmer.effects.clone();
         let list = match target {
             RecordTarget::List(id) => id,
             RecordTarget::New(list_name) => add_cue_list(state, &list_name),
@@ -169,6 +171,7 @@ pub fn record_cue(
                 name,
                 fade: fade.max(0.0),
                 values,
+                effects,
                 ..Default::default()
             },
         );
@@ -184,16 +187,20 @@ pub fn record_cue(
 #[tauri::command]
 pub fn update_cue(app: State<'_, App>, list: u32, index: usize) -> Result<PlaybackView> {
     change(&app, true, |state| {
-        if state.programmer.values.is_empty() {
+        if state.programmer.values.is_empty() && state.programmer.effects.is_empty() {
             return Err(Error::NothingToRecord);
         }
         let values = state.programmer.values.clone();
+        let effects = state.programmer.effects.clone();
         let cue = list_mut(state, list)?
             .cues
             .get_mut(index)
             .ok_or(Error::UnknownCue(index + 1))?;
         for (fixture, v) in values {
             cue.values.entry(fixture).or_default().merge(&v);
+        }
+        for effect in effects {
+            lay_over(&mut cue.effects, effect);
         }
         state.programmer.clear(None);
         refresh(state, list);
@@ -289,7 +296,6 @@ pub fn release_cue_list(app: State<'_, App>, list: u32) -> Result<PlaybackView> 
 pub fn release_all(app: State<'_, App>) -> Result<PlaybackView> {
     change(&app, false, |state| {
         state.playbacks.release_all();
-        state.running_effects.stop_all();
         Ok(())
     })
 }
@@ -345,14 +351,16 @@ impl EffectSettings {
     }
 }
 
-/// Creates an effect on the selected fixtures, or changes effect `id`'s
-/// settings (keeping its fixtures). A new effect starts running.
+/// Creates an effect in the programmer on the selected fixtures, or changes
+/// programmer effect `id`'s settings (keeping its fixtures). Programmer
+/// effects run straight away and record into cues with the values.
 #[tauri::command]
 pub fn save_effect(app: State<'_, App>, settings: EffectSettings, id: Option<u32>) -> Result<PlaybackView> {
-    change(&app, true, |state| {
+    change(&app, false, |state| {
         match id {
             Some(id) => {
                 let effect = state
+                    .programmer
                     .effects
                     .iter_mut()
                     .find(|e| e.id == id)
@@ -363,7 +371,7 @@ pub fn save_effect(app: State<'_, App>, settings: EffectSettings, id: Option<u32
                 if state.programmer.selection.is_empty() {
                     return Err(Error::InvalidShow("select the fixtures for the effect first".into()));
                 }
-                let id = next_id(state.effects.iter().map(|e| e.id));
+                let id = next_id(state.programmer.effects.iter().map(|e| e.id));
                 let mut effect = Effect::new(
                     id,
                     String::new(),
@@ -372,8 +380,7 @@ pub fn save_effect(app: State<'_, App>, settings: EffectSettings, id: Option<u32
                     state.programmer.selection.clone(),
                 );
                 settings.apply_to(&mut effect);
-                state.effects.push(effect);
-                state.effects.sort_by_key(|e| e.id);
+                state.programmer.effects.push(effect);
                 state.running_effects.start(id, Instant::now());
             }
         }
@@ -383,24 +390,18 @@ pub fn save_effect(app: State<'_, App>, settings: EffectSettings, id: Option<u32
 
 #[tauri::command]
 pub fn delete_effect(app: State<'_, App>, id: u32) -> Result<PlaybackView> {
-    change(&app, true, |state| {
-        state.effects.retain(|e| e.id != id);
+    change(&app, false, |state| {
+        state.programmer.effects.retain(|e| e.id != id);
         state.running_effects.stop(id);
         Ok(())
     })
 }
 
+/// Sets the master that scales every effect, from 0 to 1.
 #[tauri::command]
-pub fn set_effect_running(app: State<'_, App>, id: u32, on: bool) -> Result<PlaybackView> {
+pub fn set_effect_size(app: State<'_, App>, level: f32) -> Result<PlaybackView> {
     change(&app, false, |state| {
-        if !state.effects.iter().any(|e| e.id == id) {
-            return Err(Error::UnknownEffect(id));
-        }
-        if on {
-            state.running_effects.start(id, Instant::now());
-        } else {
-            state.running_effects.stop(id);
-        }
+        state.effect_size = EffectSize(level.clamp(0.0, 1.0));
         Ok(())
     })
 }

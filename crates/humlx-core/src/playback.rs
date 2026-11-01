@@ -1,8 +1,10 @@
 //! Cue lists and their live playback with timed fades.
 //!
-//! Each cue stores programmer values. Cue lists track: the look at a cue is
-//! every earlier cue with that cue's changes laid on top, so a cue only needs
-//! to hold what changes.
+//! Each cue stores programmer values and effects. Cue lists track: the look
+//! at a cue is every earlier cue with that cue's changes laid on top, so a cue
+//! only needs to hold what changes. An effect keeps running into later cues
+//! until a later cue sets a value or another effect of its family on its
+//! fixtures, as on grandMA3.
 
 use std::collections::BTreeMap;
 use std::time::{Duration, Instant};
@@ -12,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use crate::error::{Error, Result};
 use crate::programmer::{Rgb, Values};
 
-/// Fixture values by fixture number.
+use crate::effect::{families_in, lay_over, take_out};
 pub use crate::effect::{Effect, Look, RunningEffects};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -32,6 +34,9 @@ pub struct Cue {
     pub follow: f32,
     #[serde(default)]
     pub values: Look,
+    /// Effects this cue starts.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub effects: Vec<Effect>,
 }
 
 impl Default for Cue {
@@ -42,6 +47,7 @@ impl Default for Cue {
             mode: CueMode::Hold,
             follow: 0.0,
             values: Look::new(),
+            effects: Vec::new(),
         }
     }
 }
@@ -86,6 +92,22 @@ impl CueList {
             }
         }
         look
+    }
+
+    /// The effects running at cue `index`, with earlier cues tracked through.
+    pub fn effects_at(&self, index: usize) -> Vec<Effect> {
+        let mut effects = Vec::new();
+        for cue in self.cues.iter().take(index + 1) {
+            for (fixture, values) in &cue.values {
+                for family in families_in(values) {
+                    take_out(&mut effects, family, &[*fixture]);
+                }
+            }
+            for effect in &cue.effects {
+                lay_over(&mut effects, effect.clone());
+            }
+        }
+        effects
     }
 }
 
@@ -149,6 +171,11 @@ pub struct Playback {
     pub order: u64,
     from: Look,
     to: Look,
+    /// Effects fading out and in, alongside the values.
+    from_effects: Vec<Effect>,
+    to_effects: Vec<Effect>,
+    /// When the list started running, which effects keep time from.
+    clock: Instant,
     started: Instant,
     fade: Duration,
     /// When the current cue was gone to, kept when the list is refreshed.
@@ -173,6 +200,31 @@ impl Playback {
         } else {
             blend_looks(&self.from, &self.to, t)
         }
+    }
+
+    /// The look with this playback's effects on it, their sizes scaled by
+    /// `size`. Effects fade in and out with the cue fade; an effect in both
+    /// cues keeps running.
+    pub fn look_with_effects(&self, now: Instant, size: f32) -> Look {
+        let mut look = self.look(now);
+        let t = self.progress(now);
+        let elapsed = now.saturating_duration_since(self.clock).as_secs_f32();
+        if t < 1.0 {
+            for effect in self.from_effects.iter().filter(|e| !self.to_effects.contains(e)) {
+                effect.apply_scaled(&mut look, elapsed, size * (1.0 - t));
+            }
+        }
+        for effect in &self.to_effects {
+            let k = if self.from_effects.contains(effect) { 1.0 } else { t };
+            if k > 0.0 {
+                effect.apply_scaled(&mut look, elapsed, size * k);
+            }
+        }
+        look
+    }
+
+    pub fn effects(&self) -> &[Effect] {
+        &self.to_effects
     }
 
     /// True while a fade is running.
@@ -215,7 +267,10 @@ impl Playbacks {
     /// Fades the list to cue `index`, from wherever it is now.
     pub fn go_to(&mut self, list: &CueList, index: usize, now: Instant) -> Result<()> {
         let cue = list.cues.get(index).ok_or(Error::UnknownCue(index + 1))?;
-        let from = self.active.get(&list.id).map(|p| p.look(now)).unwrap_or_default();
+        let previous = self.active.get(&list.id);
+        let from = previous.map(|p| p.look(now)).unwrap_or_default();
+        let from_effects = previous.map(|p| p.to_effects.clone()).unwrap_or_default();
+        let clock = previous.map_or(now, |p| p.clock);
         self.counter += 1;
         let playback = Playback {
             current: index,
@@ -223,6 +278,9 @@ impl Playbacks {
             order: self.counter,
             from,
             to: list.look_at(index),
+            from_effects,
+            to_effects: list.effects_at(index),
+            clock,
             started: now,
             fade: Duration::from_secs_f32(cue.fade.max(0.0)),
             entered: now,
@@ -316,15 +374,20 @@ impl Playbacks {
         self.masters.retain(|id, _| exists(*id));
     }
 
-    /// The combined output of every running playback. Intensity takes the
-    /// highest level (after each master); everything else comes from the
-    /// most recently moved playback.
+    /// The combined output of every running playback, without effects.
     pub fn output(&self, now: Instant) -> Look {
+        self.output_with_effects(now, 0.0)
+    }
+
+    /// The combined output of every running playback, with their effects at
+    /// `effect_size`. Intensity takes the highest level (after each master);
+    /// everything else comes from the most recently moved playback.
+    pub fn output_with_effects(&self, now: Instant, effect_size: f32) -> Look {
         let mut playbacks: Vec<&Playback> = self.active.values().collect();
         playbacks.sort_by_key(|p| p.order);
         let mut out = Look::new();
         for playback in playbacks {
-            for (fixture, mut values) in playback.look(now) {
+            for (fixture, mut values) in playback.look_with_effects(now, effect_size) {
                 values.intensity = values.intensity.map(|i| i * playback.master);
                 let entry = out.entry(fixture).or_default();
                 let highest = match (entry.intensity, values.intensity) {
@@ -371,6 +434,7 @@ mod tests {
                     mode: Default::default(),
                     follow: 0.0,
                     values: [(1, red)].into(),
+                    effects: Vec::new(),
                 },
                 Cue {
                     name: "Half".into(),
@@ -378,6 +442,7 @@ mod tests {
                     mode: Default::default(),
                     follow: 0.0,
                     values: [(1, values(0.5)), (2, values(1.0))].into(),
+                    effects: Vec::new(),
                 },
             ],
         }
@@ -474,6 +539,45 @@ mod tests {
     }
 
     #[test]
+    fn effects_track_until_replaced() {
+        use crate::effect::Shape;
+        let pulse = Effect::new(1, "Pulse".into(), Shape::Pulse, &[], vec![1, 2]);
+        let circle = Effect::new(2, "Circle".into(), Shape::Circle, &[], vec![1]);
+        let mut list = list();
+        list.cues[0].effects = vec![pulse.clone(), circle.clone()];
+        // Cue 2 sets intensity on fixtures 1 and 2, which stops the pulse.
+        assert_eq!(list.effects_at(0), vec![pulse.clone(), circle.clone()]);
+        assert_eq!(list.effects_at(1), vec![circle.clone()]);
+
+        list.cues[1].values.clear();
+        list.cues[1].effects = vec![Effect::new(3, "Chase".into(), Shape::Chase, &[], vec![2])];
+        let at_two = list.effects_at(1);
+        assert_eq!(at_two.len(), 3);
+        assert_eq!(at_two[0].fixtures, vec![1]); // the pulse carries on on fixture 1 only
+    }
+
+    #[test]
+    fn effects_fade_with_the_cue() {
+        use crate::effect::Shape;
+        let mut list = list();
+        list.cues[1].values.clear();
+        list.cues[1].effects = vec![Effect::new(1, "Chase".into(), Shape::Chase, &[], vec![1])];
+        let mut playbacks = Playbacks::default();
+        let start = Instant::now();
+        playbacks.go(&list, start).unwrap();
+        playbacks.go(&list, start).unwrap();
+        let out = playbacks.output_with_effects(start + Duration::from_millis(250), 1.0);
+        assert!((out[&1].intensity.unwrap() - 1.0).abs() < 1e-6); // chase on
+        let out = playbacks.output_with_effects(start + Duration::from_millis(1500), 1.0);
+        let level = out[&1].intensity.unwrap();
+        assert!((level - 0.25).abs() < 1e-6, "{level}"); // 75% faded in, chase off
+        assert_eq!(
+            playbacks.output(start + Duration::from_millis(1500))[&1].intensity,
+            Some(1.0)
+        );
+    }
+
+    #[test]
     fn hold_is_the_default() {
         let cue: Cue = serde_json::from_str(r#"{"name":"Old","fade":1}"#).unwrap();
         assert_eq!(cue.mode, CueMode::Hold);
@@ -504,6 +608,7 @@ mod tests {
                 mode: Default::default(),
                 follow: 0.0,
                 values: [(1, values(0.8))].into(),
+                effects: Vec::new(),
             }],
         };
         let mut b = a.clone();
