@@ -2,6 +2,7 @@
 // in a plain browser for previewing. It skips most validation; the real
 // rules live in `crates/humlx-core`.
 
+import { recipe, SHAPES } from "../components/programmer/effects";
 import type {
   Attribute,
   CueList,
@@ -19,6 +20,7 @@ import type {
   Profile,
   ProgrammerView,
   Rgb,
+  Shape,
   Values,
   OscSettings,
 } from "./types";
@@ -52,14 +54,14 @@ let groups: Group[] = [];
 let presets: Preset[] = [];
 let cueLists: CueList[] = [];
 let osc: OscSettings = { enabled: false, port: 8000 };
-let effects: Effect[] = [];
+let effects: Effect[] = []; // in the programmer
+let effectSize = 1;
 const running = new Map<number, number>(); // cue list -> current cue
 const masters = new Map<number, number>();
-const effectsOn = new Set<number>();
 
 const playback = (): PlaybackView => ({
   cueLists: structuredClone(cueLists),
-  effects: structuredClone(effects),
+  effectSize,
   masters: cueLists.map((l) => [l.id, masters.get(l.id) ?? 1]),
 });
 
@@ -116,6 +118,7 @@ function only(v: Values, family: Family): Values {
 const programmer = (): ProgrammerView => ({
   selection: [...selection],
   values: structuredClone(values),
+  effects: structuredClone(effects),
   groups: structuredClone(groups),
   presets: structuredClone(presets),
 });
@@ -279,7 +282,6 @@ const commands: Record<string, (args: Args) => unknown> = {
     highlight,
     tested: [...tests.keys()].sort((a, b) => a - b),
     playbacks: [...running].map(([list, current]) => ({ list, current, fading: false, followIn: null })),
-    runningEffects: [...effectsOn],
     masters: cueLists.map((l) => [l.id, masters.get(l.id) ?? 1]),
     osc: { listening: osc.enabled, error: null, received: 0, last: null },
   }),
@@ -303,7 +305,6 @@ const commands: Record<string, (args: Args) => unknown> = {
     values = {};
     selection = [];
     running.clear();
-    effectsOn.clear();
     highlight = false;
   },
   set_output: ({ settings }) => (output = settings),
@@ -334,13 +335,17 @@ const commands: Record<string, (args: Args) => unknown> = {
     }),
   set_attribute: ({ attribute, value }) => update((v) => ((v.other ??= {})[attribute as Attribute] = value)),
   clear_programmer: ({ family }) => {
-    if (family == null) values = {};
-    else
+    if (family == null) {
+      values = {};
+      effects = [];
+    } else {
+      effects = effects.filter((e) => SHAPES[e.shape].family !== family);
       for (const v of Object.values(values)) {
         for (const key of Object.keys(FAMILY)) if (FAMILY[key] === family) delete v[key as keyof Values];
         if (family === "beam") delete v.other;
         if (family === "colour") for (const a of [...COLOUR_ATTRIBUTES, "color_temperature" as const]) delete v.other?.[a];
       }
+    }
     return programmer();
   },
   save_group: ({ name, id }) => {
@@ -376,19 +381,22 @@ const commands: Record<string, (args: Args) => unknown> = {
   rename_cue_list: ({ id, name }) => ((cueLists.find((l) => l.id === id)!.name = name), playback()),
   delete_cue_list: ({ id }) => ((cueLists = cueLists.filter((l) => l.id !== id)), running.delete(id), playback()),
   record_cue: ({ target, name, fade, after }) => {
-    if (!Object.keys(values).length) throw "There is nothing in the programmer to record";
+    if (!Object.keys(values).length && !effects.length) throw "There is nothing in the programmer to record";
     const list = "list" in target ? target.list : addCueList(target.new);
     const l = cueLists.find((x) => x.id === list)!;
     const index = after == null ? l.cues.length : Math.min(after + 1, l.cues.length);
-    l.cues.splice(index, 0, { name: name.trim() || `Cue ${index + 1}`, fade, mode: "hold", follow: 0, values: structuredClone(values) });
+    l.cues.splice(index, 0, { name: name.trim() || `Cue ${index + 1}`, fade, mode: "hold", follow: 0, values: structuredClone(values), effects: structuredClone(effects) });
     values = {};
+    effects = [];
     running.set(list, index);
     return playback();
   },
   update_cue: ({ list, index }) => {
     const cue = cueLists.find((x) => x.id === list)!.cues[index];
     for (const [f, v] of Object.entries(values)) cue.values[f] = { ...cue.values[f], ...v };
+    cue.effects = [...(cue.effects ?? []), ...structuredClone(effects)];
     values = {};
+    effects = [];
     return playback();
   },
   edit_cue: ({ list, index, name, fade, mode, follow }) => {
@@ -410,27 +418,23 @@ const commands: Record<string, (args: Args) => unknown> = {
   back: ({ list }) => (running.has(list) && running.set(list, Math.max(0, running.get(list)! - 1)), playback()),
   go_to: ({ list, index }) => (running.set(list, index), playback()),
   release_cue_list: ({ list }) => (running.delete(list), playback()),
-  release_all: () => (running.clear(), effectsOn.clear(), playback()),
+  release_all: () => (running.clear(), playback()),
   set_master: ({ list, level }) => (masters.set(list, level), playback()),
   save_effect: ({ settings, id }) => {
-    // The real engine builds steps from the shape; here only a swap's colours are kept.
     const made = {
       ...settings,
-      steps: (settings.colours ?? []).map((colour: Rgb) => ({ colour })),
-      layering: "onTop" as const,
-      transition: settings.transition ?? 1,
+      ...recipe(settings.shape, settings.colours),
+      transition: settings.transition ?? SHAPES[settings.shape as Shape].transition,
     };
     if (id != null) Object.assign(effects.find((e) => e.id === id)!, made);
     else {
       if (!selection.length) throw "select the fixtures for the effect first";
-      const eid = nextId(effects.map((e) => e.id));
-      effects.push({ ...made, id: eid, fixtures: [...selection] });
-      effectsOn.add(eid);
+      effects.push({ ...made, id: nextId(effects.map((e) => e.id)), fixtures: [...selection] });
     }
     return playback();
   },
-  delete_effect: ({ id }) => ((effects = effects.filter((e) => e.id !== id)), effectsOn.delete(id), playback()),
-  set_effect_running: ({ id, on }) => (on ? effectsOn.add(id) : effectsOn.delete(id), playback()),
+  delete_effect: ({ id }) => ((effects = effects.filter((e) => e.id !== id)), playback()),
+  set_effect_size: ({ level }) => ((effectSize = level), playback()),
   discover_nodes: async () => {
     await new Promise((r) => setTimeout(r, 800));
     return [{ ip: "192.168.1.50", shortName: "Preview node", longName: "Pretend Art-Net node", outputs: [0, 1] }];

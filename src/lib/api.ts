@@ -117,5 +117,5 @@ export const api = {
   setMaster: (list: number, level: number) => invoke<PlaybackView>("set_master", { list, level }),
   saveEffect: (settings: EffectSettings, id: number | null) => invoke<PlaybackView>("save_effect", { settings, id }),
   deleteEffect: (id: number) => invoke<PlaybackView>("delete_effect", { id }),
-  setEffectRunning: (id: number, on: boolean) => invoke<PlaybackView>("set_effect_running", { id, on }),
+  setEffectSize: (level: number) => invoke<PlaybackView>("set_effect_size", { level }),
 };

@@ -1,7 +1,7 @@
 <script lang="ts">
-  // The effects of one family, shown in place of a Programmer window's controls.
-  // Add makes a new one on the selected fixtures; effects that include a
-  // selected fixture are marked.
+  // The programmer's effects of one family, shown in place of a Programmer
+  // window's controls. Add makes a new one on the selected fixtures; they run
+  // straight away and record into cues with the programmer's values.
 
   import { api } from "../../lib/api";
   import { show } from "../../lib/show.svelte";
@@ -15,7 +15,7 @@
 
   let { family }: Props = $props();
 
-  const effects = $derived(show.playback.effects.filter((e) => SHAPES[e.shape]?.family === family));
+  const effects = $derived(show.programmer.effects.filter((e) => SHAPES[e.shape]?.family === family));
   const selected = $derived(new Set(show.programmer.selection));
   let editing = $state<Effect | "new" | null>(null);
 </script>
@@ -25,18 +25,19 @@
     {selected.size === 0 ? "Select fixtures to add an effect" : `+ Add ${FAMILY_LABELS[family]} effect`}
   </button>
   {#each effects as e (e.id)}
-    {@const on = show.live.runningEffects.includes(e.id)}
-    <div class="effect" class:on class:mine={e.fixtures.some((f) => selected.has(f))}>
-      <button class="toggle" aria-pressed={on} onclick={() => show.play(() => api.setEffectRunning(e.id, !on))}>
-        {on ? "On" : "Off"}
-      </button>
+    <div class="effect" class:mine={e.fixtures.some((f) => selected.has(f))}>
       <button class="text" onclick={() => (editing = e)}>
         <strong>{e.name}</strong>
-        <span class="muted">{e.name !== SHAPES[e.shape]?.label ? `${SHAPES[e.shape]?.label} · ` : ""}{e.fixtures.length} fixtures · {Math.round(e.rate * 60)} BPM{e.spread > 0 && e.pattern !== "inOrder" ? ` · ${PATTERNS[e.pattern].label}` : ""}</span>
+        <span class="muted"
+          >{e.name !== SHAPES[e.shape]?.label ? `${SHAPES[e.shape]?.label} · ` : ""}{e.fixtures.length} fixtures · {Math.round(
+            e.rate * 60,
+          )} BPM{e.spread > 0 && e.pattern !== "inOrder" ? ` · ${PATTERNS[e.pattern].label}` : ""}</span
+        >
       </button>
+      <button class="remove" aria-label="Remove {e.name}" onclick={() => show.play(() => api.deleteEffect(e.id))}>✕</button>
     </div>
   {:else}
-    <p class="muted">No {FAMILY_LABELS[family]} effects yet.</p>
+    <p class="muted">No {FAMILY_LABELS[family]} effects in the programmer. Effects in cues show on stage but not here.</p>
   {/each}
 </div>
 
@@ -63,16 +64,9 @@
 
   .effect {
     display: grid;
-    grid-template-columns: 64px 1fr;
+    grid-template-columns: 1fr 48px;
     gap: 6px;
     flex-shrink: 0;
-  }
-
-  .toggle[aria-pressed="true"] {
-    background: var(--accent);
-    border-color: var(--accent);
-    color: var(--accent-text);
-    font-weight: 700;
   }
 
   .text {

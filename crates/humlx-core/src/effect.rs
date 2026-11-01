@@ -533,14 +533,63 @@ impl RunningEffects {
         self.started.keys().copied().collect()
     }
 
-    /// Applies every running effect to `look`, in effect number order.
-    pub fn apply(&self, effects: &[Effect], look: &mut Look, now: Instant) {
+    /// Applies every running effect to `look`, in order, with sizes scaled by `scale`.
+    pub fn apply(&self, effects: &[Effect], look: &mut Look, now: Instant, scale: f32) {
         for effect in effects {
             if let Some(started) = self.started.get(&effect.id) {
-                effect.apply(look, now.saturating_duration_since(*started).as_secs_f32());
+                effect.apply_scaled(look, now.saturating_duration_since(*started).as_secs_f32(), scale);
             }
         }
     }
+}
+
+/// The master that scales the size of every effect, from 0 (no movement) to 1.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct EffectSize(pub f32);
+
+impl Default for EffectSize {
+    fn default() -> Self {
+        Self(1.0)
+    }
+}
+
+/// The families `values` sets.
+pub fn families_in(values: &Values) -> Vec<Family> {
+    let mut families = Vec::new();
+    let mut add = |f: Family| {
+        if !families.contains(&f) {
+            families.push(f);
+        }
+    };
+    if values.intensity.is_some() {
+        add(Family::Intensity);
+    }
+    if values.colour.is_some() {
+        add(Family::Colour);
+    }
+    if values.pan.is_some() || values.tilt.is_some() {
+        add(Family::Position);
+    }
+    for attribute in values.other.keys() {
+        add(attribute.family());
+    }
+    families
+}
+
+/// Takes `fixtures` out of every effect in `effects` that moves `family`,
+/// dropping effects left with no fixtures. This is how a later cue's value
+/// or effect stops an earlier effect on the same fixtures.
+pub fn take_out(effects: &mut Vec<Effect>, family: Family, fixtures: &[u32]) {
+    for effect in effects.iter_mut().filter(|e| e.family() == family) {
+        effect.fixtures.retain(|f| !fixtures.contains(f));
+    }
+    effects.retain(|e| !e.fixtures.is_empty());
+}
+
+/// Adds `effect` to `effects`, replacing earlier effects of its family on its fixtures.
+pub fn lay_over(effects: &mut Vec<Effect>, effect: Effect) {
+    take_out(effects, effect.family(), &effect.fixtures);
+    effects.push(effect);
 }
 
 #[cfg(test)]
@@ -710,6 +759,24 @@ mod tests {
         // And new ones round-trip.
         let json = serde_json::to_string(&e).unwrap();
         assert_eq!(serde_json::from_str::<Effect>(&json).unwrap(), e);
+    }
+
+    #[test]
+    fn later_effects_replace_earlier_ones() {
+        let mut effects = vec![effect(Shape::Pulse, vec![1, 2, 3]), effect(Shape::Circle, vec![1])];
+        lay_over(&mut effects, effect(Shape::Chase, vec![2, 3]));
+        assert_eq!(effects.len(), 3);
+        assert_eq!(effects[0].fixtures, vec![1]);
+        take_out(&mut effects, Family::Position, &[1]);
+        assert_eq!(
+            effects.iter().map(|e| e.shape).collect::<Vec<_>>(),
+            vec![Shape::Pulse, Shape::Chase]
+        );
+        let values = Values {
+            tilt: Some(0.2),
+            ..Default::default()
+        };
+        assert_eq!(families_in(&values), vec![Family::Position]);
     }
 
     #[test]

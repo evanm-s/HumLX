@@ -1,7 +1,7 @@
 <script lang="ts">
   // Cue lists: record the programmer as cues, run them with GO, and mix them
   // on playback faders. Effects are made in the Programmer's Intensity, Colour
-  // and Position windows.
+  // and Position windows and recorded into cues; the Effect size fader scales them all.
 
   import Dialog from "../components/Dialog.svelte";
   import Fader from "../components/Fader.svelte";
@@ -33,7 +33,10 @@
   // Masters come from the live poll too, since OSC can move them.
   const master = (id: number) =>
     (show.live.masters.find(([l]) => l === id) ?? show.playback.masters.find(([l]) => l === id))?.[1] ?? 1;
-  const programmed = $derived(Object.keys(show.programmer.values).length);
+  // Fixtures with programmer values or effects, which Record would take.
+  const programmed = $derived(
+    new Set([...Object.keys(show.programmer.values).map(Number), ...show.programmer.effects.flatMap((e) => e.fixtures)]).size,
+  );
 
   // Dialogs
   let dialog = $state<null | "record" | "edit" | "list">(null);
@@ -112,7 +115,7 @@
   <header class="row">
     <h1>Playback</h1>
     {#if programmed > 0}
-      <span class="programmer-note">Programmer has values for {programmed} fixtures, shown on top of playback</span>
+      <span class="programmer-note">Programmer has values or effects for {programmed} fixtures, shown on top of playback</span>
       <button onclick={() => show.program(() => api.clearProgrammer(null))}>Clear programmer</button>
     {/if}
     <span class="spacer"></span>
@@ -154,7 +157,12 @@
             <span class="state">{live?.current === i ? (live.fading ? "◐" : "▶") : ""}</span>
             <span class="num">{i + 1}</span>
             <span class="name">{cue.name}</span>
-            <span class="muted">{Object.keys(cue.values).length} fixtures</span>
+            <span class="muted">
+              {Object.keys(cue.values).length} fixtures{#if cue.effects?.length}<span
+                  class="fx"
+                  title={cue.effects.map((e) => e.name).join(", ")}>&nbsp;· FX {cue.effects.length}</span
+                >{/if}
+            </span>
             <span class="mode" class:follow={cue.mode === "follow"}>
               {#if cue.mode === "follow"}
                 Follow {live?.current === i && live.followIn != null ? `in ${live.followIn.toFixed(1)}` : cue.follow}s
@@ -191,6 +199,19 @@
 
   <!-- Playback faders -->
   <section class="panel strips scroll-x">
+    <div class="strip effect-size" class:running={show.playback.effectSize < 1}>
+      <div class="strip-name">Effect size</div>
+      <div class="strip-cue muted">All effects</div>
+      <div class="strip-body">
+        <Fader
+          max={100}
+          value={Math.round(show.playback.effectSize * 100)}
+          label="Size"
+          active={show.playback.effectSize > 0}
+          onchange={(v) => play(() => api.setEffectSize(v / 100))}
+        />
+      </div>
+    </div>
     {#each show.playback.cueLists as l (l.id)}
       {@const live = status(l.id)}
       <div class="strip" class:running={live != null}>
@@ -315,6 +336,14 @@
   .cue.selected {
     border-color: var(--accent);
     background: var(--panel-raised);
+  }
+
+  .strip.effect-size {
+    width: 140px;
+  }
+
+  .fx {
+    color: var(--accent);
   }
 
   .state {

@@ -93,7 +93,6 @@ impl App {
             groups: state.groups.clone(),
             presets: state.presets.clone(),
             cue_lists: state.cue_lists.clone(),
-            effects: state.effects.clone(),
             osc: state.osc_settings.clone(),
             highlight_colour: state.highlight_colour,
             profiles,
@@ -129,7 +128,6 @@ fn apply_show(state: &mut State, show: Show) {
     state.groups = show.groups;
     state.presets = show.presets;
     state.cue_lists = show.cue_lists;
-    state.effects = show.effects;
     state.osc_settings = show.osc;
     state.highlight_colour = show.highlight_colour;
     state.programmer = Default::default();
@@ -224,7 +222,7 @@ pub fn run() {
             playback::set_master,
             playback::save_effect,
             playback::delete_effect,
-            playback::set_effect_running,
+            playback::set_effect_size,
         ])
         .run(tauri::generate_context!())
         .expect("error while running HumLX");

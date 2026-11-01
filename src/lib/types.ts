@@ -104,7 +104,6 @@ export interface Live {
   highlight: boolean;
   tested: number[];
   playbacks: PlaybackStatus[];
-  runningEffects: number[];
   /** Master level by cue list number. */
   masters: [number, number][];
   osc: OscStatus;
@@ -184,6 +183,8 @@ export interface Preset {
 export interface ProgrammerView {
   selection: number[];
   values: Record<string, Values>;
+  /** Effects being built, which record into cues with the values. */
+  effects: Effect[];
   groups: Group[];
   presets: Preset[];
 }
@@ -200,6 +201,8 @@ export interface Cue {
   /** For a follow cue, seconds from GO until the next cue starts. */
   follow: number;
   values: Record<string, Values>;
+  /** Effects this cue starts; they run on into later cues until replaced. */
+  effects?: Effect[];
 }
 
 export interface CueList {
@@ -252,12 +255,16 @@ export interface Effect extends EffectSettings {
   /** The values the fixtures run through. */
   steps: Values[];
   layering: "onTop" | "replace";
+  curve: "smooth" | "linear";
+  /** Whether the last step fades back to the first. */
+  wrap: boolean;
   transition: number;
 }
 
 export interface PlaybackView {
   cueLists: CueList[];
-  effects: Effect[];
+  /** The master that scales every effect, 0 to 1. */
+  effectSize: number;
   masters: [number, number][];
 }
 

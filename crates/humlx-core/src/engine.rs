@@ -12,11 +12,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::artnet;
 use crate::dmx::Universe;
+use crate::effect::EffectSize;
 use crate::error::{Error, Result};
 use crate::fixture::{Attribute, Library, Mode};
 use crate::osc::{OscSettings, OscStatus};
 use crate::patch::{mode_of, Patch};
-use crate::playback::{CueList, Effect, Playbacks, RunningEffects};
+use crate::playback::{CueList, Playbacks, RunningEffects};
 use crate::programmer::{Group, Preset, Programmer, Rgb, Values};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -84,9 +85,11 @@ pub struct State {
     pub groups: Vec<Group>,
     pub presets: Vec<Preset>,
     pub cue_lists: Vec<CueList>,
-    pub effects: Vec<Effect>,
     pub playbacks: Playbacks,
+    /// When each programmer effect started, by its number.
     pub running_effects: RunningEffects,
+    /// Scales the size of every effect, in cues and the programmer.
+    pub effect_size: EffectSize,
     pub osc_settings: OscSettings,
     pub osc: OscStatus,
     /// Raw channel levels set from the channel test screen, by fixture
@@ -172,12 +175,15 @@ impl State {
     pub fn compose_at(&mut self, now: Instant) -> &Universe {
         // Follow cues move on first, so this frame shows the cue they went to.
         self.playbacks.follow(&self.cue_lists, now);
-        // Playbacks, then the programmer on top, then effects moving whatever results.
-        let mut look = self.playbacks.output(now);
+        // Playbacks with their effects, then programmer values on top (which
+        // override a cue's effect on what they set), then programmer effects.
+        let size = self.effect_size.0.clamp(0.0, 1.0);
+        let mut look = self.playbacks.output_with_effects(now, size);
         for (fixture, values) in &self.programmer.values {
             look.entry(*fixture).or_default().merge(values);
         }
-        self.running_effects.apply(&self.effects, &mut look, now);
+        self.running_effects
+            .apply(&self.programmer.effects, &mut look, now, size);
         if self.highlight {
             for fixture in self.patch.fixtures() {
                 let values = look.entry(fixture.id).or_default();
@@ -475,45 +481,66 @@ mod tests {
 
     #[test]
     fn playback_under_programmer_and_effects() {
-        use crate::effect::{Effect, Shape};
+        use crate::effect::{Effect, EffectSize, Shape};
         use crate::playback::{Cue, CueList};
         use crate::programmer::{SelectMode, Values};
         let mut state = state_with("generic/dimmer", "1ch", 1);
+        let chase = Effect::new(1, "Chase".into(), Shape::Chase, &[], vec![1]);
         let list = CueList {
             id: 1,
             name: "Main".into(),
-            cues: vec![Cue {
-                name: "Warm".into(),
-                fade: 2.0,
-                mode: Default::default(),
-                follow: 0.0,
-                values: [(
-                    1,
-                    Values {
-                        intensity: Some(1.0),
-                        ..Default::default()
-                    },
-                )]
-                .into(),
-            }],
+            cues: vec![
+                Cue {
+                    name: "Warm".into(),
+                    fade: 2.0,
+                    values: [(
+                        1,
+                        Values {
+                            intensity: Some(1.0),
+                            ..Default::default()
+                        },
+                    )]
+                    .into(),
+                    ..Default::default()
+                },
+                Cue {
+                    name: "Chase".into(),
+                    fade: 0.0,
+                    effects: vec![chase.clone()],
+                    ..Default::default()
+                },
+            ],
         };
         let start = Instant::now();
+        let at = |ms: u64| start + Duration::from_millis(ms);
         state.playbacks.go(&list, start).unwrap();
-        state.cue_lists.push(list);
-        state.compose_at(start + Duration::from_secs(1));
+        state.compose_at(at(1000));
         assert_eq!(state.universe().get(1), 128); // halfway through the fade
 
+        // The cue's effect keeps time from when the list started.
+        state.playbacks.go(&list, at(2000)).unwrap();
+        state.cue_lists.push(list);
+        state.compose_at(at(2250));
+        assert_eq!(state.universe().get(1), 255);
+        state.compose_at(at(2750));
+        assert_eq!(state.universe().get(1), 0); // in the off half of the chase
+
+        state.effect_size = EffectSize(0.0);
+        state.compose_at(at(2750));
+        assert_eq!(state.universe().get(1), 255);
+        state.effect_size = EffectSize(1.0);
+
+        // A programmer value overrides the cue's effect.
         state.programmer.select(&[1], SelectMode::Set);
         state.programmer.update(|v| v.intensity = Some(0.25));
-        state.compose_at(start + Duration::from_secs(5));
-        assert_eq!(state.universe().get(1), 64); // programmer wins
+        state.compose_at(at(2750));
+        assert_eq!(state.universe().get(1), 64);
 
-        state
-            .effects
-            .push(Effect::new(1, "Chase".into(), Shape::Chase, &[], vec![1]));
+        // A programmer effect runs on top.
+        state.programmer.effects.push(chase);
         state.running_effects.start(1, start);
-        state.compose_at(start + Duration::from_millis(750));
-        assert_eq!(state.universe().get(1), 0); // in the off half of the square wave
+        state.compose_at(at(2750));
+        assert_eq!(state.universe().get(1), 0);
     }
 
     #[test]

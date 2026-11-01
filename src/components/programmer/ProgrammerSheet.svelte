@@ -41,8 +41,16 @@
   }
 </script>
 
+{#if show.programmer.effects.length > 0}
+  <p class="effects">
+    Effects:
+    {#each show.programmer.effects as e, i (e.id)}{i > 0 ? ", " : ""}<strong>{e.name}</strong> on {e.fixtures.length}{/each}
+  </p>
+{/if}
 {#if rows.length === 0}
-  <p class="empty muted">Nothing in the programmer. Values you set on the selected fixtures show up here.</p>
+  <p class="empty muted">
+    {show.programmer.effects.length ? "No values" : "Nothing in the programmer"}. Values you set on the selected fixtures show up here.
+  </p>
 {:else}
   <table>
     <thead>
@@ -84,6 +92,10 @@
 <style>
   .empty {
     margin: 0;
+  }
+
+  .effects {
+    margin: 0 0 8px;
   }
 
   table {

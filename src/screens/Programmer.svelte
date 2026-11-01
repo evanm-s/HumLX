@@ -138,7 +138,7 @@
   // the effects of their family.
   let effectsShown = $state<Record<string, boolean>>({});
   const runningOfFamily = (id: string) =>
-    show.playback.effects.filter((e) => SHAPES[e.shape]?.family === EFFECT_WINDOWS[id] && show.live.runningEffects.includes(e.id)).length;
+    show.programmer.effects.filter((e) => SHAPES[e.shape]?.family === EFFECT_WINDOWS[id]).length;
 
   const BEAM: Attribute[] = [
     "shutter",
@@ -297,7 +297,7 @@
       if (namingGroup || recordingCue) return;
       if (!(e as CustomEvent<{ cue?: boolean }>).detail?.cue) return surface.setMode("record");
       surface.setMode(null);
-      if (Object.keys(show.programmer.values).length > 0) recordingCue = true;
+      if (Object.keys(show.programmer.values).length > 0 || show.programmer.effects.length > 0) recordingCue = true;
     };
     window.addEventListener(RECORD_EVENT, record);
     return () => window.removeEventListener(RECORD_EVENT, record);
@@ -345,7 +345,7 @@
       </button>
       <button
         class="record"
-        disabled={Object.keys(show.programmer.values).length === 0}
+        disabled={Object.keys(show.programmer.values).length === 0 && show.programmer.effects.length === 0}
         onclick={() => (recordingCue = true)}
       >
         ● Record cue

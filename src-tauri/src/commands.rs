@@ -62,7 +62,6 @@ pub struct Live {
     /// Fixtures with channel test levels applied.
     tested: Vec<u32>,
     playbacks: Vec<crate::playback::PlaybackStatus>,
-    running_effects: Vec<u32>,
     /// Master levels by cue list, which OSC can change too.
     masters: Vec<(u32, f32)>,
     osc: humlx_core::osc::OscStatus,
@@ -226,7 +225,6 @@ pub fn live(app: State<'_, App>) -> Live {
         highlight: state.highlight,
         tested: state.tested_fixtures(),
         playbacks: crate::playback::statuses(&state),
-        running_effects: state.running_effects.ids(),
         masters: crate::playback::masters(&state),
         osc: state.osc.clone(),
     }
@@ -275,6 +273,7 @@ pub async fn discover_nodes() -> Result<Vec<Node>> {
 pub struct ProgrammerView {
     selection: Vec<u32>,
     values: std::collections::BTreeMap<u32, Values>,
+    effects: Vec<humlx_core::effect::Effect>,
     groups: Vec<Group>,
     presets: Vec<Preset>,
 }
@@ -284,6 +283,7 @@ fn programmer_view(app: &App) -> ProgrammerView {
     ProgrammerView {
         selection: state.programmer.selection.clone(),
         values: state.programmer.values.clone(),
+        effects: state.programmer.effects.clone(),
         groups: state.groups.clone(),
         presets: state.presets.clone(),
     }

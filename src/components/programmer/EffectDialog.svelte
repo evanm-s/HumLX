@@ -7,7 +7,8 @@
   import { api } from "../../lib/api";
   import { show } from "../../lib/show.svelte";
   import type { Direction, Effect, EffectFamily, Pattern, Rgb, Shape } from "../../lib/types";
-  import { FAMILY_LABELS, PATTERNS, SHAPES, shapesOf } from "./effects";
+  import EffectPreview from "./EffectPreview.svelte";
+  import { FAMILY_LABELS, PATTERNS, recipe, SHAPES, shapesOf } from "./effects";
 
   interface Props {
     family: EffectFamily;
@@ -50,6 +51,19 @@
   });
   let more = $state(false);
 
+  const preview = $derived({
+    ...recipe(draft.shape, draft.colours),
+    transition: draft.transition,
+    width: draft.width,
+    direction: draft.direction,
+    pattern: draft.pattern,
+    rate: draft.bpm / 60,
+    size: draft.size,
+    spread: draft.spread,
+  });
+  // svelte-ignore state_referenced_locally
+  const count = effect?.fixtures.length ?? show.programmer.selection.length;
+
   function pick(shape: Shape) {
     if (shape === draft.shape) return;
     draft.shape = shape;
@@ -91,6 +105,7 @@
     {/each}
   </div>
   <p class="muted">{SHAPES[draft.shape].hint}.</p>
+  <EffectPreview fx={preview} {family} {count} />
 
   {#if draft.shape === "swap"}
     {#each [0, 1] as i (i)}
@@ -166,15 +181,18 @@
     <input bind:value={draft.name} placeholder={SHAPES[draft.shape].label} />
   </label>
   {#if effect}
-    <p class="muted">Runs on {effect.fixtures.length} fixtures.</p>
+    <p class="muted">Runs on {effect.fixtures.length} fixtures. Record a cue to keep it.</p>
   {:else}
-    <p class="muted">Runs on the {show.programmer.selection.length} selected fixtures, in the order you picked them.</p>
+    <p class="muted">
+      Runs on the {show.programmer.selection.length} selected fixtures, in the order you picked them. It goes in the programmer;
+      record a cue to keep it.
+    </p>
   {/if}
   {#snippet actions()}
-    {#if effect}<button class="danger" onclick={remove}>Delete</button>{/if}
+    {#if effect}<button class="danger" onclick={remove}>Remove</button>{/if}
     <span class="spacer"></span>
     <button onclick={onclose}>Cancel</button>
-    <button class="primary" onclick={save}>{effect ? "Save" : "Create and run"}</button>
+    <button class="primary" onclick={save}>{effect ? "Save" : "Add effect"}</button>
   {/snippet}
 </Dialog>
 
