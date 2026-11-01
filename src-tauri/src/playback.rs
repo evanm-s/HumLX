@@ -2,9 +2,11 @@
 
 use std::time::Instant;
 
+use humlx_core::effect::{Direction, Effect, Pattern, Shape};
 use humlx_core::engine::State as EngineState;
-use humlx_core::playback::{Cue, CueList, CueMode, Effect, EffectKind, Wave};
+use humlx_core::playback::{Cue, CueList, CueMode};
 use humlx_core::programmer::next_id;
+use humlx_core::programmer::Rgb;
 use humlx_core::{Error, Result};
 use serde::{Deserialize, Serialize};
 use tauri::State;
@@ -304,11 +306,43 @@ pub fn set_master(app: State<'_, App>, list: u32, level: f32) -> Result<Playback
 #[serde(rename_all = "camelCase")]
 pub struct EffectSettings {
     name: String,
-    kind: EffectKind,
-    wave: Wave,
+    shape: Shape,
     rate: f32,
     size: f32,
     spread: f32,
+    #[serde(default)]
+    pattern: Pattern,
+    #[serde(default)]
+    direction: Direction,
+    #[serde(default = "full")]
+    width: f32,
+    /// Fade between steps; the shape's own when not given.
+    #[serde(default)]
+    transition: Option<f32>,
+    /// The colours a two-colour swap swaps between.
+    #[serde(default)]
+    colours: Vec<Rgb>,
+}
+
+fn full() -> f32 {
+    1.0
+}
+
+impl EffectSettings {
+    /// Sets `effect` up from these settings, remaking its steps from the shape.
+    fn apply_to(self, effect: &mut Effect) {
+        effect.reshape(self.shape, &self.colours);
+        effect.name = self.name.trim().to_string();
+        effect.rate = self.rate.clamp(0.01, 20.0);
+        effect.size = self.size.clamp(0.0, 1.0);
+        effect.spread = self.spread.clamp(0.0, 1.0);
+        effect.pattern = self.pattern;
+        effect.direction = self.direction;
+        effect.width = self.width.clamp(0.05, 1.0);
+        if let Some(t) = self.transition {
+            effect.transition = t.clamp(0.0, 1.0);
+        }
+    }
 }
 
 /// Creates an effect on the selected fixtures, or changes effect `id`'s
@@ -316,15 +350,6 @@ pub struct EffectSettings {
 #[tauri::command]
 pub fn save_effect(app: State<'_, App>, settings: EffectSettings, id: Option<u32>) -> Result<PlaybackView> {
     change(&app, true, |state| {
-        let EffectSettings {
-            name,
-            kind,
-            wave,
-            rate,
-            size,
-            spread,
-        } = settings;
-        let (rate, size, spread) = (rate.clamp(0.01, 20.0), size.clamp(0.0, 1.0), spread.clamp(0.0, 1.0));
         match id {
             Some(id) => {
                 let effect = state
@@ -332,28 +357,22 @@ pub fn save_effect(app: State<'_, App>, settings: EffectSettings, id: Option<u32
                     .iter_mut()
                     .find(|e| e.id == id)
                     .ok_or(Error::UnknownEffect(id))?;
-                effect.name = name.trim().to_string();
-                effect.kind = kind;
-                effect.wave = wave;
-                effect.rate = rate;
-                effect.size = size;
-                effect.spread = spread;
+                settings.apply_to(effect);
             }
             None => {
                 if state.programmer.selection.is_empty() {
                     return Err(Error::InvalidShow("select the fixtures for the effect first".into()));
                 }
                 let id = next_id(state.effects.iter().map(|e| e.id));
-                state.effects.push(Effect {
+                let mut effect = Effect::new(
                     id,
-                    name: name.trim().to_string(),
-                    kind,
-                    wave,
-                    fixtures: state.programmer.selection.clone(),
-                    rate,
-                    size,
-                    spread,
-                });
+                    String::new(),
+                    settings.shape,
+                    &[],
+                    state.programmer.selection.clone(),
+                );
+                settings.apply_to(&mut effect);
+                state.effects.push(effect);
                 state.effects.sort_by_key(|e| e.id);
                 state.running_effects.start(id, Instant::now());
             }

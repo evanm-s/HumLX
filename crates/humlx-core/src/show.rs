@@ -130,16 +130,13 @@ mod tests {
                 values: programmer.values.clone(),
             }],
         });
-        show.effects.push(crate::playback::Effect {
-            id: 1,
-            name: "Rainbow".into(),
-            kind: crate::playback::EffectKind::Rainbow,
-            wave: crate::playback::Wave::Sine,
-            fixtures: vec![1, 2],
-            rate: 0.2,
-            size: 1.0,
-            spread: 0.5,
-        });
+        show.effects.push(crate::effect::Effect::new(
+            1,
+            "Rainbow".into(),
+            crate::effect::Shape::Rainbow,
+            &[],
+            vec![1, 2],
+        ));
         show.presets.push(
             crate::programmer::Preset::record(1, "Half".into(), crate::fixture::Family::Intensity, &programmer)
                 .unwrap(),

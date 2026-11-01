@@ -413,11 +413,18 @@ const commands: Record<string, (args: Args) => unknown> = {
   release_all: () => (running.clear(), effectsOn.clear(), playback()),
   set_master: ({ list, level }) => (masters.set(list, level), playback()),
   save_effect: ({ settings, id }) => {
-    if (id != null) Object.assign(effects.find((e) => e.id === id)!, settings);
+    // The real engine builds steps from the shape; here only a swap's colours are kept.
+    const made = {
+      ...settings,
+      steps: (settings.colours ?? []).map((colour: Rgb) => ({ colour })),
+      layering: "onTop" as const,
+      transition: settings.transition ?? 1,
+    };
+    if (id != null) Object.assign(effects.find((e) => e.id === id)!, made);
     else {
       if (!selection.length) throw "select the fixtures for the effect first";
       const eid = nextId(effects.map((e) => e.id));
-      effects.push({ ...settings, id: eid, fixtures: [...selection] });
+      effects.push({ ...made, id: eid, fixtures: [...selection] });
       effectsOn.add(eid);
     }
     return playback();

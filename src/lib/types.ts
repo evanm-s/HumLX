@@ -211,22 +211,48 @@ export interface CueList {
 /** Where a recorded cue goes: an existing cue list, or a new one with this name. */
 export type RecordTarget = { list: number } | { new: string };
 
-export type EffectKind = "dimmer" | "rainbow" | "circle";
-export type Wave = "sine" | "square" | "saw";
+/** The Programmer families an effect can move. */
+export type EffectFamily = "intensity" | "colour" | "position";
+export type Shape =
+  | "pulse"
+  | "chase"
+  | "rampUp"
+  | "rampDown"
+  | "flicker"
+  | "rainbow"
+  | "swap"
+  | "circle"
+  | "figure8"
+  | "panSweep"
+  | "tiltNod";
+/** How fixtures are spaced out in an effect, in the order they were picked. */
+export type Pattern = "inOrder" | "mirror" | "pairs" | "oddEven";
+export type Direction = "forward" | "backward" | "bounce";
 
 export interface EffectSettings {
   name: string;
-  kind: EffectKind;
-  wave: Wave;
+  shape: Shape;
   /** Cycles per second. */
   rate: number;
   size: number;
   spread: number;
+  pattern: Pattern;
+  direction: Direction;
+  /** How much of each cycle the steps take, 0 to 1. */
+  width: number;
+  /** How much of each step fades to the next, 0 (snap) to 1; the shape's own if left out. */
+  transition?: number;
+  /** The two colours of a swap. */
+  colours?: Rgb[];
 }
 
 export interface Effect extends EffectSettings {
   id: number;
   fixtures: number[];
+  /** The values the fixtures run through. */
+  steps: Values[];
+  layering: "onTop" | "replace";
+  transition: number;
 }
 
 export interface PlaybackView {

@@ -1,11 +1,10 @@
-//! Cue lists, their live playback with timed fades, and effects.
+//! Cue lists and their live playback with timed fades.
 //!
 //! Each cue stores programmer values. Cue lists track: the look at a cue is
 //! every earlier cue with that cue's changes laid on top, so a cue only needs
 //! to hold what changes.
 
 use std::collections::BTreeMap;
-use std::f32::consts::TAU;
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
@@ -14,7 +13,7 @@ use crate::error::{Error, Result};
 use crate::programmer::{Rgb, Values};
 
 /// Fixture values by fixture number.
-pub type Look = BTreeMap<u32, Values>;
+pub use crate::effect::{Effect, Look, RunningEffects};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -344,139 +343,6 @@ impl Playbacks {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum EffectKind {
-    /// Intensity rises and falls.
-    Dimmer,
-    /// Colour cycles round the colour wheel.
-    Rainbow,
-    /// Moving heads trace a circle around their position.
-    Circle,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Wave {
-    Sine,
-    Square,
-    Saw,
-}
-
-impl Wave {
-    /// Level from 0 to 1 at `phase` (in cycles).
-    fn at(self, phase: f32) -> f32 {
-        let p = phase.rem_euclid(1.0);
-        match self {
-            Wave::Sine => 0.5 - 0.5 * (p * TAU).cos(),
-            Wave::Square => {
-                if p < 0.5 {
-                    1.0
-                } else {
-                    0.0
-                }
-            }
-            Wave::Saw => 1.0 - p,
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Effect {
-    pub id: u32,
-    pub name: String,
-    pub kind: EffectKind,
-    #[serde(default = "default_wave")]
-    pub wave: Wave,
-    /// Fixtures in order; spread offsets each one along this order.
-    pub fixtures: Vec<u32>,
-    /// Cycles per second.
-    pub rate: f32,
-    /// Depth of the effect, from 0 to 1.
-    pub size: f32,
-    /// How far apart the fixtures are, from 0 (all together) to 1 (spread
-    /// evenly over one cycle).
-    pub spread: f32,
-}
-
-fn default_wave() -> Wave {
-    Wave::Sine
-}
-
-impl Effect {
-    /// Changes `look` for this effect's fixtures at `elapsed` seconds since it started.
-    pub fn apply(&self, look: &mut Look, elapsed: f32) {
-        let count = self.fixtures.len().max(1) as f32;
-        let size = self.size.clamp(0.0, 1.0);
-        for (i, fixture) in self.fixtures.iter().enumerate() {
-            let phase = elapsed * self.rate - self.spread * i as f32 / count;
-            let values = look.entry(*fixture).or_default();
-            match self.kind {
-                EffectKind::Dimmer => {
-                    let base = values.intensity.unwrap_or(1.0);
-                    values.intensity = Some(base * (1.0 - size * (1.0 - self.wave.at(phase))));
-                }
-                EffectKind::Rainbow => {
-                    let hue = phase.rem_euclid(1.0) * 6.0;
-                    let f = |n: f32| {
-                        let k = (n + hue) % 6.0;
-                        1.0 - size.max(0.05) * k.min(4.0 - k).clamp(0.0, 1.0)
-                    };
-                    values.colour = Some(Rgb {
-                        r: f(5.0),
-                        g: f(3.0),
-                        b: f(1.0),
-                    });
-                }
-                EffectKind::Circle => {
-                    let angle = phase * TAU;
-                    let radius = size * 0.25;
-                    values.pan = Some((values.pan.unwrap_or(0.5) + radius * angle.cos()).clamp(0.0, 1.0));
-                    values.tilt = Some((values.tilt.unwrap_or(0.5) + radius * angle.sin()).clamp(0.0, 1.0));
-                }
-            }
-        }
-    }
-}
-
-/// Effects that are switched on, with when each started.
-#[derive(Debug, Clone, Default)]
-pub struct RunningEffects {
-    started: BTreeMap<u32, Instant>,
-}
-
-impl RunningEffects {
-    pub fn start(&mut self, id: u32, now: Instant) {
-        self.started.insert(id, now);
-    }
-
-    pub fn stop(&mut self, id: u32) {
-        self.started.remove(&id);
-    }
-
-    pub fn stop_all(&mut self) {
-        self.started.clear();
-    }
-
-    pub fn is_running(&self, id: u32) -> bool {
-        self.started.contains_key(&id)
-    }
-
-    pub fn ids(&self) -> Vec<u32> {
-        self.started.keys().copied().collect()
-    }
-
-    /// Applies every running effect to `look`, in effect number order.
-    pub fn apply(&self, effects: &[Effect], look: &mut Look, now: Instant) {
-        for effect in effects {
-            if let Some(started) = self.started.get(&effect.id) {
-                effect.apply(look, now.saturating_duration_since(*started).as_secs_f32());
-            }
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -662,72 +528,5 @@ mod tests {
         assert_eq!(out[&1].pan, Some(0.9));
         playbacks.set_master(2, 0.0);
         assert_eq!(playbacks.output(now)[&1].intensity, Some(0.4));
-    }
-
-    #[test]
-    fn dimmer_effect_spreads_over_fixtures() {
-        let effect = Effect {
-            id: 1,
-            name: "Chase".into(),
-            kind: EffectKind::Dimmer,
-            wave: Wave::Square,
-            fixtures: vec![1, 2],
-            rate: 1.0,
-            size: 1.0,
-            spread: 1.0,
-        };
-        let mut look = Look::new();
-        effect.apply(&mut look, 0.25);
-        // Fixture 1 is in the first half of its cycle, fixture 2 half a cycle behind.
-        assert_eq!(look[&1].intensity, Some(1.0));
-        assert_eq!(look[&2].intensity, Some(0.0));
-    }
-
-    #[test]
-    fn circle_and_rainbow() {
-        let mut look: Look = [(
-            1,
-            Values {
-                pan: Some(0.5),
-                tilt: Some(0.5),
-                ..Default::default()
-            },
-        )]
-        .into();
-        let circle = Effect {
-            id: 1,
-            name: "".into(),
-            kind: EffectKind::Circle,
-            wave: Wave::Sine,
-            fixtures: vec![1],
-            rate: 1.0,
-            size: 1.0,
-            spread: 0.0,
-        };
-        circle.apply(&mut look, 0.0);
-        assert_eq!(look[&1].pan, Some(0.75));
-        assert_eq!(look[&1].tilt, Some(0.5));
-
-        let rainbow = Effect {
-            kind: EffectKind::Rainbow,
-            ..circle
-        };
-        rainbow.apply(&mut look, 0.0);
-        let red = look[&1].colour.unwrap();
-        assert!(
-            (red.r - 1.0).abs() < 1e-6 && red.g.abs() < 1e-6 && red.b.abs() < 1e-6,
-            "{red:?}"
-        );
-    }
-
-    #[test]
-    fn running_effects() {
-        let mut running = RunningEffects::default();
-        let now = Instant::now();
-        running.start(3, now);
-        assert!(running.is_running(3));
-        assert_eq!(running.ids(), vec![3]);
-        running.stop(3);
-        assert!(!running.is_running(3));
     }
 }

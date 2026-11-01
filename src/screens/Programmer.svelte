@@ -5,7 +5,7 @@
 
   import { onDestroy } from "svelte";
   import EffectList from "../components/programmer/EffectList.svelte";
-  import { EFFECT_WINDOWS } from "../components/programmer/effects";
+  import { EFFECT_WINDOWS, SHAPES } from "../components/programmer/effects";
   import ColourPicker from "../components/ColourPicker.svelte";
   import Dialog from "../components/Dialog.svelte";
   import Fader from "../components/Fader.svelte";
@@ -135,10 +135,10 @@
   // --- Effects -------------------------------------------------------------
 
   // The Intensity, Colour and Position windows can swap their controls for
-  // the effects of their kind.
+  // the effects of their family.
   let effectsShown = $state<Record<string, boolean>>({});
-  const runningOfKind = (id: string) =>
-    show.playback.effects.filter((e) => e.kind === EFFECT_WINDOWS[id] && show.live.runningEffects.includes(e.id)).length;
+  const runningOfFamily = (id: string) =>
+    show.playback.effects.filter((e) => SHAPES[e.shape]?.family === EFFECT_WINDOWS[id] && show.live.runningEffects.includes(e.id)).length;
 
   const BEAM: Attribute[] = [
     "shutter",
@@ -367,7 +367,7 @@
     </button>
   {:else if families[id]}
     {#if EFFECT_WINDOWS[id]}
-      {@const running = runningOfKind(id)}
+      {@const running = runningOfFamily(id)}
       <button
         class="small"
         class:on={effectsShown[id]}
@@ -439,7 +439,7 @@
   {:else if id.startsWith("presets-")}
     <PresetPool family={presetFamily(id)} />
   {:else if EFFECT_WINDOWS[id] && effectsShown[id]}
-    <EffectList kind={EFFECT_WINDOWS[id]} />
+    <EffectList family={EFFECT_WINDOWS[id]} />
   {:else if selection.length === 0}
     {@render noSelection()}
   {:else if id === "intensity"}

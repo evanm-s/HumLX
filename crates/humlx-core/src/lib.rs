@@ -3,6 +3,7 @@
 
 pub mod artnet;
 pub mod dmx;
+pub mod effect;
 pub mod engine;
 pub mod error;
 pub mod fixture;
