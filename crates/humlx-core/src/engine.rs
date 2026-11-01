@@ -475,7 +475,8 @@ mod tests {
 
     #[test]
     fn playback_under_programmer_and_effects() {
-        use crate::playback::{Cue, CueList, Effect, EffectKind, Wave};
+        use crate::effect::{Effect, Shape};
+        use crate::playback::{Cue, CueList};
         use crate::programmer::{SelectMode, Values};
         let mut state = state_with("generic/dimmer", "1ch", 1);
         let list = CueList {
@@ -507,16 +508,9 @@ mod tests {
         state.compose_at(start + Duration::from_secs(5));
         assert_eq!(state.universe().get(1), 64); // programmer wins
 
-        state.effects.push(Effect {
-            id: 1,
-            name: "Pulse".into(),
-            kind: EffectKind::Dimmer,
-            wave: Wave::Square,
-            fixtures: vec![1],
-            rate: 1.0,
-            size: 1.0,
-            spread: 0.0,
-        });
+        state
+            .effects
+            .push(Effect::new(1, "Chase".into(), Shape::Chase, &[], vec![1]));
         state.running_effects.start(1, start);
         state.compose_at(start + Duration::from_millis(750));
         assert_eq!(state.universe().get(1), 0); // in the off half of the square wave

@@ -1,28 +1,28 @@
 <script lang="ts">
-  // The effects of one kind, shown in place of a Programmer window's controls.
+  // The effects of one family, shown in place of a Programmer window's controls.
   // Add makes a new one on the selected fixtures; effects that include a
   // selected fixture are marked.
 
   import { api } from "../../lib/api";
   import { show } from "../../lib/show.svelte";
-  import type { Effect, EffectKind } from "../../lib/types";
+  import type { Effect, EffectFamily } from "../../lib/types";
   import EffectDialog from "./EffectDialog.svelte";
-  import { EFFECT_KINDS } from "./effects";
+  import { FAMILY_LABELS, PATTERNS, SHAPES } from "./effects";
 
   interface Props {
-    kind: EffectKind;
+    family: EffectFamily;
   }
 
-  let { kind }: Props = $props();
+  let { family }: Props = $props();
 
-  const effects = $derived(show.playback.effects.filter((e) => e.kind === kind));
+  const effects = $derived(show.playback.effects.filter((e) => SHAPES[e.shape]?.family === family));
   const selected = $derived(new Set(show.programmer.selection));
   let editing = $state<Effect | "new" | null>(null);
 </script>
 
 <div class="effects">
   <button class="add" disabled={selected.size === 0} onclick={() => (editing = "new")}>
-    {selected.size === 0 ? "Select fixtures to add an effect" : `+ Add ${EFFECT_KINDS[kind].label.toLowerCase()} effect`}
+    {selected.size === 0 ? "Select fixtures to add an effect" : `+ Add ${FAMILY_LABELS[family]} effect`}
   </button>
   {#each effects as e (e.id)}
     {@const on = show.live.runningEffects.includes(e.id)}
@@ -32,16 +32,16 @@
       </button>
       <button class="text" onclick={() => (editing = e)}>
         <strong>{e.name}</strong>
-        <span class="muted">{e.fixtures.length} fixtures · {e.rate} per second</span>
+        <span class="muted">{e.name !== SHAPES[e.shape]?.label ? `${SHAPES[e.shape]?.label} · ` : ""}{e.fixtures.length} fixtures · {Math.round(e.rate * 60)} BPM{e.spread > 0 && e.pattern !== "inOrder" ? ` · ${PATTERNS[e.pattern].label}` : ""}</span>
       </button>
     </div>
   {:else}
-    <p class="muted">No {EFFECT_KINDS[kind].label.toLowerCase()} effects yet.</p>
+    <p class="muted">No {FAMILY_LABELS[family]} effects yet.</p>
   {/each}
 </div>
 
 {#if editing}
-  <EffectDialog {kind} effect={editing === "new" ? undefined : editing} onclose={() => (editing = null)} />
+  <EffectDialog {family} effect={editing === "new" ? undefined : editing} onclose={() => (editing = null)} />
 {/if}
 
 <style>
