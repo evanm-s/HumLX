@@ -12,7 +12,7 @@ use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 
-use crate::fixture::Family;
+use crate::fixture::{Attribute, Family};
 use crate::programmer::{Rgb, Values};
 
 /// Fixture values by fixture number.
@@ -32,10 +32,14 @@ pub enum Shape {
     RampDown,
     /// Intensity jumps around like a flame.
     Flicker,
+    /// A quick burst of flashes, then dark for the rest of the cycle.
+    Burst,
     /// Colour cycles round the colour wheel.
     Rainbow,
     /// Colour snaps between two colours.
     Swap,
+    /// Colour steps through a list of colours.
+    Steps,
     /// Moving heads trace a circle around their position.
     Circle,
     /// Moving heads trace a figure of eight around their position.
@@ -44,20 +48,28 @@ pub enum Shape {
     PanSweep,
     /// Moving heads nod up and down.
     TiltNod,
+    /// Moving heads spread out sideways from the middle and back.
+    Fan,
+    /// Zoom opens and closes.
+    ZoomPulse,
+    /// Iris opens and closes.
+    IrisPulse,
 }
 
 impl Shape {
     pub fn family(self) -> Family {
         use Shape::*;
         match self {
-            Pulse | Chase | RampUp | RampDown | Flicker => Family::Intensity,
-            Rainbow | Swap => Family::Colour,
-            Circle | Figure8 | PanSweep | TiltNod => Family::Position,
+            Pulse | Chase | RampUp | RampDown | Flicker | Burst => Family::Intensity,
+            Rainbow | Swap | Steps => Family::Colour,
+            Circle | Figure8 | PanSweep | TiltNod | Fan => Family::Position,
+            ZoomPulse | IrisPulse => Family::Beam,
         }
     }
 
     /// The steps and settings this shape starts with. `colours` are the
-    /// colours a [`Shape::Swap`] swaps between (red and blue if not given).
+    /// colours a [`Shape::Swap`] swaps between (red and blue if not given)
+    /// or a [`Shape::Steps`] steps through (red, green and blue if not given).
     pub fn recipe(self, colours: &[Rgb]) -> Recipe {
         use Shape::*;
         let level = |l: f32| Values {
@@ -82,12 +94,18 @@ impl Shape {
                 })
                 .collect()
         };
+        let beam = |attribute: Attribute, v: f32| Values {
+            other: BTreeMap::from([(attribute, v)]),
+            ..Default::default()
+        };
         let base = Recipe {
             steps: Vec::new(),
             layering: Layering::OnTop,
             transition: 1.0,
             curve: Curve::Smooth,
             wrap: true,
+            width: 1.0,
+            fan: false,
         };
         match self {
             Pulse => Recipe {
@@ -115,6 +133,12 @@ impl Shape {
                 curve: Curve::Linear,
                 ..base
             },
+            Burst => Recipe {
+                steps: [1.0, 0.0, 1.0, 0.0, 1.0, 0.0].map(level).to_vec(),
+                transition: 0.0,
+                width: 0.5,
+                ..base
+            },
             Rainbow => Recipe {
                 // Straight lines between these six make the full colour wheel.
                 steps: [
@@ -140,6 +164,20 @@ impl Shape {
                 transition: 0.0,
                 ..base
             },
+            Steps => Recipe {
+                steps: if colours.len() >= 2 {
+                    colours.iter().copied().map(colour).collect()
+                } else {
+                    vec![
+                        colour(Rgb { r: 1.0, g: 0.0, b: 0.0 }),
+                        colour(Rgb { r: 0.0, g: 1.0, b: 0.0 }),
+                        colour(Rgb { r: 0.0, g: 0.0, b: 1.0 }),
+                    ]
+                },
+                layering: Layering::Replace,
+                transition: 0.0,
+                ..base
+            },
             Circle => Recipe {
                 steps: path(&|a| (a.cos(), a.sin())),
                 curve: Curve::Linear,
@@ -158,6 +196,20 @@ impl Shape {
                 steps: vec![at(None, Some(0.0)), at(None, Some(1.0))],
                 ..base
             },
+            // Out from the middle and back; each fixture goes its own way.
+            Fan => Recipe {
+                steps: vec![at(Some(0.5), None), at(Some(1.0), None)],
+                fan: true,
+                ..base
+            },
+            ZoomPulse => Recipe {
+                steps: vec![beam(Attribute::Zoom, 0.0), beam(Attribute::Zoom, 1.0)],
+                ..base
+            },
+            IrisPulse => Recipe {
+                steps: vec![beam(Attribute::Iris, 0.0), beam(Attribute::Iris, 1.0)],
+                ..base
+            },
         }
     }
 }
@@ -173,6 +225,8 @@ pub struct Recipe {
     pub transition: f32,
     pub curve: Curve,
     pub wrap: bool,
+    pub width: f32,
+    pub fan: bool,
 }
 
 /// How an effect's values meet the look underneath.
@@ -261,6 +315,10 @@ pub struct Effect {
     /// How much of each cycle the steps take, from 0 to 1. For the rest of
     /// the cycle the fixtures wait where the cycle ends.
     pub width: f32,
+    /// Whether each fixture moves by a different amount along the fixture
+    /// order: the first one way, the middle not at all, the last the other
+    /// way. A fan of pan steps spreads the beams out.
+    pub fan: bool,
     /// Fixtures in order; spread offsets each one along this order.
     pub fixtures: Vec<u32>,
     /// Cycles per second, when the effect keeps its own speed.
@@ -304,18 +362,20 @@ impl Effect {
             curve: recipe.curve,
             wrap: recipe.wrap,
             transition: recipe.transition,
-            width: 1.0,
+            width: recipe.width,
+            fan: recipe.fan,
             fixtures,
             rate: 1.0,
             speed: Speed::Own,
             multiplier: 1.0,
             size: 1.0,
-            spread: 1.0,
+            // A fan opens all together; the rest run one after another.
+            spread: if recipe.fan { 0.0 } else { 1.0 },
         }
     }
 
     /// Changes to `shape`, taking its steps and settings but keeping speed,
-    /// size, spread, pattern, direction and width.
+    /// size, spread, pattern and direction.
     pub fn reshape(&mut self, shape: Shape, colours: &[Rgb]) {
         let recipe = shape.recipe(colours);
         self.shape = shape;
@@ -324,6 +384,20 @@ impl Effect {
         self.curve = recipe.curve;
         self.wrap = recipe.wrap;
         self.transition = recipe.transition;
+        self.width = recipe.width;
+        self.fan = recipe.fan;
+    }
+
+    /// Sets the steps by hand, keeping only the values of the effect's
+    /// family. Fewer than one step is refused.
+    pub fn set_steps(&mut self, steps: Vec<Values>) -> bool {
+        let family = self.family();
+        let steps: Vec<Values> = steps.into_iter().map(|s| only(&s, family)).collect();
+        if steps.is_empty() {
+            return false;
+        }
+        self.steps = steps;
+        true
     }
 
     pub fn family(&self) -> Family {
@@ -400,6 +474,12 @@ impl Effect {
             let step = self.sample(phase);
             let values = look.entry(*fixture).or_default();
             let on_top = self.layering == Layering::OnTop;
+            // How far, and which way, this fixture moves in a fan.
+            let fan = match (self.fan, count) {
+                (false, _) => 1.0,
+                (true, 0 | 1) => 1.0,
+                (true, n) => 2.0 * index as f32 / (n - 1) as f32 - 1.0,
+            };
             match family {
                 Family::Intensity => {
                     let s = step.intensity.unwrap_or(1.0);
@@ -418,6 +498,7 @@ impl Effect {
                 }
                 Family::Position => {
                     let mv = |base: Option<f32>, s: f32| {
+                        let s = 0.5 + (s - 0.5) * fan;
                         if on_top {
                             // A full-size move goes a quarter of the range each way.
                             base.unwrap_or(0.5) + (s - 0.5) * size * 0.5
@@ -433,7 +514,19 @@ impl Effect {
                         values.tilt = Some(mv(values.tilt, s));
                     }
                 }
-                Family::Beam | Family::Control => {}
+                Family::Beam => {
+                    for (attribute, s) in &step.other {
+                        let s = 0.5 + (s - 0.5) * fan;
+                        let v = if on_top {
+                            // A full-size move goes half the range each way.
+                            values.other.get(attribute).copied().unwrap_or(0.5) + (s - 0.5) * size
+                        } else {
+                            0.5 + (s - 0.5) * size
+                        };
+                        values.other.insert(*attribute, v.clamp(0.0, 1.0));
+                    }
+                }
+                Family::Control => {}
             }
         }
     }
@@ -467,7 +560,44 @@ fn lerp_values(a: &Values, b: &Values, k: f32) -> Values {
         },
         pan: lerp_opt(a.pan, b.pan, k),
         tilt: lerp_opt(a.tilt, b.tilt, k),
-        other: BTreeMap::new(),
+        other: a
+            .other
+            .keys()
+            .chain(b.other.keys())
+            .map(|attr| {
+                let v = lerp_opt(a.other.get(attr).copied(), b.other.get(attr).copied(), k);
+                (*attr, v.unwrap_or(0.0))
+            })
+            .collect(),
+    }
+}
+
+/// The values of `values` that are in `family`.
+fn only(values: &Values, family: Family) -> Values {
+    let clamp = |v: Option<f32>| v.map(|v| v.clamp(0.0, 1.0));
+    match family {
+        Family::Intensity => Values {
+            intensity: clamp(values.intensity),
+            ..Default::default()
+        },
+        Family::Colour => Values {
+            colour: values.colour,
+            ..Default::default()
+        },
+        Family::Position => Values {
+            pan: clamp(values.pan),
+            tilt: clamp(values.tilt),
+            ..Default::default()
+        },
+        Family::Beam | Family::Control => Values {
+            other: values
+                .other
+                .iter()
+                .filter(|(a, _)| a.family() == family)
+                .map(|(a, v)| (*a, v.clamp(0.0, 1.0)))
+                .collect(),
+            ..Default::default()
+        },
     }
 }
 
@@ -493,6 +623,7 @@ struct EffectFile {
     wrap: Option<bool>,
     transition: Option<f32>,
     width: Option<f32>,
+    fan: Option<bool>,
     #[serde(default)]
     speed: Speed,
     multiplier: Option<f32>,
@@ -540,7 +671,8 @@ impl From<EffectFile> for Effect {
             curve: f.curve.unwrap_or(recipe.curve),
             wrap: f.wrap.unwrap_or(recipe.wrap),
             transition: f.transition.unwrap_or(recipe.transition),
-            width: f.width.unwrap_or(1.0),
+            width: f.width.unwrap_or(recipe.width),
+            fan: f.fan.unwrap_or(recipe.fan),
             fixtures: f.fixtures,
             rate: f.rate,
             speed: f.speed,
@@ -975,5 +1107,87 @@ mod tests {
         assert_eq!(running.ids(), vec![3]);
         running.stop(3);
         assert!(!running.is_running(3));
+    }
+
+    #[test]
+    fn burst_flashes_then_waits() {
+        let e = Effect {
+            spread: 0.0,
+            ..effect(Shape::Burst, vec![1])
+        };
+        assert_eq!(levels(&e, 0.01), vec![1.0]);
+        assert_eq!(levels(&e, 0.1), vec![0.0]);
+        assert_eq!(levels(&e, 0.18), vec![1.0]);
+        assert_eq!(levels(&e, 0.7), vec![0.0]); // dark for the second half
+    }
+
+    #[test]
+    fn colour_steps_use_the_given_colours() {
+        let red = Rgb { r: 1.0, g: 0.0, b: 0.0 };
+        let green = Rgb { r: 0.0, g: 1.0, b: 0.0 };
+        let white = Rgb::WHITE;
+        let e = Effect {
+            spread: 0.0,
+            ..Effect::new(1, String::new(), Shape::Steps, &[red, green, white], vec![1])
+        };
+        assert_eq!(e.steps.len(), 3);
+        let at = |t: f32| {
+            let mut look = Look::new();
+            e.apply(&mut look, t);
+            look[&1].colour.unwrap()
+        };
+        assert_eq!(at(0.1), red);
+        assert_eq!(at(0.4), green);
+        assert_eq!(at(0.8), white);
+        // Too few colours: red, green and blue.
+        assert_eq!(Shape::Steps.recipe(&[red]).steps.len(), 3);
+    }
+
+    #[test]
+    fn fan_spreads_the_fixtures_out() {
+        let e = effect(Shape::Fan, vec![1, 2, 3]);
+        assert_eq!(e.spread, 0.0);
+        let mut look = Look::new();
+        e.apply_at(&mut look, 0.5, 1.0); // fully open
+        let pans: Vec<f32> = [1, 2, 3].iter().map(|f| look[f].pan.unwrap()).collect();
+        assert!(
+            close(pans[0], 0.25) && close(pans[1], 0.5) && close(pans[2], 0.75),
+            "{pans:?}"
+        );
+        let mut look = Look::new();
+        e.apply_at(&mut look, 0.0, 1.0); // closed
+        assert!([1, 2, 3].iter().all(|f| close(look[f].pan.unwrap(), 0.5)));
+    }
+
+    #[test]
+    fn zoom_pulse_moves_zoom() {
+        let e = Effect {
+            spread: 0.0,
+            ..effect(Shape::ZoomPulse, vec![1])
+        };
+        assert_eq!(e.family(), Family::Beam);
+        let mut look = Look::new();
+        look.entry(1).or_default().other.insert(Attribute::Zoom, 0.5);
+        e.apply_at(&mut look, 0.5, 1.0);
+        assert!(close(look[&1].other[&Attribute::Zoom], 1.0));
+        e.apply_at(&mut look, 0.0, 0.5);
+        assert!(close(look[&1].other[&Attribute::Zoom], 0.75));
+        assert_eq!(families_in(&e.steps[0]), vec![Family::Beam]);
+    }
+
+    #[test]
+    fn steps_set_by_hand_keep_their_family() {
+        let mut e = effect(Shape::Pulse, vec![1]);
+        let step = |l: f32| Values {
+            intensity: Some(l),
+            pan: Some(0.2),
+            ..Default::default()
+        };
+        assert!(e.set_steps(vec![step(1.0), step(0.5), step(2.0)]));
+        assert_eq!(e.steps.len(), 3);
+        assert_eq!(e.steps[2].intensity, Some(1.0));
+        assert_eq!(e.steps[0].pan, None);
+        assert!(!e.set_steps(Vec::new()));
+        assert_eq!(e.steps.len(), 3);
     }
 }

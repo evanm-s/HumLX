@@ -6,10 +6,12 @@
     pan: number | undefined;
     tilt: number | undefined;
     fine: boolean;
+    /** A position effect's path to draw, if one is running. */
+    path?: { pan: number; tilt: number }[];
     onchange: (pan: number, tilt: number) => void;
   }
 
-  let { pan, tilt, fine, onchange }: Props = $props();
+  let { pan, tilt, fine, path, onchange }: Props = $props();
 
   let pad: HTMLDivElement;
   let start: { x: number; y: number; pan: number; tilt: number } | null = null;
@@ -47,6 +49,11 @@
 >
   <div class="axis h"></div>
   <div class="axis v"></div>
+  {#if path?.length}
+    <svg class="path" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+      <polygon points={path.map((p) => `${p.pan * 100},${(1 - p.tilt) * 100}`).join(" ")} />
+    </svg>
+  {/if}
   <div class="cross h" style:top="{(1 - y) * 100}%"></div>
   <div class="cross v" style:left="{x * 100}%"></div>
   <div class="dot" style:left="{x * 100}%" style:top="{(1 - y) * 100}%"></div>
@@ -69,6 +76,21 @@
     box-shadow: inset 0 0 0 1px var(--line);
     touch-action: none;
     overflow: hidden;
+  }
+
+  .path {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+  .path polygon {
+    fill: none;
+    stroke: color-mix(in srgb, var(--f-position) 70%, transparent);
+    stroke-width: 2;
+    stroke-dasharray: 6 5;
+    vector-effect: non-scaling-stroke;
   }
 
   .axis,

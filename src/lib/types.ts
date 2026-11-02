@@ -221,19 +221,24 @@ export interface CueList {
 export type RecordTarget = { list: number } | { new: string };
 
 /** The Programmer families an effect can move. */
-export type EffectFamily = "intensity" | "colour" | "position";
+export type EffectFamily = "intensity" | "colour" | "position" | "beam";
 export type Shape =
   | "pulse"
   | "chase"
   | "rampUp"
   | "rampDown"
   | "flicker"
+  | "burst"
   | "rainbow"
   | "swap"
+  | "steps"
   | "circle"
   | "figure8"
   | "panSweep"
-  | "tiltNod";
+  | "tiltNod"
+  | "fan"
+  | "zoomPulse"
+  | "irisPulse";
 /** How fixtures are spaced out in an effect, in the order they were picked. */
 export type Pattern = "inOrder" | "mirror" | "pairs" | "oddEven";
 export type Direction = "forward" | "backward" | "bounce";
@@ -256,8 +261,12 @@ export interface EffectSettings {
   multiplier: number;
   /** How much of each step fades to the next, 0 (snap) to 1; the shape's own if left out. */
   transition?: number;
-  /** The two colours of a swap. */
+  /** The two colours of a swap, or the colours that colour steps step through. */
   colours?: Rgb[];
+  /** Steps set by hand in the step editor; the shape's own if left out. */
+  steps?: Values[];
+  /** Whether the effect works from the look underneath; the shape's own if left out. */
+  layering?: "onTop" | "replace";
 }
 
 export interface Effect extends EffectSettings {
@@ -269,6 +278,8 @@ export interface Effect extends EffectSettings {
   curve: "smooth" | "linear";
   /** Whether the last step fades back to the first. */
   wrap: boolean;
+  /** Whether each fixture moves a different way along the fixture order. */
+  fan: boolean;
   transition: number;
 }
 

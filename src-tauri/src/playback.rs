@@ -2,11 +2,11 @@
 
 use std::time::Instant;
 
-use humlx_core::effect::{lay_over, Direction, Effect, EffectSize, Pattern, Shape, Speed};
+use humlx_core::effect::{lay_over, Direction, Effect, EffectSize, Layering, Pattern, Shape, Speed};
 use humlx_core::engine::State as EngineState;
 use humlx_core::playback::{Cue, CueList, CueMode};
 use humlx_core::programmer::next_id;
-use humlx_core::programmer::Rgb;
+use humlx_core::programmer::{Rgb, Values};
 use humlx_core::{Error, Result};
 use serde::{Deserialize, Serialize};
 use tauri::State;
@@ -332,9 +332,15 @@ pub struct EffectSettings {
     /// Fade between steps; the shape's own when not given.
     #[serde(default)]
     transition: Option<f32>,
-    /// The colours a two-colour swap swaps between.
+    /// The colours a two-colour swap swaps between, or colour steps step through.
     #[serde(default)]
     colours: Vec<Rgb>,
+    /// Steps set by hand in the step editor; the shape's own when not given.
+    #[serde(default)]
+    steps: Option<Vec<Values>>,
+    /// Whether the effect works from the look underneath; the shape's own when not given.
+    #[serde(default)]
+    layering: Option<Layering>,
 }
 
 fn full() -> f32 {
@@ -356,6 +362,12 @@ impl EffectSettings {
         effect.multiplier = self.multiplier.clamp(0.125, 8.0);
         if let Some(t) = self.transition {
             effect.transition = t.clamp(0.0, 1.0);
+        }
+        if let Some(steps) = self.steps {
+            effect.set_steps(steps);
+        }
+        if let Some(layering) = self.layering {
+            effect.layering = layering;
         }
     }
 }

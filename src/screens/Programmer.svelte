@@ -5,7 +5,7 @@
 
   import { onDestroy } from "svelte";
   import EffectList from "../components/programmer/EffectList.svelte";
-  import { EFFECT_WINDOWS, SHAPES } from "../components/programmer/effects";
+  import { EFFECT_WINDOWS, pathOf, SHAPES } from "../components/programmer/effects";
   import ColourPicker from "../components/ColourPicker.svelte";
   import Dialog from "../components/Dialog.svelte";
   import Fader from "../components/Fader.svelte";
@@ -152,6 +152,14 @@
   let effectsShown = $state<Record<string, boolean>>({});
   const runningOfFamily = (id: string) =>
     show.programmer.effects.filter((e) => SHAPES[e.shape]?.family === EFFECT_WINDOWS[id]).length;
+
+  // The path of the position effect on the first selected fixture, drawn on the pad.
+  const positionPath = $derived.by(() => {
+    const first = selection[0];
+    const fx = show.programmer.effects.find((e) => SHAPES[e.shape]?.family === "position" && e.fixtures.includes(first));
+    if (!fx) return undefined;
+    return pathOf(fx, fx.fixtures.indexOf(first), fx.fixtures.length, { pan: current.pan, tilt: current.tilt });
+  });
 
   const BEAM: Attribute[] = [
     "shutter",
@@ -560,6 +568,7 @@
           pan={current.pan}
           tilt={current.tilt}
           {fine}
+          path={positionPath}
           onchange={(pan, tilt) => program(() => api.setPosition(pan, tilt))}
         />
       {/if}
