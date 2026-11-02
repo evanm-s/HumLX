@@ -47,42 +47,56 @@
 >
   <div class="axis h"></div>
   <div class="axis v"></div>
+  <div class="cross h" style:top="{(1 - y) * 100}%"></div>
+  <div class="cross v" style:left="{x * 100}%"></div>
   <div class="dot" style:left="{x * 100}%" style:top="{(1 - y) * 100}%"></div>
   <span class="label pan">Pan {Math.round(x * 100)}%</span>
   <span class="label tilt">Tilt {Math.round(y * 100)}%</span>
 </div>
 
 <style>
+  /* A grid with fine crosshairs through a ring, in the position colour. */
   .pad {
     position: relative;
     aspect-ratio: 1;
     width: 100%;
     max-width: 640px;
-    border-radius: 16px;
+    border-radius: var(--radius);
     background:
-      linear-gradient(var(--line) 1px, transparent 1px) 0 0 / 10% 10%,
-      linear-gradient(90deg, var(--line) 1px, transparent 1px) 0 0 / 10% 10%,
-      var(--bg);
-    border: 1px solid var(--line);
+      linear-gradient(#232833 1px, transparent 1px) 0 0 / 12.5% 12.5%,
+      linear-gradient(90deg, #232833 1px, transparent 1px) 0 0 / 12.5% 12.5%,
+      #0a0c0f;
+    box-shadow: inset 0 0 0 1px var(--line);
     touch-action: none;
     overflow: hidden;
   }
 
-  .axis {
+  .axis,
+  .cross {
     position: absolute;
-    background: color-mix(in srgb, var(--accent) 40%, transparent);
+    pointer-events: none;
   }
-  .axis.h {
+  .axis {
+    background: #343b48;
+  }
+  .cross {
+    background: color-mix(in srgb, var(--f-position) 45%, transparent);
+  }
+  .h {
     left: 0;
     right: 0;
-    top: 50%;
-    height: 2px;
+    height: 1px;
   }
-  .axis.v {
+  .v {
     top: 0;
     bottom: 0;
+    width: 1px;
+  }
+  .axis.h {
+    top: 50%;
+  }
+  .axis.v {
     left: 50%;
-    width: 2px;
   }
 
   .dot {
@@ -90,21 +104,22 @@
     width: 48px;
     height: 48px;
     margin: -24px 0 0 -24px;
+    box-sizing: border-box;
     border-radius: 50%;
-    background: var(--accent);
-    box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 30%, transparent);
+    border: 3px solid var(--f-position);
     pointer-events: none;
   }
 
-  .unset .dot {
-    background: var(--muted);
-    box-shadow: none;
+  .unset .dot,
+  .unset .cross {
+    opacity: 0.4;
   }
 
   .label {
     position: absolute;
+    font-family: var(--mono);
     font-size: 0.85rem;
-    color: var(--muted);
+    color: var(--f-position);
     font-variant-numeric: tabular-nums;
   }
   .label.pan {

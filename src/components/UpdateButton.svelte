@@ -40,8 +40,8 @@
   .update {
     width: 100%;
     min-height: 64px;
-    border-color: var(--ok);
-    color: var(--ok);
+    background: var(--ok);
+    color: var(--accent-text);
     font-weight: 600;
     line-height: 1.2;
   }
@@ -54,13 +54,12 @@
   .notes {
     white-space: pre-wrap;
     background: var(--bg);
-    border-radius: 8px;
+    border-radius: var(--radius);
     padding: 12px;
   }
 
   .bar {
     height: 10px;
-    border-radius: 5px;
     background: var(--bg);
     overflow: hidden;
   }

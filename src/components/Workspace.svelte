@@ -7,7 +7,8 @@
   import { fits, freeSpot, type Grid, type Layout, type Rect } from "../lib/layout";
 
   interface Props {
-    windows: { id: string; title: string }[];
+    /** tone: the colour of the window's title band; white when not given. */
+    windows: { id: string; title: string; tone?: string }[];
     layout: Layout;
     grid: Grid;
     editing: boolean;
@@ -113,7 +114,13 @@
   {#each windows as win (win.id)}
     {@const p = layout[win.id]}
     {#if p && !p.hidden}
-      <section class="window panel" class:moving={drag?.id === win.id} style={place(p)} aria-label={win.title}>
+      <section
+        class="window panel"
+        class:moving={drag?.id === win.id}
+        style={place(p)}
+        style:--tone={win.tone ?? "var(--accent)"}
+        aria-label={win.title}
+      >
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <header
           class="bar"
@@ -160,7 +167,7 @@
   }
 
   .cell {
-    border-radius: 8px;
+    border-radius: var(--radius);
     border: 1px dashed color-mix(in srgb, var(--line) 70%, transparent);
     pointer-events: none;
   }
@@ -183,18 +190,24 @@
     opacity: 0.55;
   }
 
+  /* A solid band in the window's colour, so the kind of control reads at a
+     glance from across the room. */
   .bar {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     min-height: 40px;
-    padding: 3px 6px 3px 12px;
-    border-bottom: 1px solid var(--line);
+    padding: 3px 4px 3px 12px;
+    background: var(--tone);
+    color: var(--accent-text);
   }
 
   .bar h2 {
     margin: 0;
-    font-size: 1rem;
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -203,7 +216,19 @@
   .editing .bar {
     cursor: grab;
     touch-action: none;
-    background: color-mix(in srgb, var(--accent) 12%, transparent);
+  }
+
+  .bar :global(button) {
+    background: rgb(13 15 19 / 0.16);
+    border-color: transparent;
+    color: var(--accent-text);
+    box-shadow: none;
+  }
+
+  .bar :global(button.on),
+  .bar :global(button[aria-pressed="true"]) {
+    background: var(--accent-text);
+    color: var(--tone);
   }
 
   .bar :global(button.small) {
@@ -233,7 +258,7 @@
   }
 
   .ghost-rect {
-    border-radius: 12px;
+    border-radius: var(--radius);
     border: 3px solid var(--accent);
     background: color-mix(in srgb, var(--accent) 15%, transparent);
     pointer-events: none;

@@ -51,7 +51,7 @@
     grid-template-rows: auto 1fr auto;
     padding: 24px;
     gap: 20px;
-    box-shadow: 0 30px 80px rgb(0 0 0 / 0.5);
+    border-top: 6px solid var(--accent);
   }
 
   .body {

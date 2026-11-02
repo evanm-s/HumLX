@@ -82,7 +82,7 @@
   .strip {
     position: relative;
     height: 72px;
-    border-radius: 12px;
+    border-radius: var(--radius);
     /* Roughly 2700 K through 6500 K. */
     background: linear-gradient(to right, #ffa957, #ffd2a1, #fff4e8, #e9efff, #c9d9ff);
     box-shadow: 0 0 0 1px var(--line);
@@ -100,11 +100,9 @@
     bottom: -4px;
     width: 12px;
     margin-left: -6px;
-    border-radius: 6px;
+    border-radius: 2px;
     background: #fff;
-    box-shadow:
-      0 0 0 2px #000,
-      0 4px 10px rgb(0 0 0 / 0.5);
+    box-shadow: 0 0 0 2px #000;
     pointer-events: none;
   }
 
@@ -120,8 +118,5 @@
     font-size: 0.85rem;
   }
 
-  .stops button[aria-pressed="true"] {
-    border-color: var(--accent);
-    color: var(--accent);
-  }
+
 </style>

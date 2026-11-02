@@ -21,7 +21,7 @@
   import { endSelectWindow, restartSelectWindow, tapMode } from "../lib/selection";
   import { attempt, show } from "../lib/show.svelte";
   import { RECORD_EVENT, surface } from "../lib/surface.svelte";
-  import type { Attribute, Channel, Family } from "../lib/types";
+  import type { Attribute, Channel, Family, Rgb } from "../lib/types";
 
   const selection = $derived(show.programmer.selection);
   const selected = $derived(new Set(selection));
@@ -34,14 +34,14 @@
     { id: "fixtures", title: "Fixtures" },
     { id: "groups", title: "Groups" },
     { id: "sheet", title: "Programmer" },
-    { id: "presets-intensity", title: "Intensity presets" },
-    { id: "presets-beam", title: "Beam presets" },
-    { id: "presets-position", title: "Position presets" },
-    { id: "presets-colour", title: "Colour presets" },
-    { id: "intensity", title: "Intensity" },
-    { id: "colour", title: "Colour" },
-    { id: "position", title: "Position" },
-    { id: "beam", title: "Beam" },
+    { id: "presets-intensity", title: "Intensity presets", tone: "var(--f-intensity)" },
+    { id: "presets-beam", title: "Beam presets", tone: "var(--f-beam)" },
+    { id: "presets-position", title: "Position presets", tone: "var(--f-position)" },
+    { id: "presets-colour", title: "Colour presets", tone: "var(--f-colour)" },
+    { id: "intensity", title: "Intensity", tone: "var(--f-intensity)" },
+    { id: "colour", title: "Colour", tone: "var(--f-colour)" },
+    { id: "position", title: "Position", tone: "var(--f-position)" },
+    { id: "beam", title: "Beam", tone: "var(--f-beam)" },
   ];
   const presetFamily = (id: string) => id.slice("presets-".length) as Family;
 
@@ -309,6 +309,9 @@
     if (show.live.highlight) setHighlight(false);
   });
 
+  const sameColour = (a: Rgb | undefined, b: Rgb) =>
+    a != null && Math.abs(a.r - b.r) < 0.01 && Math.abs(a.g - b.g) < 0.01 && Math.abs(a.b - b.b) < 0.01;
+
   const families: Record<string, Family> = { intensity: "intensity", colour: "colour", position: "position", beam: "beam" };
 </script>
 
@@ -447,6 +450,7 @@
       <Fader
         wide
         max={100}
+        colour="var(--f-intensity)"
         value={Math.round((current.intensity ?? 0) * 100)}
         label="Intensity"
         detail={current.intensity == null ? "Not set" : `${Math.round(current.intensity * 100)}%`}
@@ -489,11 +493,12 @@
           {#each SWATCHES as s (s.name)}
             <button
               class="swatch"
-              title={s.name}
-              aria-label={s.name}
-              style:background={rgbCss(s.colour)}
+              aria-pressed={sameColour(current.colour, s.colour)}
               onclick={() => program(() => api.setColour(s.colour))}
-            ></button>
+            >
+              <span class="chip" style:background={rgbCss(s.colour)}></span>
+              <span>{s.name}</span>
+            </button>
           {/each}
         </div>
       {/if}
@@ -520,6 +525,7 @@
             <Fader
               wide
               {fine}
+              colour="var(--f-position)"
               max={POSITION_STEPS}
               format={positionPercent}
               value={Math.round((f.level ?? 0.5) * POSITION_STEPS)}
@@ -559,6 +565,7 @@
           label={attributeName(attribute)}
           sublabel={set == null ? "Not set" : undefined}
           detail={capabilityAt(channel.capabilities, value)}
+          colour="var(--f-beam)"
           active={set != null}
           onchange={(v) => program(() => api.setAttribute(attribute, v / 255))}
         />
@@ -596,19 +603,13 @@
     min-height: 0;
   }
 
-  .highlight[aria-pressed="true"] {
-    background: var(--accent);
-    border-color: var(--accent);
-    color: #fff;
-  }
-
   .mode {
-    padding: 4px 12px;
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--danger) 18%, var(--panel));
-    border: 1px solid var(--danger);
-    color: var(--danger);
-    font-size: 0.85rem;
+    padding: 6px 12px;
+    border-radius: var(--radius);
+    background: var(--danger);
+    color: var(--bg);
+    font-weight: 600;
+    font-size: 0.9rem;
   }
 
   .hint {
@@ -632,14 +633,15 @@
     text-align: left;
   }
 
-  .tile[aria-pressed="true"] {
-    border-color: var(--accent);
-    background: color-mix(in srgb, var(--accent) 22%, var(--panel-raised));
+  .num {
+    font-family: var(--mono);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
   }
 
-  .num {
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
+  /* Selected tiles are white, so the fixture's own colour would wash out. */
+  .tile[aria-pressed="true"] .num {
+    color: var(--accent-text) !important;
   }
 
   .name {
@@ -651,8 +653,11 @@
   .dot {
     width: 8px;
     height: 8px;
-    border-radius: 50%;
-    background: var(--accent);
+    background: var(--f-intensity);
+  }
+
+  .tile[aria-pressed="true"] .dot {
+    background: var(--accent-text);
   }
 
   .group {
@@ -665,15 +670,13 @@
 
   /* Selected like a fixture tile when all its fixtures are selected, and
      with a dashed outline when only some are. */
-  .group[aria-pressed="true"] {
-    border-color: var(--accent);
-    background: color-mix(in srgb, var(--accent) 22%, var(--panel-raised));
+  .group[aria-pressed="true"] .muted {
+    color: #4a5260;
   }
 
   .group[aria-pressed="mixed"] {
     border-color: var(--accent);
     border-style: dashed;
-    background: color-mix(in srgb, var(--accent) 8%, var(--panel-raised));
   }
 
   .group span:last-child {
@@ -681,7 +684,9 @@
   }
 
   .group.add {
+    border-color: var(--line);
     border-style: dashed;
+    background: transparent;
     text-align: center;
     color: var(--muted);
   }
@@ -696,9 +701,8 @@
   }
 
   .on {
-    border-color: var(--accent);
-    color: var(--accent);
-    background: color-mix(in srgb, var(--accent) 15%, var(--panel-raised));
+    background: var(--accent);
+    color: var(--accent-text);
   }
 
   /* Controls size themselves to their window (the window body is a size container). */
@@ -737,12 +741,12 @@
   }
 
   .colour :global(.disc) {
-    width: min(100cqw, 100cqh - 96px);
+    width: min(100cqw, 100cqh - 150px);
     flex-shrink: 0;
   }
 
   .colour.with-balance :global(.disc) {
-    width: min(100cqw, 100cqh - 290px);
+    width: min(100cqw, 100cqh - 344px);
   }
 
   .position :global(.pad) {
@@ -750,17 +754,42 @@
     flex-shrink: 0;
   }
 
+  /* A chip of the colour above its name, like a gel swatch. */
   .swatches {
     display: grid;
-    grid-template-columns: repeat(6, 1fr);
+    grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
     gap: 6px;
     width: 100%;
   }
 
   .swatch {
-    min-height: 36px;
-    padding: 0;
-    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.15);
+    display: grid;
+    gap: 4px;
+    min-height: 0;
+    padding: 6px;
+    text-align: left;
+    font-size: 0.8rem;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    overflow: hidden;
+  }
+
+  .swatch span:last-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .chip {
+    height: 22px;
+    border-radius: 2px;
+    box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.4);
+  }
+
+  .swatch[aria-pressed="true"] {
+    background: color-mix(in srgb, var(--f-colour) 22%, var(--panel-raised));
+    border-color: var(--f-colour);
+    color: #ff9fd6;
   }
 
   .segmented {
