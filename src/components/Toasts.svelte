@@ -19,20 +19,21 @@
     max-width: 560px;
   }
 
+  /* Flat blocks: errors red, warnings yellow, everything else grey. */
   .toast {
     text-align: left;
     padding: 16px 20px;
     height: auto;
-    background: var(--panel-raised);
-    border-left: 6px solid var(--muted);
-    box-shadow: 0 12px 30px rgb(0 0 0 / 0.4);
+    background: #2c333f;
   }
 
   .error {
-    border-left-color: var(--danger);
+    background: var(--danger);
+    color: var(--accent-text);
   }
 
   .warning {
-    border-left-color: var(--warning);
+    background: var(--warning);
+    color: var(--accent-text);
   }
 </style>

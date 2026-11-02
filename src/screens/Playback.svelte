@@ -207,6 +207,7 @@
           max={100}
           value={Math.round(show.playback.effectSize * 100)}
           label="Size"
+          colour="var(--f-playback)"
           active={show.playback.effectSize > 0}
           onchange={(v) => play(() => api.setEffectSize(v / 100))}
         />
@@ -224,6 +225,7 @@
             max={100}
             value={Math.round(master(l.id) * 100)}
             label="Level"
+            colour="var(--f-playback)"
             active={live != null}
             onchange={(v) => play(() => api.setMaster(l.id, v / 100))}
           />
@@ -329,13 +331,21 @@
     background: transparent;
   }
 
+  /* The live cue is filled in the playback colour; the picked one is outlined. */
   .cue.live {
-    background: color-mix(in srgb, var(--ok) 12%, transparent);
+    background: var(--f-playback);
+    color: var(--accent-text);
+  }
+
+  .cue.live .muted,
+  .cue.live .mode,
+  .cue.live .fx,
+  .cue.live .state {
+    color: var(--accent-text);
   }
 
   .cue.selected {
     border-color: var(--accent);
-    background: var(--panel-raised);
   }
 
   .strip.effect-size {
@@ -343,15 +353,16 @@
   }
 
   .fx {
-    color: var(--accent);
+    color: var(--f-playback);
   }
 
   .state {
-    color: var(--ok);
+    color: var(--f-playback);
   }
 
   .num {
-    font-weight: 700;
+    font-family: var(--mono);
+    font-weight: 600;
     font-variant-numeric: tabular-nums;
   }
 
@@ -362,16 +373,18 @@
   }
 
   .mode {
+    font-family: var(--mono);
     font-size: 0.9rem;
     color: var(--muted);
     font-variant-numeric: tabular-nums;
   }
 
   .mode.follow {
-    color: var(--accent);
+    color: var(--f-playback);
   }
 
   .fade {
+    font-family: var(--mono);
     text-align: right;
     font-variant-numeric: tabular-nums;
   }
@@ -412,17 +425,19 @@
     flex-shrink: 0;
     padding: 14px;
     border-radius: var(--radius);
-    border: 1px solid var(--line);
+    border-top: 4px solid var(--line);
     background: var(--panel-raised);
   }
 
   .strip.running {
-    border-color: var(--ok);
+    border-top-color: var(--f-playback);
   }
 
   .strip-name {
     font-weight: 700;
     font-size: 1.1rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
   }
 
   .strip-cue {
@@ -446,11 +461,11 @@
   }
 
   .go {
-    background: var(--ok);
-    border-color: var(--ok);
-    color: #04140b;
-    font-size: 1.6rem;
-    font-weight: 800;
+    background: var(--f-playback);
+    color: var(--accent-text);
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
   }
 
   @media (max-width: 2000px) {

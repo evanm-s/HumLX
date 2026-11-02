@@ -117,14 +117,14 @@
     flex-shrink: 0;
   }
 
-  .tile[aria-pressed="true"] {
-    border-color: var(--accent);
-    background: color-mix(in srgb, var(--accent) 12%, var(--panel-raised));
+  .num {
+    font-family: var(--mono);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
   }
 
-  .num {
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
+  .tile[aria-pressed="true"] .num {
+    color: var(--accent-text) !important;
   }
 
   .name {
@@ -136,8 +136,7 @@
   .dot {
     width: 12px;
     height: 12px;
-    border-radius: 50%;
-    background: var(--accent);
+    background: var(--f-intensity);
   }
 
   .channels {
