@@ -21,12 +21,25 @@
   import { endSelectWindow, restartSelectWindow, tapMode } from "../lib/selection";
   import { attempt, show } from "../lib/show.svelte";
   import { RECORD_EVENT, surface } from "../lib/surface.svelte";
-  import type { Attribute, Channel, Family } from "../lib/types";
+  import type { Attribute, Channel, Family, Fixture } from "../lib/types";
 
   const selection = $derived(show.programmer.selection);
   const selected = $derived(new Set(selection));
   const current = $derived(show.current);
   const program = show.program.bind(show);
+
+  // Fixtures split by type (profile and mode), in order of first appearance
+  // in the patch, so each type starts on its own row like Onyx.
+  const fixtureTypes = $derived.by(() => {
+    const types = new Map<string, Fixture[]>();
+    for (const f of show.patch.fixtures) {
+      const key = `${f.profile}\u0000${f.mode}`;
+      const list = types.get(key);
+      if (list) list.push(f);
+      else types.set(key, [f]);
+    }
+    return [...types.values()];
+  });
 
   // --- Layout --------------------------------------------------------------
 
@@ -394,12 +407,15 @@
 {#snippet body(id: string)}
   {#if id === "fixtures"}
     <div class="tiles">
-      {#each show.patch.fixtures as f (f.id)}
-        <button class="tile" title={f.name} aria-pressed={selected.has(f.id)} onclick={() => tapFixture(f.id)}>
-          <span class="num" style:color={fixtureColour(f.id)}>{f.id}</span>
-          <span class="name">{f.name}</span>
-          {#if show.programmer.values[f.id]}<span class="dot" aria-label="Has programmer values"></span>{/if}
-        </button>
+      {#each fixtureTypes as type, i (type[0].id)}
+        {#if i > 0}<span class="type-break" aria-hidden="true"></span>{/if}
+        {#each type as f (f.id)}
+          <button class="tile" title={f.name} aria-pressed={selected.has(f.id)} onclick={() => tapFixture(f.id)}>
+            <span class="num" style:color={fixtureColour(f.id)}>{f.id}</span>
+            <span class="name">{f.name}</span>
+            {#if show.programmer.values[f.id]}<span class="dot" aria-label="Has programmer values"></span>{/if}
+          </button>
+        {/each}
       {:else}
         <p class="muted">Patch some fixtures first.</p>
       {/each}
@@ -620,6 +636,11 @@
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
     gap: 6px;
+  }
+
+  /* Ends the row so the next fixture type starts on a new one. */
+  .type-break {
+    grid-column: 1 / -1;
   }
 
   .tile {
