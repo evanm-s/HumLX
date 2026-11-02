@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use crate::error::{Error, Result};
 use crate::programmer::{Rgb, Values};
 
-use crate::effect::{families_in, lay_over, take_out};
+use crate::effect::{families_in, lay_over, take_out, Beats};
 pub use crate::effect::{Effect, Look, RunningEffects};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -205,19 +205,19 @@ impl Playback {
     /// The look with this playback's effects on it, their sizes scaled by
     /// `size`. Effects fade in and out with the cue fade; an effect in both
     /// cues keeps running.
-    pub fn look_with_effects(&self, now: Instant, size: f32) -> Look {
+    pub fn look_with_effects(&self, now: Instant, size: f32, beats: &Beats) -> Look {
         let mut look = self.look(now);
         let t = self.progress(now);
         let elapsed = now.saturating_duration_since(self.clock).as_secs_f32();
         if t < 1.0 {
             for effect in self.from_effects.iter().filter(|e| !self.to_effects.contains(e)) {
-                effect.apply_scaled(&mut look, elapsed, size * (1.0 - t));
+                effect.apply_timed(&mut look, elapsed, beats, size * (1.0 - t));
             }
         }
         for effect in &self.to_effects {
             let k = if self.from_effects.contains(effect) { 1.0 } else { t };
             if k > 0.0 {
-                effect.apply_scaled(&mut look, elapsed, size * k);
+                effect.apply_timed(&mut look, elapsed, beats, size * k);
             }
         }
         look
@@ -376,18 +376,18 @@ impl Playbacks {
 
     /// The combined output of every running playback, without effects.
     pub fn output(&self, now: Instant) -> Look {
-        self.output_with_effects(now, 0.0)
+        self.output_with_effects(now, 0.0, &Beats::default())
     }
 
     /// The combined output of every running playback, with their effects at
     /// `effect_size`. Intensity takes the highest level (after each master);
     /// everything else comes from the most recently moved playback.
-    pub fn output_with_effects(&self, now: Instant, effect_size: f32) -> Look {
+    pub fn output_with_effects(&self, now: Instant, effect_size: f32, beats: &Beats) -> Look {
         let mut playbacks: Vec<&Playback> = self.active.values().collect();
         playbacks.sort_by_key(|p| p.order);
         let mut out = Look::new();
         for playback in playbacks {
-            for (fixture, mut values) in playback.look_with_effects(now, effect_size) {
+            for (fixture, mut values) in playback.look_with_effects(now, effect_size, beats) {
                 values.intensity = values.intensity.map(|i| i * playback.master);
                 let entry = out.entry(fixture).or_default();
                 let highest = match (entry.intensity, values.intensity) {
@@ -566,9 +566,9 @@ mod tests {
         let start = Instant::now();
         playbacks.go(&list, start).unwrap();
         playbacks.go(&list, start).unwrap();
-        let out = playbacks.output_with_effects(start + Duration::from_millis(250), 1.0);
+        let out = playbacks.output_with_effects(start + Duration::from_millis(250), 1.0, &Beats::default());
         assert!((out[&1].intensity.unwrap() - 1.0).abs() < 1e-6); // chase on
-        let out = playbacks.output_with_effects(start + Duration::from_millis(1500), 1.0);
+        let out = playbacks.output_with_effects(start + Duration::from_millis(1500), 1.0, &Beats::default());
         let level = out[&1].intensity.unwrap();
         assert!((level - 0.25).abs() < 1e-6, "{level}"); // 75% faded in, chase off
         assert_eq!(

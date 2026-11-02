@@ -56,12 +56,18 @@ let cueLists: CueList[] = [];
 let osc: OscSettings = { enabled: false, port: 8000 };
 let effects: Effect[] = []; // in the programmer
 let effectSize = 1;
+const speedBpm: [number, number] = [120, 120];
+const speedOrigin = [Date.now(), Date.now()];
+const taps: number[][] = [[], []];
+const beats = (): [number, number] =>
+  [0, 1].map((i) => ((Date.now() - speedOrigin[i]) / 60000) * speedBpm[i]) as [number, number];
 const running = new Map<number, number>(); // cue list -> current cue
 const masters = new Map<number, number>();
 
 const playback = (): PlaybackView => ({
   cueLists: structuredClone(cueLists),
   effectSize,
+  speedBpm: [...speedBpm] as [number, number],
   masters: cueLists.map((l) => [l.id, masters.get(l.id) ?? 1]),
 });
 
@@ -283,6 +289,8 @@ const commands: Record<string, (args: Args) => unknown> = {
     tested: [...tests.keys()].sort((a, b) => a - b),
     playbacks: [...running].map(([list, current]) => ({ list, current, fading: false, followIn: null })),
     masters: cueLists.map((l) => [l.id, masters.get(l.id) ?? 1]),
+    speedBpm: [...speedBpm] as [number, number],
+    beats: beats(),
     osc: { listening: osc.enabled, error: null, received: 0, last: null },
   }),
   osc_settings: () => osc,
@@ -360,10 +368,13 @@ const commands: Record<string, (args: Args) => unknown> = {
       ids.map((f) => [f, only(values[f] ?? {}, family)]).filter(([, v]) => Object.keys(v).length),
     );
     const list = Object.values(recorded);
-    if (!list.length) throw "There is nothing in the programmer to record";
+    const fx = structuredClone(effects.filter((e) => SHAPES[e.shape].family === family));
+    if (!list.length && !fx.length) throw "There is nothing in the programmer to record";
     const shared = list.every((v) => JSON.stringify(v) === JSON.stringify(list[0]));
     const pid = id ?? nextId(presets.map((p) => p.id));
-    const preset: Preset = shared ? { id: pid, name, family, all: list[0] } : { id: pid, name, family, fixtures: recorded };
+    const preset: Preset = shared
+      ? { id: pid, name, family, all: list[0] ?? {}, effects: fx }
+      : { id: pid, name, family, fixtures: recorded, effects: fx };
     presets = [...presets.filter((p) => p.id !== pid), preset].sort((a, b) => a.id - b.id);
     return programmer();
   },
@@ -372,6 +383,12 @@ const commands: Record<string, (args: Args) => unknown> = {
     for (const f of selection) {
       const v = preset.fixtures?.[f] ?? preset.all;
       if (v) values[f] = { ...values[f], ...structuredClone(v), other: { ...values[f]?.other, ...v.other } };
+    }
+    for (const e of preset.effects ?? []) {
+      if (!selection.length) break;
+      const family = SHAPES[e.shape].family;
+      effects = effects.filter((x) => SHAPES[x.shape].family !== family || !x.fixtures.some((f) => selection.includes(f)));
+      effects.push({ ...structuredClone(e), id: nextId(effects.map((x) => x.id)), fixtures: [...selection] });
     }
     return programmer();
   },
@@ -435,6 +452,22 @@ const commands: Record<string, (args: Args) => unknown> = {
   },
   delete_effect: ({ id }) => ((effects = effects.filter((e) => e.id !== id)), playback()),
   set_effect_size: ({ level }) => ((effectSize = level), playback()),
+  tap_speed: ({ master }) => {
+    const now = Date.now();
+    const t = taps[master];
+    if (t.length && now - t[t.length - 1] > 2000) t.length = 0;
+    t.push(now);
+    if (t.length > 5) t.shift();
+    if (t.length > 1) speedBpm[master] = Math.min(300, Math.max(10, 60000 / ((t[t.length - 1] - t[0]) / (t.length - 1))));
+    speedOrigin[master] = now;
+    return playback();
+  },
+  set_speed_bpm: ({ master, bpm }) => {
+    const b = beats()[master];
+    speedBpm[master] = Math.min(300, Math.max(10, bpm));
+    speedOrigin[master] = Date.now() - (b * 60000) / speedBpm[master];
+    return playback();
+  },
   discover_nodes: async () => {
     await new Promise((r) => setTimeout(r, 800));
     return [{ ip: "192.168.1.50", shortName: "Preview node", longName: "Pretend Art-Net node", outputs: [0, 1] }];

@@ -6,7 +6,7 @@
   import Dialog from "../Dialog.svelte";
   import { api } from "../../lib/api";
   import { show } from "../../lib/show.svelte";
-  import type { Direction, Effect, EffectFamily, Pattern, Rgb, Shape } from "../../lib/types";
+  import type { Direction, Effect, EffectFamily, Pattern, Rgb, Shape, Speed } from "../../lib/types";
   import EffectPreview from "./EffectPreview.svelte";
   import { FAMILY_LABELS, PATTERNS, recipe, SHAPES, shapesOf } from "./effects";
 
@@ -20,6 +20,18 @@
 
   const shapes = $derived(shapesOf(family));
   const directions: Direction[] = ["forward", "backward", "bounce"];
+  const SPEEDS: [Speed, string][] = [
+    ["own", "Own"],
+    ["a", "Speed A"],
+    ["b", "Speed B"],
+  ];
+  const MULTIPLIERS: [number, string][] = [
+    [0.25, "¼"],
+    [0.5, "½"],
+    [1, "×1"],
+    [2, "×2"],
+    [4, "×4"],
+  ];
   const PALETTE: Rgb[] = [
     { r: 1, g: 0, b: 0 },
     { r: 1, g: 0.5, b: 0 },
@@ -46,10 +58,14 @@
     pattern: (effect?.pattern ?? "inOrder") as Pattern,
     direction: (effect?.direction ?? "forward") as Direction,
     width: effect?.width ?? 1,
+    speed: (effect?.speed ?? "own") as Speed,
+    multiplier: effect?.multiplier ?? 1,
     transition: effect?.transition ?? SHAPES[startShape].transition,
     colours: [effect?.steps[0]?.colour ?? PALETTE[0], effect?.steps[1]?.colour ?? PALETTE[5]],
   });
   let more = $state(false);
+  // Live tempo of the speed master the effect follows, which tapping can change.
+  const masterBpm = $derived(draft.speed === "own" ? 0 : show.live.speedBpm[draft.speed === "a" ? 0 : 1]);
 
   const preview = $derived({
     ...recipe(draft.shape, draft.colours),
@@ -57,7 +73,7 @@
     width: draft.width,
     direction: draft.direction,
     pattern: draft.pattern,
-    rate: draft.bpm / 60,
+    rate: draft.speed === "own" ? draft.bpm / 60 : (masterBpm * draft.multiplier) / 60,
     size: draft.size,
     spread: draft.spread,
   });
@@ -81,6 +97,8 @@
       pattern: draft.pattern,
       direction: draft.direction,
       width: draft.width,
+      speed: draft.speed,
+      multiplier: draft.multiplier,
       transition: draft.transition,
       colours: draft.shape === "swap" ? $state.snapshot(draft.colours) : undefined,
     };
@@ -126,10 +144,29 @@
     {/each}
   {/if}
 
-  <label class="field">
-    Speed: {draft.bpm} BPM
-    <input type="range" min="3" max="240" step="1" bind:value={draft.bpm} />
-  </label>
+  <div class="field">
+    Speed from
+    <div class="segmented">
+      {#each SPEEDS as [sp, label] (sp)}
+        <button aria-pressed={draft.speed === sp} onclick={() => (draft.speed = sp)}>{label}</button>
+      {/each}
+    </div>
+  </div>
+  {#if draft.speed === "own"}
+    <label class="field">
+      Speed: {draft.bpm} BPM
+      <input type="range" min="3" max="240" step="1" bind:value={draft.bpm} />
+    </label>
+  {:else}
+    <div class="field">
+      Speed: {Math.round(masterBpm * draft.multiplier)} BPM, following {draft.speed === "a" ? "Speed A" : "Speed B"} ({Math.round(masterBpm)} BPM)
+      <div class="segmented">
+        {#each MULTIPLIERS as [m, label] (m)}
+          <button aria-pressed={draft.multiplier === m} onclick={() => (draft.multiplier = m)}>{label}</button>
+        {/each}
+      </div>
+    </div>
+  {/if}
   <label class="field">
     Size: {Math.round(draft.size * 100)}%
     <input type="range" min="0" max="1" step="0.01" bind:value={draft.size} />

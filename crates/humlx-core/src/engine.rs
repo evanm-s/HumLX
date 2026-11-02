@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::artnet;
 use crate::dmx::Universe;
-use crate::effect::EffectSize;
+use crate::effect::{EffectSize, SpeedMasters};
 use crate::error::{Error, Result};
 use crate::fixture::{Attribute, Library, Mode};
 use crate::osc::{OscSettings, OscStatus};
@@ -90,6 +90,8 @@ pub struct State {
     pub running_effects: RunningEffects,
     /// Scales the size of every effect, in cues and the programmer.
     pub effect_size: EffectSize,
+    /// Tempos that effects can follow.
+    pub speed_masters: SpeedMasters,
     pub osc_settings: OscSettings,
     pub osc: OscStatus,
     /// Raw channel levels set from the channel test screen, by fixture
@@ -178,12 +180,14 @@ impl State {
         // Playbacks with their effects, then programmer values on top (which
         // override a cue's effect on what they set), then programmer effects.
         let size = self.effect_size.0.clamp(0.0, 1.0);
-        let mut look = self.playbacks.output_with_effects(now, size);
+        let beats = self.speed_masters.beats(now);
+        let mut look = self.playbacks.output_with_effects(now, size, &beats);
         for (fixture, values) in &self.programmer.values {
             look.entry(*fixture).or_default().merge(values);
         }
+        self.running_effects.start_new(&self.programmer.effects, now);
         self.running_effects
-            .apply(&self.programmer.effects, &mut look, now, size);
+            .apply(&self.programmer.effects, &mut look, now, &beats, size);
         if self.highlight {
             for fixture in self.patch.fixtures() {
                 let values = look.entry(fixture.id).or_default();

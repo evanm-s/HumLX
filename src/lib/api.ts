@@ -118,4 +118,6 @@ export const api = {
   saveEffect: (settings: EffectSettings, id: number | null) => invoke<PlaybackView>("save_effect", { settings, id }),
   deleteEffect: (id: number) => invoke<PlaybackView>("delete_effect", { id }),
   setEffectSize: (level: number) => invoke<PlaybackView>("set_effect_size", { level }),
+  tapSpeed: (master: number) => invoke<PlaybackView>("tap_speed", { master }),
+  setSpeedBpm: (master: number, bpm: number) => invoke<PlaybackView>("set_speed_bpm", { master, bpm }),
 };

@@ -24,9 +24,11 @@ class ShowState {
     tested: [],
     playbacks: [],
     masters: [],
+    speedBpm: [120, 120],
+    beats: [0, 0],
     osc: { listening: false, error: null, received: 0, last: null },
   });
-  playback = $state<PlaybackView>({ cueLists: [], effectSize: 1, masters: [] });
+  playback = $state<PlaybackView>({ cueLists: [], effectSize: 1, speedBpm: [120, 120], masters: [] });
   programmer = $state<ProgrammerView>({ selection: [], values: {}, effects: [], groups: [], presets: [] });
   loaded = $state(false);
   /** Bumped when a different show is loaded, so screens start afresh. */

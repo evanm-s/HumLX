@@ -388,6 +388,10 @@ pub struct Preset {
     /// Values recorded per fixture, for presets such as positions that differ.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub fixtures: BTreeMap<u32, Values>,
+    /// Effects of the preset's family. Applying the preset puts them on the
+    /// selected fixtures, in the order they were picked.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub effects: Vec<crate::effect::Effect>,
 }
 
 impl Preset {
@@ -401,16 +405,26 @@ impl Preset {
             .map(|(fixture, values)| (*fixture, values.only(family)))
             .filter(|(_, values)| !values.is_empty())
             .collect();
-        let Some(first) = recorded.values().next() else {
-            return Err(Error::NothingToRecord);
+        let effects: Vec<crate::effect::Effect> = programmer
+            .effects
+            .iter()
+            .filter(|e| e.family() == family)
+            .filter(|e| programmer.selection.is_empty() || e.fixtures.iter().any(|f| programmer.selection.contains(f)))
+            .cloned()
+            .collect();
+        let first = match recorded.values().next() {
+            Some(first) => first.clone(),
+            None if !effects.is_empty() => Values::default(),
+            None => return Err(Error::NothingToRecord),
         };
-        let shared = recorded.values().all(|values| values == first);
+        let shared = recorded.values().all(|values| *values == first);
         Ok(Preset {
             id,
             name,
             family,
-            all: if shared { first.clone() } else { Values::default() },
+            all: if shared { first } else { Values::default() },
             fixtures: if shared { BTreeMap::new() } else { recorded },
+            effects,
         })
     }
 
@@ -428,6 +442,15 @@ impl Preset {
                 let values = values.only(self.family);
                 programmer.values.entry(id).or_default().merge(&values);
             }
+        }
+        if programmer.selection.is_empty() {
+            return;
+        }
+        for effect in &self.effects {
+            let mut effect = effect.clone();
+            effect.id = next_id(programmer.effects.iter().map(|e| e.id));
+            effect.fixtures = programmer.selection.clone();
+            crate::effect::lay_over(&mut programmer.effects, effect);
         }
     }
 }
@@ -654,6 +677,33 @@ mod tests {
         preset.apply(&mut other);
         assert_eq!(other.values[&2].pan, Some(0.8));
         assert!(!other.values.contains_key(&3));
+    }
+
+    #[test]
+    fn effect_presets_go_on_the_selection() {
+        use crate::effect::{Effect, Shape};
+        let mut programmer = Programmer::default();
+        programmer.select(&[1, 2], SelectMode::Set);
+        programmer
+            .effects
+            .push(Effect::new(1, "Circle".into(), Shape::Circle, &[], vec![1, 2]));
+        programmer
+            .effects
+            .push(Effect::new(2, "Pulse".into(), Shape::Pulse, &[], vec![1, 2]));
+        let preset = Preset::record(1, "Slow circle".into(), Family::Position, &programmer).unwrap();
+        assert!(preset.all.is_empty() && preset.fixtures.is_empty());
+        assert_eq!(preset.effects.len(), 1);
+
+        let mut other = Programmer::default();
+        other.select(&[4, 3], SelectMode::Set);
+        other
+            .effects
+            .push(Effect::new(1, "Sweep".into(), Shape::PanSweep, &[], vec![3]));
+        preset.apply(&mut other);
+        // The circle replaces the sweep on fixture 3 and runs in pick order.
+        assert_eq!(other.effects.len(), 1);
+        assert_eq!(other.effects[0].shape, Shape::Circle);
+        assert_eq!(other.effects[0].fixtures, vec![4, 3]);
     }
 
     #[test]
