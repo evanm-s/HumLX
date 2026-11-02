@@ -373,6 +373,7 @@
   }
 
   .strip.speed {
+    border-top-color: var(--f-playback);
     width: 170px;
   }
 
@@ -390,6 +391,7 @@
 
   .bpm {
     text-align: center;
+    font-family: var(--mono);
     font-variant-numeric: tabular-nums;
   }
 
@@ -398,6 +400,7 @@
   }
 
   .tap {
+    border-color: var(--f-playback);
     flex: 1;
     min-height: 88px;
     font-size: 1.2rem;
@@ -415,7 +418,7 @@
   }
 
   .beat.on {
-    background: var(--accent);
+    background: var(--f-playback);
   }
 
   .fx {
