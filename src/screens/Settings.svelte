@@ -373,13 +373,12 @@
   .swatch {
     min-height: 48px;
     padding: 0;
-    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.15);
+    box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.4);
   }
 
   .swatch[aria-pressed="true"] {
-    box-shadow:
-      inset 0 0 0 3px #000,
-      0 0 0 3px var(--accent);
+    border-color: var(--accent);
+    box-shadow: inset 0 0 0 3px var(--bg);
   }
 
   .addresses {
@@ -400,7 +399,7 @@
   }
 
   code {
-    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-family: var(--mono);
     color: var(--accent);
   }
 

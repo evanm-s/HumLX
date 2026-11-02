@@ -85,9 +85,14 @@
     onpointercancel={up}
     onkeydown={key}
     style:--colour={colour}
+    style:--level={fill / 100}
   >
-    <div class="fill" style:height="{fill}%"></div>
-    <div class="handle" style:bottom="{fill}%"></div>
+    <div class="groove"></div>
+    <div class="fill"></div>
+    <div class="tick top"></div>
+    <div class="tick mid"></div>
+    <div class="tick low"></div>
+    <div class="handle"></div>
   </div>
   <div class="label" title={label}>{label}</div>
   {#if sublabel}<div class="sublabel">{sublabel}</div>{/if}
@@ -95,6 +100,8 @@
 </div>
 
 <style>
+  /* Drawn like a console fader: a slot with a groove, the level filling the
+     groove in the fader's colour, and a flat cap with a line across it. */
   .fader {
     display: grid;
     grid-template-rows: auto 1fr auto auto auto;
@@ -102,25 +109,33 @@
     gap: 8px;
     width: 88px;
     min-height: 0;
+    --pad: 22px;
+    --cap: 40px;
   }
 
   .wide {
     width: 140px;
+    --cap: 54px;
   }
 
   .wide .track {
-    width: 116px;
-    border-radius: 20px;
+    width: 110px;
   }
 
   .value {
+    font-family: var(--mono);
     font-variant-numeric: tabular-nums;
     font-size: 1.1rem;
     font-weight: 600;
   }
 
+  .wide .value {
+    font-size: 2rem;
+    line-height: 1.1;
+  }
+
   .active .value {
-    color: var(--accent);
+    color: var(--colour);
   }
 
   .track {
@@ -128,10 +143,9 @@
     width: 64px;
     height: 100%;
     min-height: 160px;
-    border-radius: 12px;
-    background: var(--bg);
-    border: 1px solid var(--line);
-    overflow: hidden;
+    border-radius: var(--radius);
+    background: #0a0c0f;
+    box-shadow: inset 0 0 0 1px var(--line);
     touch-action: none;
     cursor: ns-resize;
   }
@@ -140,22 +154,61 @@
     outline: 2px solid var(--accent);
   }
 
+  .groove,
   .fill {
     position: absolute;
-    inset: auto 0 0 0;
-    background: linear-gradient(to top, color-mix(in srgb, var(--colour) 35%, transparent), var(--colour));
-    opacity: 0.85;
+    left: calc(50% - 3px);
+    width: 6px;
+    bottom: var(--pad);
+  }
+
+  .groove {
+    top: var(--pad);
+    background: var(--line);
+  }
+
+  .fill {
+    height: calc((100% - 2 * var(--pad)) * var(--level));
+    background: var(--colour);
+  }
+
+  .tick {
+    position: absolute;
+    left: 8px;
+    right: 8px;
+    height: 2px;
+    background:
+      linear-gradient(90deg, #3a4150 0 calc(50% - 10px), transparent calc(50% - 10px) calc(50% + 10px), #3a4150 calc(50% + 10px));
+  }
+  .tick.top {
+    top: calc(var(--pad) - 1px);
+  }
+  .tick.mid {
+    top: calc(50% - 1px);
+  }
+  .tick.low {
+    bottom: calc(var(--pad) - 1px);
   }
 
   .handle {
     position: absolute;
     left: 6px;
     right: 6px;
-    height: 6px;
-    margin-bottom: -3px;
-    border-radius: 3px;
-    background: var(--text);
-    box-shadow: 0 0 0 2px var(--bg);
+    height: var(--cap);
+    bottom: calc(var(--pad) + (100% - 2 * var(--pad)) * var(--level) - var(--cap) / 2);
+    border-radius: var(--radius);
+    background: #3a404c;
+    pointer-events: none;
+  }
+
+  .handle::after {
+    content: "";
+    position: absolute;
+    left: 6px;
+    right: 6px;
+    top: calc(50% - 2px);
+    height: 4px;
+    background: var(--colour);
   }
 
   .label {

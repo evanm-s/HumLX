@@ -52,7 +52,7 @@
 
 <div class="shell">
   <nav class="rail" aria-label="Screens">
-    <div class="brand">Hum<span>LX</span></div>
+    <div class="brand">HumLX<span class="gels" aria-hidden="true"></span></div>
     {#each screens as s (s.id)}
       <button class="nav" aria-current={screen === s.id ? "page" : undefined} onclick={() => (screen = s.id)}>
         <span class="icon" aria-hidden="true">{s.icon}</span>
@@ -119,15 +119,26 @@
   }
 
   .brand {
+    display: grid;
+    justify-items: center;
+    gap: 6px;
     font-size: 1.6rem;
-    font-weight: 800;
-    letter-spacing: -0.02em;
-    text-align: center;
-    padding-bottom: 8px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    padding-bottom: 10px;
   }
 
-  .brand span {
-    color: var(--accent);
+  /* The four attribute colours, as a key to the rest of the app. */
+  .gels {
+    width: 68px;
+    height: 8px;
+    background: linear-gradient(
+      90deg,
+      var(--f-intensity) 0 25%,
+      var(--f-colour) 25% 50%,
+      var(--f-position) 50% 75%,
+      var(--f-beam) 75%
+    );
   }
 
   .nav {
@@ -136,7 +147,6 @@
     gap: 4px;
     padding: 8px 6px;
     min-height: 68px;
-    border-color: transparent;
     background: transparent;
     font-size: 0.9rem;
   }
@@ -147,9 +157,8 @@
   }
 
   .nav[aria-current="page"] {
-    background: var(--panel-raised);
-    border-color: var(--line);
-    color: var(--accent);
+    background: var(--accent);
+    color: var(--accent-text);
   }
 
   .status {
@@ -165,18 +174,19 @@
   .led {
     width: 14px;
     height: 14px;
-    border-radius: 50%;
     background: var(--muted);
   }
 
   .ok .led {
     background: var(--ok);
-    box-shadow: 0 0 10px var(--ok);
   }
 
   .bad .led {
     background: var(--danger);
-    box-shadow: 0 0 10px var(--danger);
+  }
+
+  .status {
+    font-family: var(--mono);
   }
 
   .blackout {
@@ -184,10 +194,16 @@
     font-weight: 700;
   }
 
+  .blackout:not([aria-pressed="true"]) {
+    box-shadow: inset 0 0 0 2px var(--danger);
+    background: transparent;
+    color: var(--danger);
+  }
+
   .blackout[aria-pressed="true"] {
     background: var(--danger);
     border-color: var(--danger);
-    color: #fff;
+    color: var(--accent-text);
   }
 
   main {
@@ -211,7 +227,6 @@
     padding: 6px 12px;
     border-radius: var(--radius);
     background: var(--panel);
-    border: 1px solid var(--line);
     font-size: 0.9rem;
   }
 
@@ -226,7 +241,7 @@
 
   .surface .line {
     flex: 1;
-    font-family: ui-monospace, monospace;
+    font-family: var(--mono);
     font-size: 1.1rem;
   }
 
@@ -238,7 +253,7 @@
 
   .surface .fine {
     padding: 2px 8px;
-    border-radius: 999px;
+    border-radius: var(--radius);
     background: var(--accent);
     color: var(--bg, #000);
     font-weight: 700;

@@ -63,7 +63,9 @@
 
   .add {
     min-height: 44px;
+    border-color: var(--line);
     border-style: dashed;
+    background: transparent;
   }
 
   .effect {

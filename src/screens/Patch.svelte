@@ -527,17 +527,21 @@
 
   .fixture {
     min-height: 44px;
-    border-color: transparent;
     background: transparent;
   }
 
   .fixture.selected {
-    background: var(--panel-raised);
-    border-color: var(--accent);
+    background: var(--accent);
+    color: var(--accent-text);
+  }
+
+  .fixture.selected :global(.muted) {
+    color: #4a5260;
   }
 
   .num {
-    font-weight: 700;
+    font-family: var(--mono);
+    font-weight: 600;
     font-variant-numeric: tabular-nums;
   }
 
@@ -546,7 +550,7 @@
     place-items: center;
     width: 44px;
     height: 32px;
-    border-radius: 8px;
+    border-radius: var(--radius);
     background: color-mix(in srgb, var(--colour) 25%, transparent);
     color: var(--colour);
   }
@@ -559,6 +563,7 @@
   }
 
   .addr {
+    font-family: var(--mono);
     font-variant-numeric: tabular-nums;
     text-align: right;
   }
@@ -598,9 +603,8 @@
     font-size: 0.8rem;
   }
 
-  .type-option[aria-pressed="true"] {
-    border-color: var(--accent);
-    background: color-mix(in srgb, var(--accent) 15%, var(--panel-raised));
+  .type-option[aria-pressed="true"] span {
+    color: var(--accent-text);
   }
 
   .summary {
@@ -616,13 +620,13 @@
   }
 
   .on {
-    border-color: var(--accent);
-    background: color-mix(in srgb, var(--accent) 15%, var(--panel-raised));
+    background: var(--accent);
+    color: var(--accent-text);
   }
 
   .locating {
-    border-color: var(--accent);
-    color: var(--accent);
+    border-color: var(--f-intensity);
+    color: var(--f-intensity);
   }
 
   .map {

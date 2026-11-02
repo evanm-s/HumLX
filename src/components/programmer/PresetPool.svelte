@@ -186,7 +186,9 @@
   }
 
   .empty-slot {
+    border-color: var(--line);
     border-style: dashed;
+    background: transparent;
     color: var(--muted);
     align-content: center;
     text-align: center;
@@ -194,13 +196,12 @@
 
   .chip {
     height: 24px;
-    border-radius: 8px;
-    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.15);
+    border-radius: 2px;
+    box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.4);
   }
 
   .bar {
-    height: 12px;
-    border-radius: 6px;
+    height: 8px;
     background: var(--bg);
     overflow: hidden;
   }
@@ -208,13 +209,13 @@
   .bar span {
     display: block;
     height: 100%;
-    background: var(--accent);
+    background: var(--f-intensity);
   }
 
   .mini-pad {
     position: relative;
     height: 28px;
-    border-radius: 8px;
+    border-radius: 2px;
     background: var(--bg);
   }
 
@@ -223,7 +224,8 @@
     width: 10px;
     height: 10px;
     margin: -5px 0 0 -5px;
+    box-sizing: border-box;
     border-radius: 50%;
-    background: var(--accent);
+    border: 2px solid var(--f-position);
   }
 </style>

@@ -56,11 +56,11 @@
     <thead>
       <tr>
         <th class="fixture">Fixture</th>
-        {#if has("intensity")}<th>Intensity %</th>{/if}
-        {#if has("colour")}<th>Colour</th>{/if}
-        {#if has("pan")}<th>Pan %</th>{/if}
-        {#if has("tilt")}<th>Tilt %</th>{/if}
-        {#each other as a (a)}<th>{attributeName(a)}</th>{/each}
+        {#if has("intensity")}<th class="f-i">Intensity %</th>{/if}
+        {#if has("colour")}<th class="f-c">Colour</th>{/if}
+        {#if has("pan")}<th class="f-p">Pan %</th>{/if}
+        {#if has("tilt")}<th class="f-p">Tilt %</th>{/if}
+        {#each other as a (a)}<th class="f-b">{attributeName(a)}</th>{/each}
       </tr>
     </thead>
     <tbody>
@@ -121,6 +121,26 @@
     font-weight: 600;
     color: var(--muted);
     height: 36px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  /* Column heads carry their attribute colour, as on the window bands. */
+  th.f-i {
+    color: var(--f-intensity);
+    box-shadow: inset 0 -3px 0 var(--f-intensity);
+  }
+  th.f-c {
+    color: var(--f-colour);
+    box-shadow: inset 0 -3px 0 var(--f-colour);
+  }
+  th.f-p {
+    color: var(--f-position);
+    box-shadow: inset 0 -3px 0 var(--f-position);
+  }
+  th.f-b {
+    color: var(--f-beam);
+    box-shadow: inset 0 -3px 0 var(--f-beam);
   }
 
   .fixture {
