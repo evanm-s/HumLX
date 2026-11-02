@@ -36,6 +36,10 @@
       <div class="pad">
         <span class="dot small" style:left="{v.pan * 100}%" style:top="{(1 - v.tilt) * 100}%"></span>
       </div>
+    {:else if family === "beam"}
+      <div class="beam">
+        <span class="dot" style:transform="scale({0.25 + 0.75 * v.beam})"></span>
+      </div>
     {:else}
       <span
         class="dot"
@@ -62,6 +66,18 @@
     height: 28px;
     border-radius: 50%;
     border: 1px solid #333;
+  }
+
+  .beam {
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+  }
+
+  .beam .dot {
+    background: var(--f-beam);
+    border: none;
   }
 
   .pad {

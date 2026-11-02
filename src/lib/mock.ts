@@ -438,9 +438,12 @@ const commands: Record<string, (args: Args) => unknown> = {
   release_all: () => (running.clear(), playback()),
   set_master: ({ list, level }) => (masters.set(list, level), playback()),
   save_effect: ({ settings, id }) => {
+    const shaped = recipe(settings.shape, settings.colours);
     const made = {
       ...settings,
-      ...recipe(settings.shape, settings.colours),
+      ...shaped,
+      steps: settings.steps ?? shaped.steps,
+      layering: settings.layering ?? shaped.layering,
       transition: settings.transition ?? SHAPES[settings.shape as Shape].transition,
     };
     if (id != null) Object.assign(effects.find((e) => e.id === id)!, made);

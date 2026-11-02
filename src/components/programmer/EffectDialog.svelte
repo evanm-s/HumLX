@@ -1,14 +1,16 @@
 <script lang="ts">
   // Make an effect on the selected fixtures, or change one. Pick a shape, then
-  // set speed, size and spread; the rest sits under More. The shapes on offer
-  // come from the window it was opened from.
+  // set speed, size and spread; the rest sits under More, and the steps
+  // themselves under Edit steps. The shapes on offer come from the window it
+  // was opened from.
 
   import Dialog from "../Dialog.svelte";
   import { api } from "../../lib/api";
   import { show } from "../../lib/show.svelte";
   import type { Direction, Effect, EffectFamily, Pattern, Rgb, Shape, Speed } from "../../lib/types";
   import EffectPreview from "./EffectPreview.svelte";
-  import { FAMILY_LABELS, PATTERNS, recipe, SHAPES, shapesOf } from "./effects";
+  import StepEditor from "./StepEditor.svelte";
+  import { FAMILY_LABELS, PATTERNS, recipe, SHAPES, shapesOf, type Step } from "./effects";
 
   interface Props {
     family: EffectFamily;
@@ -42,33 +44,52 @@
     { r: 1, g: 0, b: 1 },
     { r: 1, g: 1, b: 1 },
   ];
-  const css = (c: Rgb) => `rgb(${c.r * 255} ${c.g * 255} ${c.b * 255})`;
-  const same = (a: Rgb | undefined, b: Rgb) => !!a && a.r === b.r && a.g === b.g && a.b === b.b;
+  const NAMES = ["Red", "Orange", "Yellow", "Green", "Cyan", "Blue", "Magenta", "White"];
+  // The colours to pick steps from: the basics, then the colour presets.
+  const palette = $derived([
+    ...PALETTE.map((colour, i) => ({ name: NAMES[i], colour })),
+    ...show.programmer.presets
+      .filter((p) => p.family === "colour")
+      .map((p) => ({ name: p.name, colour: p.all?.colour ?? Object.values(p.fixtures ?? {})[0]?.colour }))
+      .filter((p): p is { name: string; colour: Rgb } => !!p.colour),
+  ]);
 
   // Seeded once from the effect being edited; the dialog is remade per open.
   // svelte-ignore state_referenced_locally
   const startShape: Shape = effect?.shape ?? shapesOf(family)[0];
+  // svelte-ignore state_referenced_locally
+  const start = effect ?? { ...recipe(startShape), width: SHAPES[startShape].width ?? 1 };
   // svelte-ignore state_referenced_locally
   let draft = $state({
     name: effect?.name ?? "",
     shape: startShape,
     bpm: Math.round((effect?.rate ?? 1) * 60),
     size: effect?.size ?? 1,
-    spread: effect?.spread ?? 1,
+    spread: effect?.spread ?? (start.fan ? 0 : 1),
     pattern: (effect?.pattern ?? "inOrder") as Pattern,
     direction: (effect?.direction ?? "forward") as Direction,
-    width: effect?.width ?? 1,
+    width: start.width,
     speed: (effect?.speed ?? "own") as Speed,
     multiplier: effect?.multiplier ?? 1,
     transition: effect?.transition ?? SHAPES[startShape].transition,
-    colours: [effect?.steps[0]?.colour ?? PALETTE[0], effect?.steps[1]?.colour ?? PALETTE[5]],
+    steps: structuredClone($state.snapshot(start.steps)) as Step[],
+    layering: start.layering,
+    curve: start.curve,
+    wrap: start.wrap,
+    fan: start.fan,
   });
   let more = $state(false);
+  let editing = $state(false);
+  const colourList = $derived(SHAPES[draft.shape].colours);
   // Live tempo of the speed master the effect follows, which tapping can change.
   const masterBpm = $derived(draft.speed === "own" ? 0 : show.live.speedBpm[draft.speed === "a" ? 0 : 1]);
 
   const preview = $derived({
-    ...recipe(draft.shape, draft.colours),
+    steps: draft.steps,
+    layering: draft.layering,
+    curve: draft.curve,
+    wrap: draft.wrap,
+    fan: draft.fan,
     transition: draft.transition,
     width: draft.width,
     direction: draft.direction,
@@ -82,8 +103,15 @@
 
   function pick(shape: Shape) {
     if (shape === draft.shape) return;
-    draft.shape = shape;
-    draft.transition = SHAPES[shape].transition;
+    // Colours carry over between the shapes that take a list of them.
+    const colours = colourList ? draft.steps.flatMap((s) => (s.colour ? [s.colour] : [])) : [];
+    const made = recipe(shape, $state.snapshot(colours) as Rgb[]);
+    if (made.fan !== draft.fan) draft.spread = made.fan ? 0 : 1;
+    Object.assign(draft, made, {
+      shape,
+      transition: SHAPES[shape].transition,
+      width: SHAPES[shape].width ?? 1,
+    });
   }
 
   async function save() {
@@ -100,7 +128,8 @@
       speed: draft.speed,
       multiplier: draft.multiplier,
       transition: draft.transition,
-      colours: draft.shape === "swap" ? $state.snapshot(draft.colours) : undefined,
+      steps: $state.snapshot(draft.steps),
+      layering: draft.layering,
     };
     const ok = await show.play(() => api.saveEffect(settings, effect?.id ?? null));
     if (ok) onclose();
@@ -125,23 +154,19 @@
   <p class="muted">{SHAPES[draft.shape].hint}.</p>
   <EffectPreview fx={preview} {family} {count} />
 
-  {#if draft.shape === "swap"}
-    {#each [0, 1] as i (i)}
-      <div class="field">
-        Colour {i + 1}
-        <div class="swatches">
-          {#each PALETTE as c, j (j)}
-            <button
-              class="swatch"
-              style:background={css(c)}
-              aria-label="Colour {i + 1}: {css(c)}"
-              aria-pressed={same(draft.colours[i], c)}
-              onclick={() => (draft.colours[i] = c)}
-            ></button>
-          {/each}
-        </div>
-      </div>
-    {/each}
+  {#if colourList}
+    <div class="colours">
+      Colours
+      <StepEditor
+        {family}
+        {palette}
+        noun="Colour"
+        min={colourList.min}
+        max={colourList.max}
+        steps={draft.steps}
+        onchange={(steps) => (draft.steps = steps)}
+      />
+    </div>
   {/if}
 
   <div class="field">
@@ -211,6 +236,26 @@
       Width: {Math.round(draft.width * 100)}% of each cycle
       <input type="range" min="0.05" max="1" step="0.01" bind:value={draft.width} />
     </label>
+    <div class="field">
+      Layering
+      <div class="segmented">
+        <button aria-pressed={draft.layering === "onTop"} onclick={() => (draft.layering = "onTop")}>
+          On top of the look
+        </button>
+        <button aria-pressed={draft.layering === "replace"} onclick={() => (draft.layering = "replace")}>
+          Replace the look
+        </button>
+      </div>
+    </div>
+  {/if}
+
+  {#if !colourList}
+    <button class="ghost more" aria-expanded={editing} onclick={() => (editing = !editing)}>
+      {editing ? "▾" : "▸"} Edit steps ({draft.steps.length})
+    </button>
+    {#if editing}
+      <StepEditor {family} {palette} steps={draft.steps} onchange={(steps) => (draft.steps = steps)} />
+    {/if}
   {/if}
 
   <label class="field">
@@ -266,23 +311,11 @@
     font-weight: 700;
   }
 
-  .swatches {
-    display: flex;
-    flex-wrap: wrap;
+  .colours {
+    display: grid;
     gap: 8px;
-    padding: 5px;
-  }
-
-  .swatch {
-    width: 40px;
-    min-width: 40px;
-    height: 40px;
-    padding: 0;
-  }
-
-  .swatch[aria-pressed="true"] {
-    outline: 3px solid var(--accent);
-    outline-offset: 2px;
+    color: var(--muted);
+    font-size: 0.9rem;
   }
 
   .more {
