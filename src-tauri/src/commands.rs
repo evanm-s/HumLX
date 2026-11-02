@@ -64,6 +64,10 @@ pub struct Live {
     playbacks: Vec<crate::playback::PlaybackStatus>,
     /// Master levels by cue list, which OSC can change too.
     masters: Vec<(u32, f32)>,
+    /// Tempo of speed masters A and B, which OSC can change too.
+    speed_bpm: [f32; 2],
+    /// Beats counted by speed masters A and B, for their beat lights.
+    beats: [f32; 2],
     osc: humlx_core::osc::OscStatus,
 }
 
@@ -226,6 +230,8 @@ pub fn live(app: State<'_, App>) -> Live {
         tested: state.tested_fixtures(),
         playbacks: crate::playback::statuses(&state),
         masters: crate::playback::masters(&state),
+        speed_bpm: state.speed_masters.bpms(),
+        beats: state.speed_masters.beats(std::time::Instant::now()).0,
         osc: state.osc.clone(),
     }
 }

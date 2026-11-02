@@ -37,6 +37,9 @@ pub struct Show {
     /// Colour that Highlight turns the selected fixtures.
     #[serde(default)]
     pub highlight_colour: Rgb,
+    /// Tempos of speed masters A and B, in beats per minute.
+    #[serde(default = "default_bpm")]
+    pub speed_bpm: [f32; 2],
     /// Fixture types the patch uses that aren't built in, so a show file
     /// opens on another computer.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -55,9 +58,14 @@ impl Default for Show {
             effects: Vec::new(),
             osc: OscSettings::default(),
             highlight_colour: Rgb::WHITE,
+            speed_bpm: default_bpm(),
             profiles: Vec::new(),
         }
     }
+}
+
+fn default_bpm() -> [f32; 2] {
+    [120.0, 120.0]
 }
 
 impl Show {

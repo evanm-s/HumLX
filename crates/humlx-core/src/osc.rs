@@ -197,6 +197,10 @@ pub enum Command {
     Master(String, f32),
     ReleaseAll,
     Blackout(bool),
+    /// A tap of speed master 0 (A) or 1 (B).
+    Tap(usize),
+    /// Sets speed master 0 (A) or 1 (B) to a BPM.
+    Bpm(usize, f32),
 }
 
 /// Works out what a message asks for. `Ok(None)` means the message is ours but
@@ -210,6 +214,21 @@ pub fn command(message: &Message) -> Result<Option<Command>> {
     let command = match parts.as_slice() {
         ["humlx", "releaseall"] => pressed.then_some(Command::ReleaseAll),
         ["humlx", "blackout"] => Some(Command::Blackout(first.is_none_or(|v| v != 0.0))),
+        ["humlx", "speed", master, action] => {
+            let index = match master.to_ascii_lowercase().as_str() {
+                "a" | "1" => 0,
+                "b" | "2" => 1,
+                _ => return unknown(),
+            };
+            match *action {
+                "tap" => pressed.then_some(Command::Tap(index)),
+                "bpm" => match first {
+                    Some(bpm) => Some(Command::Bpm(index, bpm)),
+                    None => return Err(bad(format!("{} needs a BPM", message.address))),
+                },
+                _ => return unknown(),
+            }
+        }
         ["humlx", "cuelist", list, action @ ..] => {
             let list = list.to_string();
             match action {
@@ -284,6 +303,14 @@ pub fn apply(state: &mut State, command: &Command, now: Instant) -> Result<()> {
         }
         Command::Blackout(on) => {
             state.blackout = *on;
+            Ok(())
+        }
+        Command::Tap(index) => {
+            state.speed_masters.0[*index].tap(now);
+            Ok(())
+        }
+        Command::Bpm(index, bpm) => {
+            state.speed_masters.0[*index].set_bpm(*bpm, now);
             Ok(())
         }
     }
@@ -504,6 +531,16 @@ mod tests {
             Some(Command::Blackout(false))
         );
         assert!(command(&msg("/humlx/cuelist/1/dance", vec![])).is_err());
+        assert_eq!(
+            command(&msg("/humlx/speed/a/tap", vec![])).unwrap(),
+            Some(Command::Tap(0))
+        );
+        assert_eq!(command(&msg("/humlx/speed/B/tap", vec![Arg::Int(0)])).unwrap(), None);
+        assert_eq!(
+            command(&msg("/humlx/speed/2/bpm", vec![Arg::Float(128.0)])).unwrap(),
+            Some(Command::Bpm(1, 128.0))
+        );
+        assert!(command(&msg("/humlx/speed/c/tap", vec![])).is_err());
         assert!(command(&msg("/other/thing", vec![])).is_err());
     }
 

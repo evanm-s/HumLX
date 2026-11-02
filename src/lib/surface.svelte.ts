@@ -82,6 +82,9 @@ class Surface {
     if (this.mode === "delete") leds.delete = "on";
     // Clear has something to clear.
     if (this.line.length > 0 || Object.keys(show.programmer.values).length > 0 || show.programmer.effects.length > 0) leds.clear = "on";
+    // The tap keys are always live.
+    leds.fade = "on";
+    leds.delay = "on";
     if (this.fine) for (let i = 1; i <= 4; i++) leds[`encoder${i}`] = "on";
     return leds;
   }
@@ -119,6 +122,11 @@ class Surface {
         if (this.line.length > 0) this.line = [];
         else if (this.mode) this.setMode(null);
         else show.program(() => api.clearProgrammer(null));
+        return;
+      // Fade and Delay tap speed masters A and B.
+      case "fade":
+      case "delay":
+        show.play(() => api.tapSpeed(key === "fade" ? 0 : 1));
         return;
       case "highlight":
         show.live.highlight = !show.live.highlight;

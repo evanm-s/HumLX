@@ -212,6 +212,26 @@
         />
       </div>
     </div>
+    {#each [0, 1] as m (m)}
+      {@const bpm = show.live.speedBpm[m]}
+      {@const beat = (show.live.beats[m] % 1) < 0.2}
+      <div class="strip speed">
+        <div class="strip-name">Speed {m === 0 ? "A" : "B"} <span class="beat" class:on={beat}></span></div>
+        <div class="strip-cue muted">Effects that follow it</div>
+        <div class="speed-body">
+          <div class="bpm"><strong>{Math.round(bpm)}</strong> BPM</div>
+          <button class="tap" onclick={() => play(() => api.tapSpeed(m))}>Tap</button>
+          <div class="row">
+            <button aria-label="Slower by 1 BPM" onclick={() => play(() => api.setSpeedBpm(m, Math.round(bpm) - 1))}>−</button>
+            <button aria-label="Faster by 1 BPM" onclick={() => play(() => api.setSpeedBpm(m, Math.round(bpm) + 1))}>+</button>
+          </div>
+          <div class="row">
+            <button onclick={() => play(() => api.setSpeedBpm(m, bpm / 2))}>½</button>
+            <button onclick={() => play(() => api.setSpeedBpm(m, bpm * 2))}>×2</button>
+          </div>
+        </div>
+      </div>
+    {/each}
     {#each show.playback.cueLists as l (l.id)}
       {@const live = status(l.id)}
       <div class="strip" class:running={live != null}>
@@ -340,6 +360,52 @@
 
   .strip.effect-size {
     width: 140px;
+  }
+
+  .strip.speed {
+    width: 170px;
+  }
+
+  .speed-body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .speed-body .row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+
+  .bpm {
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .bpm strong {
+    font-size: 2rem;
+  }
+
+  .tap {
+    flex: 1;
+    min-height: 88px;
+    font-size: 1.2rem;
+    font-weight: 700;
+  }
+
+  .beat {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    margin-left: 6px;
+    border-radius: 50%;
+    background: var(--line);
+    vertical-align: middle;
+  }
+
+  .beat.on {
+    background: var(--accent);
   }
 
   .fx {

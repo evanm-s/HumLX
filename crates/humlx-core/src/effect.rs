@@ -8,7 +8,7 @@
 
 use std::collections::BTreeMap;
 use std::f32::consts::TAU;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 
@@ -263,13 +263,30 @@ pub struct Effect {
     pub width: f32,
     /// Fixtures in order; spread offsets each one along this order.
     pub fixtures: Vec<u32>,
-    /// Cycles per second.
+    /// Cycles per second, when the effect keeps its own speed.
     pub rate: f32,
+    /// Where the effect takes its speed from.
+    pub speed: Speed,
+    /// Cycles per beat when following a speed master, such as 0.5 or 2.
+    pub multiplier: f32,
     /// Depth of the effect, from 0 to 1.
     pub size: f32,
     /// How far apart the fixtures are, from 0 (all together) to 1 (spread
     /// evenly over one cycle).
     pub spread: f32,
+}
+
+/// Where an effect takes its speed from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Speed {
+    /// Its own rate, timed from when it started.
+    #[default]
+    Own,
+    /// Speed master A: one cycle per beat, times the multiplier.
+    A,
+    /// Speed master B.
+    B,
 }
 
 impl Effect {
@@ -290,6 +307,8 @@ impl Effect {
             width: 1.0,
             fixtures,
             rate: 1.0,
+            speed: Speed::Own,
+            multiplier: 1.0,
             size: 1.0,
             spread: 1.0,
         }
@@ -350,13 +369,34 @@ impl Effect {
 
     /// As [`Effect::apply`], with the effect's size scaled by `scale`.
     pub fn apply_scaled(&self, look: &mut Look, elapsed: f32, scale: f32) {
+        self.apply_at(look, elapsed * self.rate, scale);
+    }
+
+    /// How many cycles the effect has run: from `elapsed` seconds at its own
+    /// rate, or from the beats of the speed master it follows.
+    pub fn cycles(&self, elapsed: f32, beats: &Beats) -> f32 {
+        match self.speed {
+            Speed::Own => elapsed * self.rate,
+            Speed::A => beats.0[0] * self.multiplier,
+            Speed::B => beats.0[1] * self.multiplier,
+        }
+    }
+
+    /// Applies the effect `elapsed` seconds after it started, keeping time
+    /// with `beats` when it follows a speed master.
+    pub fn apply_timed(&self, look: &mut Look, elapsed: f32, beats: &Beats, scale: f32) {
+        self.apply_at(look, self.cycles(elapsed, beats), scale);
+    }
+
+    /// Applies the effect `cycles` cycles in.
+    pub fn apply_at(&self, look: &mut Look, cycles: f32, scale: f32) {
         let count = self.fixtures.len();
         let size = (self.size * scale).clamp(0.0, 1.0);
         let spread = self.spread.clamp(0.0, 1.0);
         let family = self.family();
         for (index, fixture) in self.fixtures.iter().enumerate() {
             let (slot, slots) = self.pattern.slot(index, count);
-            let phase = elapsed * self.rate - spread * slot as f32 / slots as f32;
+            let phase = cycles - spread * slot as f32 / slots as f32;
             let step = self.sample(phase);
             let values = look.entry(*fixture).or_default();
             let on_top = self.layering == Layering::OnTop;
@@ -454,6 +494,9 @@ struct EffectFile {
     transition: Option<f32>,
     width: Option<f32>,
     #[serde(default)]
+    speed: Speed,
+    multiplier: Option<f32>,
+    #[serde(default)]
     fixtures: Vec<u32>,
     rate: f32,
     size: f32,
@@ -500,6 +543,8 @@ impl From<EffectFile> for Effect {
             width: f.width.unwrap_or(1.0),
             fixtures: f.fixtures,
             rate: f.rate,
+            speed: f.speed,
+            multiplier: f.multiplier.unwrap_or(1.0),
             size: f.size,
             spread: f.spread,
         }
@@ -533,13 +578,115 @@ impl RunningEffects {
         self.started.keys().copied().collect()
     }
 
+    /// Starts any of `effects` not yet running, from `now`.
+    pub fn start_new(&mut self, effects: &[Effect], now: Instant) {
+        for effect in effects {
+            self.started.entry(effect.id).or_insert(now);
+        }
+    }
+
     /// Applies every running effect to `look`, in order, with sizes scaled by `scale`.
-    pub fn apply(&self, effects: &[Effect], look: &mut Look, now: Instant, scale: f32) {
+    pub fn apply(&self, effects: &[Effect], look: &mut Look, now: Instant, beats: &Beats, scale: f32) {
         for effect in effects {
             if let Some(started) = self.started.get(&effect.id) {
-                effect.apply_scaled(look, now.saturating_duration_since(*started).as_secs_f32(), scale);
+                let elapsed = now.saturating_duration_since(*started).as_secs_f32();
+                effect.apply_timed(look, elapsed, beats, scale);
             }
         }
+    }
+}
+
+/// How many beats each speed master has counted, A then B.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct Beats(pub [f32; 2]);
+
+/// The slowest and fastest a speed master runs, in beats per minute.
+pub const BPM_RANGE: (f32, f32) = (10.0, 300.0);
+
+/// A tempo that effects can follow, set by tapping or by typing a BPM.
+#[derive(Debug, Clone)]
+pub struct SpeedMaster {
+    bpm: f32,
+    /// When beat 0 was.
+    origin: Instant,
+    /// Recent taps, oldest first.
+    taps: Vec<Instant>,
+}
+
+impl SpeedMaster {
+    pub fn new(bpm: f32, now: Instant) -> Self {
+        Self {
+            bpm: bpm.clamp(BPM_RANGE.0, BPM_RANGE.1),
+            origin: now,
+            taps: Vec::new(),
+        }
+    }
+
+    pub fn bpm(&self) -> f32 {
+        self.bpm
+    }
+
+    /// Beats counted at `now`.
+    pub fn beats(&self, now: Instant) -> f32 {
+        now.saturating_duration_since(self.origin).as_secs_f32() * self.bpm / 60.0
+    }
+
+    /// Changes the tempo without a jump: effects carry on from where they are.
+    pub fn set_bpm(&mut self, bpm: f32, now: Instant) {
+        let beats = self.beats(now);
+        self.bpm = bpm.clamp(BPM_RANGE.0, BPM_RANGE.1);
+        let back = Duration::from_secs_f32(beats * 60.0 / self.bpm);
+        self.origin = now
+            .checked_sub(back)
+            .or_else(|| now.checked_sub(Duration::from_secs_f32(beats.fract() * 60.0 / self.bpm)))
+            .unwrap_or(now);
+    }
+
+    /// A tap of the beat. Two or more taps less than two seconds apart set
+    /// the tempo from their average gap; every tap puts the beat on the tap.
+    pub fn tap(&mut self, now: Instant) {
+        if self
+            .taps
+            .last()
+            .is_some_and(|last| now.saturating_duration_since(*last) > Duration::from_secs(2))
+        {
+            self.taps.clear();
+        }
+        self.taps.push(now);
+        if self.taps.len() > 5 {
+            self.taps.remove(0);
+        }
+        if let (Some(first), Some(last)) = (self.taps.first(), self.taps.last()) {
+            let gaps = (self.taps.len() - 1) as f32;
+            if gaps > 0.0 {
+                let gap = last.saturating_duration_since(*first).as_secs_f32() / gaps;
+                if gap > 0.0 {
+                    self.bpm = (60.0 / gap).clamp(BPM_RANGE.0, BPM_RANGE.1);
+                }
+            }
+        }
+        self.origin = now;
+    }
+}
+
+/// Speed masters A and B.
+#[derive(Debug, Clone)]
+pub struct SpeedMasters(pub [SpeedMaster; 2]);
+
+impl Default for SpeedMasters {
+    fn default() -> Self {
+        let now = Instant::now();
+        Self([SpeedMaster::new(120.0, now), SpeedMaster::new(120.0, now)])
+    }
+}
+
+impl SpeedMasters {
+    pub fn beats(&self, now: Instant) -> Beats {
+        Beats([self.0[0].beats(now), self.0[1].beats(now)])
+    }
+
+    pub fn bpms(&self) -> [f32; 2] {
+        [self.0[0].bpm(), self.0[1].bpm()]
     }
 }
 
@@ -777,6 +924,46 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(families_in(&values), vec![Family::Position]);
+    }
+
+    #[test]
+    fn speed_masters() {
+        let start = Instant::now();
+        let at = |ms: u64| start + Duration::from_millis(ms);
+        let mut master = SpeedMaster::new(120.0, start);
+        assert!(close(master.beats(at(1000)), 2.0));
+        // Taps 0.6 s apart: 100 BPM, with the beat on the last tap.
+        master.tap(at(1000));
+        master.tap(at(1600));
+        master.tap(at(2200));
+        assert!(close(master.bpm(), 100.0));
+        assert!(close(master.beats(at(2200)), 0.0));
+        // A tap after a long gap starts counting again and keeps the tempo.
+        master.tap(at(9000));
+        assert!(close(master.bpm(), 100.0));
+        // Changing the tempo carries on from the same beat.
+        let before = master.beats(at(9300));
+        master.set_bpm(200.0, at(9300));
+        assert!(close(master.beats(at(9300)), before));
+        assert!(close(master.beats(at(9600)), before + 1.0));
+        master.set_bpm(1000.0, at(9600));
+        assert_eq!(master.bpm(), BPM_RANGE.1);
+    }
+
+    #[test]
+    fn effects_follow_speed_masters() {
+        let e = Effect {
+            speed: Speed::B,
+            multiplier: 0.5,
+            spread: 0.0,
+            ..effect(Shape::Chase, vec![1])
+        };
+        let beats = Beats([0.0, 1.5]);
+        // 1.5 beats at half a cycle per beat: three quarters through, the off half.
+        assert!(close(e.cycles(99.0, &beats), 0.75));
+        let mut look = Look::new();
+        e.apply_timed(&mut look, 99.0, &beats, 1.0);
+        assert_eq!(look[&1].intensity, Some(0.0));
     }
 
     #[test]

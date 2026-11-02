@@ -101,6 +101,7 @@
           >
         {/if}
         <span class="slot-name">{p.name}</span>
+        {#if p.effects?.length}<span class="fx" title="Puts an effect on the selection">FX</span>{/if}
       </button>
     {/each}
     {#if recording}
@@ -169,6 +170,12 @@
   .slot.doomed {
     border-color: var(--danger);
     background: color-mix(in srgb, var(--danger) 25%, var(--panel-raised));
+  }
+
+  .fx {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--accent);
   }
 
   .slot-name {

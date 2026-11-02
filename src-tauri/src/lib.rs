@@ -95,6 +95,7 @@ impl App {
             cue_lists: state.cue_lists.clone(),
             osc: state.osc_settings.clone(),
             highlight_colour: state.highlight_colour,
+            speed_bpm: state.speed_masters.bpms(),
             profiles,
             ..Show::default()
         }
@@ -130,6 +131,10 @@ fn apply_show(state: &mut State, show: Show) {
     state.cue_lists = show.cue_lists;
     state.osc_settings = show.osc;
     state.highlight_colour = show.highlight_colour;
+    let now = std::time::Instant::now();
+    for (master, bpm) in state.speed_masters.0.iter_mut().zip(show.speed_bpm) {
+        master.set_bpm(bpm, now);
+    }
     state.programmer = Default::default();
     state.playbacks.release_all();
     state.running_effects.stop_all();
@@ -223,6 +228,8 @@ pub fn run() {
             playback::save_effect,
             playback::delete_effect,
             playback::set_effect_size,
+            playback::tap_speed,
+            playback::set_speed_bpm,
         ])
         .run(tauri::generate_context!())
         .expect("error while running HumLX");

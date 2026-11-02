@@ -2,7 +2,7 @@
 
 use std::time::Instant;
 
-use humlx_core::effect::{lay_over, Direction, Effect, EffectSize, Pattern, Shape};
+use humlx_core::effect::{lay_over, Direction, Effect, EffectSize, Pattern, Shape, Speed};
 use humlx_core::engine::State as EngineState;
 use humlx_core::playback::{Cue, CueList, CueMode};
 use humlx_core::programmer::next_id;
@@ -44,6 +44,8 @@ pub struct PlaybackView {
     cue_lists: Vec<CueList>,
     /// The master that scales every effect, 0 to 1.
     effect_size: f32,
+    /// Tempo of speed masters A and B.
+    speed_bpm: [f32; 2],
     /// Fader level of each cue list, by id.
     masters: Vec<(u32, f32)>,
 }
@@ -53,6 +55,7 @@ fn view(app: &App) -> PlaybackView {
     PlaybackView {
         cue_lists: state.cue_lists.clone(),
         effect_size: state.effect_size.0,
+        speed_bpm: state.speed_masters.bpms(),
         masters: masters(&state),
     }
 }
@@ -322,6 +325,10 @@ pub struct EffectSettings {
     direction: Direction,
     #[serde(default = "full")]
     width: f32,
+    #[serde(default)]
+    speed: Speed,
+    #[serde(default = "full")]
+    multiplier: f32,
     /// Fade between steps; the shape's own when not given.
     #[serde(default)]
     transition: Option<f32>,
@@ -345,6 +352,8 @@ impl EffectSettings {
         effect.pattern = self.pattern;
         effect.direction = self.direction;
         effect.width = self.width.clamp(0.05, 1.0);
+        effect.speed = self.speed;
+        effect.multiplier = self.multiplier.clamp(0.125, 8.0);
         if let Some(t) = self.transition {
             effect.transition = t.clamp(0.0, 1.0);
         }
@@ -393,6 +402,34 @@ pub fn delete_effect(app: State<'_, App>, id: u32) -> Result<PlaybackView> {
     change(&app, false, |state| {
         state.programmer.effects.retain(|e| e.id != id);
         state.running_effects.stop(id);
+        Ok(())
+    })
+}
+
+/// A tap of speed master 0 (A) or 1 (B), which sets its tempo after two taps.
+#[tauri::command]
+pub fn tap_speed(app: State<'_, App>, master: usize) -> Result<PlaybackView> {
+    change(&app, true, |state| {
+        let m = state
+            .speed_masters
+            .0
+            .get_mut(master)
+            .ok_or(Error::Unsupported("no such speed master".into()))?;
+        m.tap(Instant::now());
+        Ok(())
+    })
+}
+
+/// Sets speed master 0 (A) or 1 (B) to `bpm`.
+#[tauri::command]
+pub fn set_speed_bpm(app: State<'_, App>, master: usize, bpm: f32) -> Result<PlaybackView> {
+    change(&app, true, |state| {
+        let m = state
+            .speed_masters
+            .0
+            .get_mut(master)
+            .ok_or(Error::Unsupported("no such speed master".into()))?;
+        m.set_bpm(bpm, Instant::now());
         Ok(())
     })
 }

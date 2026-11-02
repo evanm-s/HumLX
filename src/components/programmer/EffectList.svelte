@@ -18,6 +18,12 @@
   const effects = $derived(show.programmer.effects.filter((e) => SHAPES[e.shape]?.family === family));
   const selected = $derived(new Set(show.programmer.selection));
   let editing = $state<Effect | "new" | null>(null);
+
+  const MULTIPLIER_TEXT: Record<number, string> = { 0.25: " ¼", 0.5: " ½", 1: "", 2: " ×2", 4: " ×4" };
+  const speedText = (e: Effect) =>
+    e.speed === "own"
+      ? `${Math.round(e.rate * 60)} BPM`
+      : `Speed ${e.speed.toUpperCase()}${MULTIPLIER_TEXT[e.multiplier] ?? ` ×${e.multiplier}`}`;
 </script>
 
 <div class="effects">
@@ -29,9 +35,7 @@
       <button class="text" onclick={() => (editing = e)}>
         <strong>{e.name}</strong>
         <span class="muted"
-          >{e.name !== SHAPES[e.shape]?.label ? `${SHAPES[e.shape]?.label} · ` : ""}{e.fixtures.length} fixtures · {Math.round(
-            e.rate * 60,
-          )} BPM{e.spread > 0 && e.pattern !== "inOrder" ? ` · ${PATTERNS[e.pattern].label}` : ""}</span
+          >{e.name !== SHAPES[e.shape]?.label ? `${SHAPES[e.shape]?.label} · ` : ""}{e.fixtures.length} fixtures · {speedText(e)}{e.spread > 0 && e.pattern !== "inOrder" ? ` · ${PATTERNS[e.pattern].label}` : ""}</span
         >
       </button>
       <button class="remove" aria-label="Remove {e.name}" onclick={() => show.play(() => api.deleteEffect(e.id))}>✕</button>

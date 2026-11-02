@@ -106,6 +106,10 @@ export interface Live {
   playbacks: PlaybackStatus[];
   /** Master level by cue list number. */
   masters: [number, number][];
+  /** Tempo of speed masters A and B, which OSC can change too. */
+  speedBpm: [number, number];
+  /** Beats counted by speed masters A and B. */
+  beats: [number, number];
   osc: OscStatus;
 }
 
@@ -178,6 +182,8 @@ export interface Preset {
   family: Family;
   all?: Values;
   fixtures?: Record<string, Values>;
+  /** Effects the preset puts on the selected fixtures. */
+  effects?: Effect[];
 }
 
 export interface ProgrammerView {
@@ -231,6 +237,8 @@ export type Shape =
 /** How fixtures are spaced out in an effect, in the order they were picked. */
 export type Pattern = "inOrder" | "mirror" | "pairs" | "oddEven";
 export type Direction = "forward" | "backward" | "bounce";
+/** Where an effect takes its speed from: its own rate, or speed master A or B. */
+export type Speed = "own" | "a" | "b";
 
 export interface EffectSettings {
   name: string;
@@ -243,6 +251,9 @@ export interface EffectSettings {
   direction: Direction;
   /** How much of each cycle the steps take, 0 to 1. */
   width: number;
+  speed: Speed;
+  /** Cycles per beat when following a speed master. */
+  multiplier: number;
   /** How much of each step fades to the next, 0 (snap) to 1; the shape's own if left out. */
   transition?: number;
   /** The two colours of a swap. */
@@ -265,6 +276,8 @@ export interface PlaybackView {
   cueLists: CueList[];
   /** The master that scales every effect, 0 to 1. */
   effectSize: number;
+  /** Tempo of speed masters A and B. */
+  speedBpm: [number, number];
   masters: [number, number][];
 }
 
