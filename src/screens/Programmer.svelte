@@ -745,7 +745,7 @@
     align-items: center;
     gap: 6px;
     padding: 0 10px;
-    min-height: 60px;
+    min-height: 90px;
     text-align: left;
   }
 
@@ -760,10 +760,14 @@
     color: var(--accent-text) !important;
   }
 
+  /* Long names wrap onto a second line, then cut off with an ellipsis. */
   .name {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow-wrap: anywhere;
   }
 
   .dot {
