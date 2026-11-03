@@ -623,8 +623,14 @@
           <div class="fields">
             <NumberField label="Across (m)" value={measuredPart(stage, b.x, 0)} onchange={(v) => setBody({ x: fromMeasuredPart(stage, v, 0) })} fractional increment={0.05} min={-500} max={500} />
             <NumberField label="Up stage (m)" value={measuredPart(stage, b.y, 1)} onchange={(v) => setBody({ y: fromMeasuredPart(stage, v, 1) })} fractional increment={0.05} min={-500} max={500} />
-            <NumberField label="Height (m)" value={b.z ?? null} onchange={(v) => setBody({ z: v })} fractional increment={0.05} min={-50} max={50} />
+            <NumberField label="Height above stage deck (m)" value={b.z ?? null} onchange={(v) => setBody({ z: v })} fractional increment={0.05} min={-50} max={50} />
           </div>
+          {#if stage.riser > 0}
+            <p class="muted small">
+              The stage is {stage.riser} m above the studio floor{#if b.z != null}, so this hangs
+                {(b.z + stage.riser).toFixed(2)} m above the studio floor{/if}.
+            </p>
+          {/if}
           {#if pickedLight.mover}
             <p class="muted small">
               {#if pickedLight.calibrated}

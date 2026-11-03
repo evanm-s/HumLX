@@ -800,8 +800,14 @@
               <div class="hang-fields">
                 <NumberField label="Across (m)" value={measuredPart(plan, hang[0], 0)} onchange={(v) => (hang[0] = fromMeasuredPart(plan, v, 0))} fractional increment={0.05} min={-500} max={500} />
                 <NumberField label="Up stage (m)" value={measuredPart(plan, hang[1], 1)} onchange={(v) => (hang[1] = fromMeasuredPart(plan, v, 1))} fractional increment={0.05} min={-500} max={500} />
-                <NumberField label="Height above stage (m)" value={hang[2]} onchange={(v) => (hang[2] = v)} fractional increment={0.05} min={-50} max={50} />
+                <NumberField label="Height above stage deck (m)" value={hang[2]} onchange={(v) => (hang[2] = v)} fractional increment={0.05} min={-50} max={50} />
               </div>
+              {#if plan.riser > 0}
+                <p class="muted small">
+                  Measured from the top of the stage, which is {plan.riser} m above the studio floor.
+                  {#if hang[2] != null}That's {(hang[2] + plan.riser).toFixed(2)} m above the studio floor.{/if}
+                </p>
+              {/if}
               <div class="row wrap">
                 <button onclick={() => saveHang([...hang])}>Save</button>
                 {#if hang[2] != null && movers.length > 1}
