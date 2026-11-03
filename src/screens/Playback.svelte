@@ -1,12 +1,15 @@
 <script lang="ts">
-  // The show as it runs: the selected cue list's cues, and fader slots that
-  // the lists needed for the show are loaded into. Lists are built and kept on
+  // The show as it runs: a grid of look buttons, the selected cue list's cues,
+  // and fader slots that the lists needed for the show are loaded into. Lists are built and kept on
   // the Cue Lists screen. Effects are made in the Programmer and recorded into
   // cues; the Effect size fader scales them all.
 
   import CueTable from "../components/CueTable.svelte";
   import Fader from "../components/Fader.svelte";
+  import Dialog from "../components/Dialog.svelte";
   import ListPicker from "../components/ListPicker.svelte";
+  import NumberField from "../components/NumberField.svelte";
+  import PlaybackGrid from "../components/PlaybackGrid.svelte";
   import RecordCue from "../components/RecordCue.svelte";
   import { api } from "../lib/api";
   import { goKeys, master, selectedList, selectList, showScreen, status } from "../lib/cuelists.svelte";
@@ -33,16 +36,54 @@
     new Set([...Object.keys(show.programmer.values).map(Number), ...show.programmer.effects.flatMap((e) => e.fixtures)]).size,
   );
 
-  let dialog = $state<null | "record" | { slot: number }>(null);
-
-  // Record on the control surface opens the same dialog as the Record button.
+  let dialog = $state<null | "record" | { slot: number } | { look: [number, number] }>(null);
+  /** Record is armed: tap an empty grid button for a new look, or a look to add a cue. */
+  let recording = $state(false);
   $effect(() => {
-    const record = () => {
-      if (!dialog && programmed > 0) dialog = "record";
+    if (programmed === 0) recording = false;
+  });
+  let lookName = $state("");
+  let lookFade = $state<number | null>(2);
+  // Where the record dialog records into, when not the selected list.
+  let recordList = $state<number | null>(null);
+
+  function openRecord(into: number | null) {
+    recording = false;
+    recordList = into;
+    dialog = "record";
+  }
+
+  // Record on the control surface arms recording onto the grid, as the Record
+  // button does; Record twice records into the selected list.
+  $effect(() => {
+    const record = (e: Event) => {
+      if (dialog || programmed === 0) return;
+      if ((e as CustomEvent<{ cue?: boolean }>).detail?.cue || recording) openRecord(list?.id ?? null);
+      else recording = true;
     };
     window.addEventListener(RECORD_EVENT, record);
     return () => window.removeEventListener(RECORD_EVENT, record);
   });
+
+  function keys(e: KeyboardEvent) {
+    if (e.key === "Escape" && recording && !dialog) {
+      e.preventDefault();
+      recording = false;
+      return;
+    }
+    goKeys(e);
+  }
+
+  function recordLook(page: number, button: number) {
+    recording = false;
+    lookName = "";
+    dialog = { look: [page, button] };
+  }
+
+  async function saveLook(page: number, button: number) {
+    const ok = await play(() => api.recordCue({ button: { page, button, name: lookName } }, lookName, Math.max(0, lookFade ?? 0), null));
+    if (ok) dialog = null;
+  }
 
   async function load(slot: number, id: number) {
     if (await play(() => api.setSlot(slot, id))) {
@@ -52,7 +93,7 @@
   }
 </script>
 
-<svelte:window onkeydown={goKeys} />
+<svelte:window onkeydown={keys} />
 
 <div class="playback">
   <header class="row">
@@ -62,11 +103,17 @@
       <button onclick={() => show.program(() => api.clearProgrammer(null))}>Clear programmer</button>
     {/if}
     <span class="spacer"></span>
-    <button class="record" disabled={programmed === 0} onclick={() => (dialog = "record")}>
-      ● Record cue{list && cueIndex != null && cueIndex < list.cues.length - 1 ? ` after ${cueIndex + 1}` : ""}
-    </button>
+    {#if recording}
+      <span class="record-hint">Tap an empty button to save a new look, or a look to add a cue to it.</span>
+      {#if list}<button onclick={() => openRecord(list.id)}>Record into {list.name}…</button>{/if}
+      <button onclick={() => (recording = false)}>Cancel</button>
+    {:else}
+      <button class="record" disabled={programmed === 0} onclick={() => (recording = true)}>● Record</button>
+    {/if}
     <button class="danger" onclick={() => play(() => api.releaseAll())}>Release all</button>
   </header>
+
+  <PlaybackGrid {recording} onrecordlook={recordLook} onrecordinto={openRecord} />
 
   <!-- The selected cue list -->
   <section class="panel cues">
@@ -180,7 +227,27 @@
 </div>
 
 {#if dialog === "record"}
-  <RecordCue list={list?.id ?? null} after={cueIndex} onclose={() => (dialog = null)} onrecorded={(_, i) => (cueIndex = i)} />
+  {@const into = recordList ?? list?.id ?? null}
+  <RecordCue
+    list={into}
+    after={into === list?.id ? cueIndex : null}
+    onclose={() => (dialog = null)}
+    onrecorded={(_, i) => (cueIndex = i)}
+  />
+{:else if dialog && "look" in dialog}
+  {@const [page, button] = dialog.look}
+  <Dialog title={`New look on button ${button + 1}`} onclose={() => (dialog = null)}>
+    <label class="field">
+      Name
+      <input bind:value={lookName} placeholder="e.g. Blue wash" />
+    </label>
+    <NumberField label="Fade time (seconds)" fractional bind:value={lookFade} min={0} max={600} />
+    <p class="muted">Saves the Programmer as a new one-cue list on this button. Tap the button to bring the look up, and again to release it.</p>
+    {#snippet actions()}
+      <button onclick={() => (dialog = null)}>Cancel</button>
+      <button class="primary" onclick={() => saveLook(page, button)}>Save look</button>
+    {/snippet}
+  </Dialog>
 {:else if dialog}
   {@const slot = dialog.slot}
   <ListPicker title={`Load a cue list into slot ${slot + 1}`} onpick={(id) => load(slot, id)} onclose={() => (dialog = null)} />
@@ -190,12 +257,18 @@
   .playback {
     height: 100%;
     display: grid;
-        grid-template-rows: auto minmax(0, 1fr) 400px;
+        grid-template-columns: minmax(0, 1fr) 640px;
+    grid-template-rows: auto minmax(0, 1fr) 400px;
     gap: var(--gap);
   }
 
   header {
     grid-column: 1 / -1;
+  }
+
+  .record-hint {
+    color: var(--danger, #e5484d);
+    font-weight: 600;
   }
 
   .programmer-note {

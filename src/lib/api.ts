@@ -103,6 +103,12 @@ export const api = {
   duplicateCueList: (id: number) => invoke<PlaybackView>("duplicate_cue_list", { id }),
   selectCueList: (list: number | null) => invoke<PlaybackView>("select_cue_list", { list }),
   setSlot: (slot: number, list: number | null) => invoke<PlaybackView>("set_slot", { slot, list }),
+  setGridButton: (page: number, button: number, list: number | null) =>
+    invoke<PlaybackView>("set_grid_button", { page, button, list }),
+  swapGridButtons: (a: [number, number], b: [number, number]) => invoke<PlaybackView>("swap_grid_buttons", { a, b }),
+  addGridPage: (name: string) => invoke<PlaybackView>("add_grid_page", { name }),
+  renameGridPage: (page: number, name: string) => invoke<PlaybackView>("rename_grid_page", { page, name }),
+  deleteGridPage: (page: number) => invoke<PlaybackView>("delete_grid_page", { page }),
   /** Records into an existing cue list, or a new one when `target` has a name. */
   recordCue: (target: RecordTarget, name: string, fade: number, after: number | null) =>
     invoke<PlaybackView>("record_cue", { target, name, fade, after }),

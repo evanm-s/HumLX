@@ -220,7 +220,11 @@ export interface CueList {
 }
 
 /** Where a recorded cue goes: an existing cue list, or a new one with this name. */
-export type RecordTarget = { list: number } | { new: string };
+export type RecordTarget =
+  | { list: number }
+  | { new: string }
+  /** A new one-cue list (a look) on a grid button, named or "Look N". */
+  | { button: { page: number; button: number; name: string } };
 
 /** The Programmer families an effect can move. */
 export type EffectFamily = "intensity" | "colour" | "position" | "beam";

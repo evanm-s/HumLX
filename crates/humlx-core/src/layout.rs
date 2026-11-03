@@ -112,6 +112,44 @@ impl Layout {
         self.tidy(|id| id != list);
     }
 
+    /// The cue list on grid button `button` (from 0) of page `page`, to change.
+    pub fn button_mut(&mut self, page: usize, button: usize) -> Option<&mut Option<u32>> {
+        self.pages.get_mut(page)?.buttons.get_mut(button)
+    }
+
+    /// Swaps two grid buttons, on the same page or different ones. Returns
+    /// false if either doesn't exist.
+    pub fn swap_buttons(&mut self, a: (usize, usize), b: (usize, usize)) -> bool {
+        let (Some(x), Some(y)) = (
+            self.button_mut(a.0, a.1).map(|v| *v),
+            self.button_mut(b.0, b.1).map(|v| *v),
+        ) else {
+            return false;
+        };
+        *self.button_mut(a.0, a.1).unwrap() = y;
+        *self.button_mut(b.0, b.1).unwrap() = x;
+        true
+    }
+
+    /// Adds an empty grid page at the end and returns its index.
+    pub fn add_page(&mut self, name: &str) -> usize {
+        self.pages.push(GridPage {
+            name: name.trim().to_string(),
+            ..Default::default()
+        });
+        self.pages.len() - 1
+    }
+
+    /// Removes a grid page, leaving its lists in the library. The last page
+    /// can't be removed. Returns false if nothing was removed.
+    pub fn remove_page(&mut self, page: usize) -> bool {
+        if self.pages.len() <= 1 || page >= self.pages.len() {
+            return false;
+        }
+        self.pages.remove(page);
+        true
+    }
+
     /// The first empty fader slot.
     pub fn free_slot(&self) -> Option<usize> {
         self.slots.iter().position(Option::is_none)
@@ -142,6 +180,23 @@ mod tests {
         assert_eq!(layout.slots, (1..=8).map(Some).collect::<Vec<_>>());
         assert_eq!(&layout.pages[0].buttons[..3], &[Some(2), Some(3), None]);
         assert_eq!(layout.selected, Some(1));
+    }
+
+    #[test]
+    fn swaps_buttons_and_manages_pages() {
+        let mut layout = Layout::default();
+        *layout.button_mut(0, 0).unwrap() = Some(1);
+        let page = layout.add_page(" Show B ");
+        assert_eq!((page, layout.pages[1].name.as_str()), (1, "Show B"));
+        assert!(layout.swap_buttons((0, 0), (1, 47)));
+        assert_eq!(
+            (layout.pages[0].buttons[0], layout.pages[1].buttons[47]),
+            (None, Some(1))
+        );
+        assert!(!layout.swap_buttons((0, 0), (2, 0)));
+        assert!(layout.remove_page(0));
+        assert!(!layout.remove_page(0));
+        assert_eq!(layout.pages[0].buttons[47], Some(1));
     }
 
     #[test]

@@ -134,6 +134,67 @@ pub fn select_cue_list(app: State<'_, App>, list: Option<u32>) -> Result<Playbac
     })
 }
 
+fn no_button() -> Error {
+    Error::Unsupported("no such grid button".into())
+}
+
+/// Puts `list` on grid button `button` (from 0) of page `page`, or empties it.
+#[tauri::command]
+pub fn set_grid_button(app: State<'_, App>, page: usize, button: usize, list: Option<u32>) -> Result<PlaybackView> {
+    change(&app, true, |state| {
+        if let Some(id) = list {
+            list_mut(state, id)?;
+        }
+        *state.layout.button_mut(page, button).ok_or_else(no_button)? = list;
+        Ok(())
+    })
+}
+
+/// Swaps two grid buttons, given as (page, button).
+#[tauri::command]
+pub fn swap_grid_buttons(app: State<'_, App>, a: (usize, usize), b: (usize, usize)) -> Result<PlaybackView> {
+    change(&app, true, |state| {
+        if state.layout.swap_buttons(a, b) {
+            Ok(())
+        } else {
+            Err(no_button())
+        }
+    })
+}
+
+#[tauri::command]
+pub fn add_grid_page(app: State<'_, App>, name: String) -> Result<PlaybackView> {
+    change(&app, true, |state| {
+        state.layout.add_page(&name);
+        Ok(())
+    })
+}
+
+#[tauri::command]
+pub fn rename_grid_page(app: State<'_, App>, page: usize, name: String) -> Result<PlaybackView> {
+    change(&app, true, |state| {
+        let page = state
+            .layout
+            .pages
+            .get_mut(page)
+            .ok_or(Error::Unsupported("no such grid page".into()))?;
+        page.name = name.trim().to_string();
+        Ok(())
+    })
+}
+
+/// Removes a grid page; its lists stay on the Cue Lists screen.
+#[tauri::command]
+pub fn delete_grid_page(app: State<'_, App>, page: usize) -> Result<PlaybackView> {
+    change(&app, true, |state| {
+        if state.layout.remove_page(page) {
+            Ok(())
+        } else {
+            Err(Error::Unsupported("the only grid page can't be removed".into()))
+        }
+    })
+}
+
 /// Loads `list` into fader slot `slot` (from 0), or empties the slot.
 #[tauri::command]
 pub fn set_slot(app: State<'_, App>, slot: usize, list: Option<u32>) -> Result<PlaybackView> {
@@ -186,6 +247,12 @@ pub fn delete_cue_list(app: State<'_, App>, id: u32) -> Result<PlaybackView> {
 pub enum RecordTarget {
     List(u32),
     New(String),
+    /// A new one-cue list (a look), named `name` or "Look N", placed on a grid button.
+    Button {
+        page: usize,
+        button: usize,
+        name: String,
+    },
 }
 
 /// Records the programmer as a new cue, after cue `after` (0-based) or at the
@@ -214,6 +281,15 @@ pub fn record_cue(
                 if let Some(slot) = state.layout.free_slot() {
                     state.layout.slots[slot] = Some(id);
                 }
+                id
+            }
+            RecordTarget::Button { page, button, name } => {
+                state.layout.button_mut(page, button).ok_or_else(no_button)?;
+                let id = add_cue_list(state, &name);
+                if name.trim().is_empty() {
+                    list_mut(state, id)?.name = format!("Look {id}");
+                }
+                *state.layout.button_mut(page, button).ok_or_else(no_button)? = Some(id);
                 id
             }
         };
