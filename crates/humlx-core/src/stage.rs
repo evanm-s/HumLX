@@ -53,6 +53,34 @@ pub struct Stage {
     pub positions: Vec<Placed>,
     /// Things on the stage drawn for reference, such as an LED wall.
     pub scenery: Vec<Scenery>,
+    /// Where measurements typed in and shown are taken from. Positions are
+    /// kept from the middle of the front edge whatever this is, so moving it
+    /// only changes the numbers shown.
+    pub reference: Reference,
+}
+
+/// The point positions are measured from, for whoever has the tape measure.
+#[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Reference {
+    pub from: ReferencePoint,
+    /// For `Custom`: the spot, from the middle of the front edge.
+    #[serde(default)]
+    pub x: f32,
+    #[serde(default)]
+    pub y: f32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ReferencePoint {
+    #[default]
+    FrontMiddle,
+    FrontLeft,
+    FrontRight,
+    BackLeft,
+    BackRight,
+    Custom,
 }
 
 /// Studio floor shown round the stage, in metres on each side. Shows saved
@@ -185,6 +213,7 @@ impl Default for Stage {
             movers: Vec::new(),
             positions: Vec::new(),
             scenery: Vec::new(),
+            reference: Reference::default(),
         }
     }
 }
@@ -301,6 +330,8 @@ pub struct Plan {
     pub marks: Vec<Mark>,
     #[serde(default)]
     pub scenery: Vec<Scenery>,
+    #[serde(default)]
+    pub reference: Reference,
 }
 
 impl Stage {
@@ -409,7 +440,11 @@ impl Stage {
             riser,
             marks,
             scenery,
+            reference,
         } = plan;
+        if !(reference.x.is_finite() && reference.y.is_finite()) {
+            return Err(Error::InvalidStage("the reference point has no position".into()));
+        }
         for piece in &scenery {
             if piece.points.len() < 2 {
                 return Err(Error::InvalidStage(format!("{} needs at least two points", piece.name)));
@@ -448,6 +483,7 @@ impl Stage {
         self.riser = riser;
         self.marks = marks;
         self.scenery = scenery;
+        self.reference = reference;
         if moved {
             let marks = self.marks.clone();
             let positions = self.positions.clone();
@@ -940,6 +976,9 @@ mod tests {
     fn margin_reads_one_number_or_each_side() {
         let old: Stage = serde_json::from_str(r#"{"width":9.2,"depth":6.6,"margin":3}"#).unwrap();
         assert_eq!(old.margin, Margins::even(3.0));
+        assert_eq!(old.reference.from, ReferencePoint::FrontMiddle);
+        let custom: Reference = serde_json::from_str(r#"{"from":"custom","x":-4.6,"y":-1}"#).unwrap();
+        assert_eq!((custom.from, custom.x), (ReferencePoint::Custom, -4.6));
         let new: Stage = serde_json::from_str(r#"{"margin":{"left":4.6,"right":0,"front":9.2,"back":0}}"#).unwrap();
         assert_eq!(new.margin.left, 4.6);
         assert_eq!(new.margin.back, 0.0);
@@ -1095,11 +1134,17 @@ mod tests {
                 points: vec![[-3.8, 3.1], [-1.0, 5.6], [0.3, 5.6], [3.2, 3.1]],
                 height: 3.0,
             }],
+            reference: Reference {
+                from: ReferencePoint::FrontLeft,
+                x: 0.0,
+                y: 0.0,
+            },
         };
         stage.set_plan(plan).unwrap();
         assert_eq!(stage.floor_at(0.0, 3.0), 0.0);
         assert_eq!(stage.floor_at(0.0, -1.0), -0.4);
         assert_eq!(stage.scenery.len(), 1);
+        assert_eq!(stage.reference.from, ReferencePoint::FrontLeft);
         let mut bad = Plan {
             width: 8.0,
             depth: 6.0,
@@ -1111,6 +1156,7 @@ mod tests {
                 points: vec![[0.0, 0.0]],
                 height: 2.0,
             }],
+            reference: Reference::default(),
         };
         assert!(stage.set_plan(bad.clone()).is_err());
         bad.scenery[0].points.push([1.0, 0.0]);

@@ -95,6 +95,70 @@ export interface Stage {
   /** Positions measured by hand; a mover with one only needs its heading worked out. */
   positions: Placed[];
   scenery: Scenery[];
+  /** Where measurements typed in and shown are taken from. */
+  reference: Reference;
+}
+
+export type ReferencePoint = "front-middle" | "front-left" | "front-right" | "back-left" | "back-right" | "custom";
+
+/** The point positions are measured from. Positions are kept from the middle of the front edge whatever it is. */
+export interface Reference {
+  from: ReferencePoint;
+  /** For "custom": the spot, from the middle of the front edge. */
+  x: number;
+  y: number;
+}
+
+export const REFERENCE_POINTS: [ReferencePoint, string][] = [
+  ["front-middle", "Front, middle"],
+  ["front-left", "Front left corner"],
+  ["front-right", "Front right corner"],
+  ["back-left", "Back left corner"],
+  ["back-right", "Back right corner"],
+  ["custom", "A spot I pick"],
+];
+
+/** Where the reference point is, from the middle of the front edge. */
+export function referenceAt(plan: Plan): [number, number] {
+  const r = plan.reference ?? { from: "front-middle", x: 0, y: 0 };
+  const half = plan.width / 2;
+  switch (r.from) {
+    case "front-left":
+      return [-half, 0];
+    case "front-right":
+      return [half, 0];
+    case "back-left":
+      return [-half, plan.depth];
+    case "back-right":
+      return [half, plan.depth];
+    case "custom":
+      return [r.x, r.y];
+    default:
+      return [0, 0];
+  }
+}
+
+const tidy = (v: number) => Math.round(v * 1000) / 1000;
+
+/** A spot as it is measured from the reference point. */
+export function measured(plan: Plan, x: number, y: number): [number, number] {
+  const [rx, ry] = referenceAt(plan);
+  return [tidy(x - rx), tidy(y - ry)];
+}
+
+/** A measurement from the reference point back to where it is on the plan. */
+export function fromMeasured(plan: Plan, x: number, y: number): [number, number] {
+  const [rx, ry] = referenceAt(plan);
+  return [tidy(x + rx), tidy(y + ry)];
+}
+
+/** One part of a measurement: 0 across, 1 up stage. Null stays null. */
+export function measuredPart(plan: Plan, value: number | null | undefined, axis: 0 | 1): number | null {
+  return value == null ? null : tidy(value - referenceAt(plan)[axis]);
+}
+
+export function fromMeasuredPart(plan: Plan, value: number | null, axis: 0 | 1): number | null {
+  return value == null ? null : tidy(value + referenceAt(plan)[axis]);
 }
 
 export type Plan = Omit<Stage, "movers" | "positions">;
@@ -124,7 +188,7 @@ export function defaultMarks(width: number, depth: number): Mark[] {
 }
 
 export function defaultStage(): Stage {
-  return { width: 8, depth: 6, margin: { left: 2, right: 2, front: 2, back: 2 }, riser: 0, marks: defaultMarks(8, 6), movers: [], positions: [], scenery: [] };
+  return { width: 8, depth: 6, margin: { left: 2, right: 2, front: 2, back: 2 }, riser: 0, marks: defaultMarks(8, 6), movers: [], positions: [], scenery: [], reference: { from: "front-middle", x: 0, y: 0 } };
 }
 
 export function onStage(stage: Plan, x: number, y: number) {

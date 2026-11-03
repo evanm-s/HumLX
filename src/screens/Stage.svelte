@@ -15,7 +15,10 @@
     beam,
     defaultStage,
     floorAt,
+    fromMeasuredPart,
     hit,
+    measuredPart,
+    referenceAt,
     pool,
     towards,
     type Extra,
@@ -468,6 +471,16 @@
         {/if}
       {/each}
 
+      {#if tab === "place"}
+        {@const [rx, ry] = referenceAt(stage)}
+        <g class="reference" transform="translate({rx} {-ry})">
+          <line x2={unit * 5} stroke-width={unit * 0.4} />
+          <line y2={-unit * 5} stroke-width={unit * 0.4} />
+          <circle r={unit * 0.9} />
+          <text x={unit * 1.2} y={unit * 2.6} font-size={unit * 1.8}>0</text>
+        </g>
+      {/if}
+
       {#if tab === "place" && pickedLight?.at && !pickedLight.mover}
         {@const aim = bodyOf(pickedLight.placed, pickedCopy).aim ?? [pickedLight.at[0], pickedLight.at[1]]}
         <g class="aim-mark" transform="translate({aim[0]} {-aim[1]})">
@@ -562,7 +575,8 @@
     {:else}
       <p class="muted small">
         Pick a light, then tap the plan where it hangs. For a fixed light, tap again where it points. Movers point
-        from their calibration.
+        from their calibration. Positions are in metres from the orange 0, which you can move in
+        <button class="ghost link" onclick={() => (windowFor = { setup: true })}>Stage set up</button>.
       </p>
       <div class="lights">
         {#each lights.filter((l) => l.copy === 0) as l (l.fixture.id)}
@@ -602,8 +616,8 @@
             </div>
           {/if}
           <div class="fields">
-            <NumberField label="Across (m)" value={b.x ?? null} onchange={(v) => setBody({ x: v })} fractional increment={0.05} min={-500} max={500} />
-            <NumberField label="Up stage (m)" value={b.y ?? null} onchange={(v) => setBody({ y: v })} fractional increment={0.05} min={-500} max={500} />
+            <NumberField label="Across (m)" value={measuredPart(stage, b.x, 0)} onchange={(v) => setBody({ x: fromMeasuredPart(stage, v, 0) })} fractional increment={0.05} min={-500} max={500} />
+            <NumberField label="Up stage (m)" value={measuredPart(stage, b.y, 1)} onchange={(v) => setBody({ y: fromMeasuredPart(stage, v, 1) })} fractional increment={0.05} min={-500} max={500} />
             <NumberField label="Height (m)" value={b.z ?? null} onchange={(v) => setBody({ z: v })} fractional increment={0.05} min={-50} max={50} />
           </div>
           {#if pickedLight.mover}
@@ -617,8 +631,8 @@
             <button onclick={() => (windowFor = { fixture: picked! })}>Calibrate</button>
           {:else}
             <div class="fields two">
-              <NumberField label="Points at, across (m)" value={b.aim?.[0] ?? null} onchange={(v) => setAimPart(0, v)} fractional increment={0.1} min={-500} max={500} />
-              <NumberField label="Points at, up stage (m)" value={b.aim?.[1] ?? null} onchange={(v) => setAimPart(1, v)} fractional increment={0.1} min={-500} max={500} />
+              <NumberField label="Points at, across (m)" value={measuredPart(stage, b.aim?.[0], 0)} onchange={(v) => setAimPart(0, fromMeasuredPart(stage, v, 0))} fractional increment={0.1} min={-500} max={500} />
+              <NumberField label="Points at, up stage (m)" value={measuredPart(stage, b.aim?.[1], 1)} onchange={(v) => setAimPart(1, fromMeasuredPart(stage, v, 1))} fractional increment={0.1} min={-500} max={500} />
             </div>
             <div class="row wrap">
               <button disabled={!b.aim} onclick={() => setBody({ aim: null })}>Straight down</button>
@@ -726,6 +740,14 @@
   }
   .light text.dark {
     fill: #0a0c0f;
+  }
+  .reference line {
+    stroke: var(--warning);
+  }
+  .reference circle,
+  .reference text {
+    fill: var(--warning);
+    font-family: var(--mono);
   }
   .aim-mark circle {
     fill: none;

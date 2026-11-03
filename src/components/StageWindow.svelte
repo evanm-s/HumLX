@@ -20,6 +20,12 @@
     knownOf,
     minReadings,
     onStage,
+    fromMeasuredPart,
+    measured as fromReference,
+    measuredPart,
+    referenceAt,
+    REFERENCE_POINTS,
+    type ReferencePoint,
     type Known,
     type Mark,
     type Plan,
@@ -142,6 +148,7 @@
       riser: s.riser,
       marks: s.marks.map((m) => ({ ...m })),
       scenery: (s.scenery ?? []).map((p) => ({ ...p, points: p.points.map((pt) => [...pt] as [number, number]) })),
+      reference: { ...(s.reference ?? { from: "front-middle", x: 0, y: 0 }) },
     };
   }
 
@@ -246,6 +253,8 @@
         dragFrom = { finger: at, target: at };
         aimAt(at);
       }
+    } else if (mode === "setup" && draft && pickingReference) {
+      draft.reference = { from: "custom", x: round5(at.x), y: round5(at.y) };
     } else if (mode === "setup" && draft && pickedMark != null) {
       moveMark(pickedMark, at);
     } else if (mode === "setup" && draft && pickedPiece != null) {
@@ -389,15 +398,43 @@
   // --- Set up ---------------------------------------------------------------
 
   let pickedMark = $state<number | null>(null);
+  /** Taps on the plan move the reference point. */
+  let pickingReference = $state(false);
+
+  const referenceName = $derived(
+    plan.reference?.from === "custom"
+      ? "your reference point"
+      : (REFERENCE_POINTS.find(([p]) => p === (plan.reference?.from ?? "front-middle"))?.[1] ?? "").toLowerCase(),
+  );
+
+  function chooseReference(point: ReferencePoint) {
+    if (!draft) return;
+    // A picked spot starts where the reference is now.
+    const [x, y] = referenceAt(draft);
+    draft.reference = { from: point, x, y };
+    pickingReference = point === "custom";
+    if (pickingReference) {
+      pickedMark = null;
+      pickedPiece = null;
+    }
+  }
+
+  function pickReference() {
+    pickingReference = !pickingReference;
+    pickedMark = null;
+    pickedPiece = null;
+  }
   /** The scenery piece that taps on the plan add points to. */
   let pickedPiece = $state<number | null>(null);
 
   function pickMark(id: number) {
+    pickingReference = false;
     pickedMark = pickedMark === id ? null : id;
     pickedPiece = null;
   }
 
   function pickPiece(index: number) {
+    pickingReference = false;
     pickedPiece = pickedPiece === index ? null : index;
     pickedMark = null;
   }
@@ -540,6 +577,16 @@
           </g>
         {/each}
 
+        {#if mode === "setup"}
+          {@const [rx, ry] = referenceAt(plan)}
+          <g class="reference" transform="translate({rx} {-ry})">
+            <line x2={unit * 5} stroke-width={unit * 0.4} />
+            <line y2={-unit * 5} stroke-width={unit * 0.4} />
+            <circle r={unit * 0.9} />
+            <text x={unit * 1.2} y={unit * 2.6} font-size={unit * 1.8}>0</text>
+          </g>
+        {/if}
+
         {#each drawn as d (d.fixture.id)}
           {#if d.end}
             {@const via = d.crosses ?? d.end}
@@ -647,7 +694,8 @@
         {/if}
         {#if target}
           <p class="readout">
-            {metres(target.x)} {target.x < 0 ? "left" : "right"} · {metres(target.y)} up stage
+            {metres(fromReference(plan, target.x, target.y)[0])} across · {metres(fromReference(plan, target.x, target.y)[1])} up
+            stage, from {referenceName}
             {onStage(plan, target.x, target.y) ? "" : " (studio floor)"}
           </p>
         {/if}
@@ -741,8 +789,8 @@
                   {needed} marks are enough.{/if}
               </p>
               <div class="hang-fields">
-                <NumberField label="Across (m)" value={hang[0]} onchange={(v) => (hang[0] = v)} fractional increment={0.05} min={-500} max={500} />
-                <NumberField label="Up stage (m)" value={hang[1]} onchange={(v) => (hang[1] = v)} fractional increment={0.05} min={-500} max={500} />
+                <NumberField label="Across (m)" value={measuredPart(plan, hang[0], 0)} onchange={(v) => (hang[0] = fromMeasuredPart(plan, v, 0))} fractional increment={0.05} min={-500} max={500} />
+                <NumberField label="Up stage (m)" value={measuredPart(plan, hang[1], 1)} onchange={(v) => (hang[1] = fromMeasuredPart(plan, v, 1))} fractional increment={0.05} min={-500} max={500} />
                 <NumberField label="Height above stage (m)" value={hang[2]} onchange={(v) => (hang[2] = v)} fractional increment={0.05} min={-50} max={50} />
               </div>
               <div class="row wrap">
@@ -777,11 +825,24 @@
             <NumberField {label} value={draft.margin[side]} onchange={(v) => draft && v != null && (draft.margin[side] = v)} fractional increment={0.5} max={50} />
           {/each}
         </div>
-        <h3>Marks</h3>
+        <h3>Measured from</h3>
         <p class="muted small">
-          In metres from the front edge of the stage, in the middle; left and right as seen from the desk. Pick a mark
-          and tap the plan to drop it there.
+          Every position is typed in and shown from this point, in metres: across to the right as seen from the desk
+          (left is minus) and up stage away from the desk. Changing it moves nothing, only the numbers.
         </p>
+        <div class="row wrap">
+          {#each REFERENCE_POINTS as [point, label] (point)}
+            <button aria-pressed={draft.reference.from === point} onclick={() => chooseReference(point)}>{label}</button>
+          {/each}
+        </div>
+        {#if draft.reference.from === "custom"}
+          <p class="muted small">
+            {pickingReference ? "Tap the plan where you measure from." : ""}
+            <button class="ghost" aria-pressed={pickingReference} onclick={() => pickReference()}>Move it</button>
+          </p>
+        {/if}
+        <h3>Marks</h3>
+        <p class="muted small">Pick a mark and tap the plan to drop it there.</p>
         <div class="setup-marks">
           {#each draft.marks as mark (mark.id)}
             <div class="setup-mark" class:picked={pickedMark === mark.id}>
@@ -793,8 +854,8 @@
               >
               <input type="text" aria-label="Mark name" bind:value={mark.name} />
               <div class="pair">
-                <NumberField label="Across" value={mark.x} onchange={(v) => v != null && (mark.x = v)} fractional increment={0.05} min={-200} max={200} />
-                <NumberField label="Up stage" value={mark.y} onchange={(v) => v != null && (mark.y = v)} fractional increment={0.05} min={-200} max={200} />
+                <NumberField label="Across" value={measuredPart(plan, mark.x, 0)} onchange={(v) => v != null && (mark.x = fromMeasuredPart(plan, v, 0)!)} fractional increment={0.05} min={-200} max={200} />
+                <NumberField label="Up stage" value={measuredPart(plan, mark.y, 1)} onchange={(v) => v != null && (mark.y = fromMeasuredPart(plan, v, 1)!)} fractional increment={0.05} min={-200} max={200} />
               </div>
               <button class="ghost" aria-label="Remove {mark.name}" onclick={() => removeMark(mark.id)}>✕</button>
             </div>
@@ -829,8 +890,8 @@
             <NumberField label="Height (m)" value={piece.height} onchange={(v) => v != null && (piece.height = v)} fractional increment={0.1} max={50} />
             {#each piece.points as point, j (j)}
               <div class="point">
-                <NumberField label="Point {j + 1} across" value={point[0]} onchange={(v) => v != null && (point[0] = v)} fractional increment={0.05} min={-500} max={500} />
-                <NumberField label="Up stage" value={point[1]} onchange={(v) => v != null && (point[1] = v)} fractional increment={0.05} min={-500} max={500} />
+                <NumberField label="Point {j + 1} across" value={measuredPart(plan, point[0], 0)} onchange={(v) => v != null && (point[0] = fromMeasuredPart(plan, v, 0)!)} fractional increment={0.05} min={-500} max={500} />
+                <NumberField label="Up stage" value={measuredPart(plan, point[1], 1)} onchange={(v) => v != null && (point[1] = fromMeasuredPart(plan, v, 1)!)} fractional increment={0.05} min={-500} max={500} />
                 <button class="ghost" aria-label="Remove point {j + 1}" onclick={() => piece.points.splice(j, 1)}>✕</button>
               </div>
             {/each}
@@ -1043,6 +1104,15 @@
   }
   .target line {
     stroke: var(--text);
+  }
+
+  .reference line {
+    stroke: var(--warning);
+  }
+  .reference circle,
+  .reference text {
+    fill: var(--warning);
+    font-family: var(--mono);
   }
 
   .side {
