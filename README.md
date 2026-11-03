@@ -21,6 +21,12 @@ up quickly.
   cues, rename, duplicate or delete it, or load it into a fader slot. The list
   you pick is the *selected* list, which Space (GO), Shift+Space (Back), the
   NX-K's Next, Last and Cue n Enter, and Record act on.
+- **Playback grid**: an 8×6 grid of buttons (with as many pages as you like)
+  for quick looks, like Onyx's Playbacks. Tap a button to play its cue list
+  and select it; tap a live one-cue look again to release it. Press
+  **Record**, then tap an empty button to save the Programmer as a new look
+  there (or a filled one to add a cue to it). **Edit layout** swaps, assigns
+  and clears buttons and adds, renames or removes pages.
 - **Playback faders**: 8 fader slots, each loaded with whichever cue list the
   show needs, with a master fader, GO, Back and Release. Tap a slot's name to
   select its list; the Playback screen shows the selected list's cues. Intensity from several lists combines highest-takes-precedence;

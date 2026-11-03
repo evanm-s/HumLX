@@ -421,14 +421,25 @@ const commands: Record<string, (args: Args) => unknown> = {
   },
   select_cue_list: ({ list }) => ((layout.selected = list), playback()),
   set_slot: ({ slot, list }) => ((layout.slots[slot] = list), playback()),
+  set_grid_button: ({ page, button, list }) => ((layout.pages[page].buttons[button] = list), playback()),
+  swap_grid_buttons: ({ a, b }) => {
+    const x = layout.pages[a[0]].buttons[a[1]];
+    layout.pages[a[0]].buttons[a[1]] = layout.pages[b[0]].buttons[b[1]];
+    layout.pages[b[0]].buttons[b[1]] = x;
+    return playback();
+  },
+  add_grid_page: ({ name }) => (layout.pages.push({ name, buttons: Array(48).fill(null) }), playback()),
+  rename_grid_page: ({ page, name }) => ((layout.pages[page].name = name), playback()),
+  delete_grid_page: ({ page }) => (layout.pages.length > 1 && layout.pages.splice(page, 1), playback()),
   rename_cue_list: ({ id, name }) => ((cueLists.find((l) => l.id === id)!.name = name), playback()),
   delete_cue_list: ({ id }) => (
     (cueLists = cueLists.filter((l) => l.id !== id)), forget(id), running.delete(id), playback()
   ),
   record_cue: ({ target, name, fade, after }) => {
     if (!Object.keys(values).length && !effects.length) throw "There is nothing in the programmer to record";
-    const list = "list" in target ? target.list : addCueList(target.new);
-    if (!("list" in target)) {
+    const list = "list" in target ? target.list : addCueList("new" in target ? target.new : target.button.name || "Look");
+    if ("button" in target) layout.pages[target.button.page].buttons[target.button.button] = list;
+    else if (!("list" in target)) {
       const free = layout.slots.indexOf(null);
       if (free >= 0) layout.slots[free] = list;
     }
