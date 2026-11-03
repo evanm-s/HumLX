@@ -7,6 +7,7 @@
   import { attributeName, rgbCss } from "../../lib/format";
   import type { Attribute, EffectFamily, Rgb } from "../../lib/types";
   import type { Step } from "./effects";
+  import { drag, type DragPoint } from "../../lib/drag";
 
   interface Props {
     family: EffectFamily;
@@ -53,10 +54,8 @@
   }
 
   // The pad places a step where it is touched; up is higher tilt.
-  let pad = $state<HTMLDivElement>();
   let area = $state<HTMLDivElement>();
-  let dragging = false;
-  function place(event: PointerEvent) {
+  function place(event: DragPoint) {
     if (!area) return;
     const rect = area.getBoundingClientRect();
     const clamp = (v: number) => Math.round(Math.max(0, Math.min(1, v)) * 1000) / 1000;
@@ -130,17 +129,9 @@
   {:else if family === "position"}
     <div
       class="pad"
-      bind:this={pad}
       role="application"
       aria-label="Where step {index + 1} points"
-      onpointerdown={(e) => {
-        pad?.setPointerCapture(e.pointerId);
-        dragging = true;
-        place(e);
-      }}
-      onpointermove={(e) => dragging && place(e)}
-      onpointerup={() => (dragging = false)}
-      onpointercancel={() => (dragging = false)}
+      use:drag={{ start: place, move: place }}
     >
       <div class="area" bind:this={area}>
         <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">

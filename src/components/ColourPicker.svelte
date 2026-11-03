@@ -3,6 +3,7 @@
 
   import { hsvToRgb, rgbCss, rgbToHsv } from "../lib/format";
   import type { Rgb } from "../lib/types";
+  import { drag, type DragPoint } from "../lib/drag";
 
   interface Props {
     colour: Rgb | undefined;
@@ -12,7 +13,6 @@
   let { colour, onchange }: Props = $props();
 
   let disc: HTMLDivElement;
-  let dragging = false;
 
   const hsv = $derived(colour ? rgbToHsv(colour) : null);
   // Marker position as a fraction of the radius.
@@ -25,7 +25,7 @@
       : null,
   );
 
-  function pick(event: PointerEvent) {
+  function pick(event: DragPoint) {
     const rect = disc.getBoundingClientRect();
     const radius = rect.width / 2;
     const dx = event.clientX - rect.left - radius;
@@ -44,14 +44,7 @@
   tabindex="0"
   aria-label="Colour"
   aria-valuenow={hsv ? Math.round(hsv.h) : undefined}
-  onpointerdown={(e) => {
-    disc.setPointerCapture(e.pointerId);
-    dragging = true;
-    pick(e);
-  }}
-  onpointermove={(e) => dragging && pick(e)}
-  onpointerup={() => (dragging = false)}
-  onpointercancel={() => (dragging = false)}
+  use:drag={{ start: pick, move: pick }}
 >
   {#if marker && colour}
     <div
