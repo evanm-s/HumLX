@@ -115,21 +115,42 @@ export function beam(s: Solution, pan: number, tilt: number): [number, number, n
 }
 
 /**
- * Where the beam meets the floor, trying the stage floor first and then the
- * studio floor, or null when it points up and away.
+ * Where the beam comes down to `height` above the floor under it (the stage
+ * floor first, then the studio floor), or null when it never does.
  */
-export function landing(stage: Plan, s: Solution, pan: number, tilt: number): [number, number] | null {
+export function meets(
+  stage: Plan,
+  s: Solution,
+  pan: number,
+  tilt: number,
+  height = 0,
+): [number, number, number] | null {
   const d = beam(s, pan, tilt);
   const [px, py, pz] = s.position;
-  for (const height of [0, -stage.riser]) {
-    if (Math.abs(d[2]) < 1e-9) return null;
-    const t = (height - pz) / d[2];
+  if (Math.abs(d[2]) < 1e-9) return null;
+  for (const floor of [0, -stage.riser]) {
+    const z = floor + height;
+    const t = (z - pz) / d[2];
     if (t <= 0) continue;
     const x = px + d[0] * t;
     const y = py + d[1] * t;
-    if (floorAt(stage, x, y) === height) return [x, y];
+    if (floorAt(stage, x, y) === floor) return [x, y, z];
   }
   return null;
+}
+
+/** Where the beam meets the floor, or null when it points up and away. */
+export function landing(stage: Plan, s: Solution, pan: number, tilt: number): [number, number] | null {
+  const at = meets(stage, s, pan, tilt);
+  return at && [at[0], at[1]];
+}
+
+/** The end of the beam to draw: where it lands, or a long way off when it never does. */
+export function beamEnd(stage: Plan, s: Solution, pan: number, tilt: number): { at: [number, number, number]; lands: boolean } {
+  const at = meets(stage, s, pan, tilt);
+  if (at) return { at, lands: true };
+  const d = beam(s, pan, tilt);
+  return { at: s.position.map((p, i) => p + d[i] * 40) as [number, number, number], lands: false };
 }
 
 /** Pan and tilt (as the fixture gets them) that point at a spot; used by the browser preview. */

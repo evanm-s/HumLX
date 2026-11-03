@@ -15,7 +15,8 @@
     defaultMarks,
     defaultStage,
     floorAt,
-    landing,
+    beamEnd,
+    meets,
     MIN_READINGS,
     onStage,
     type Mark,
@@ -87,8 +88,13 @@
 
   interface Drawn {
     fixture: Fixture;
-    at: [number, number];
-    lands: [number, number] | null;
+    /** The mover, in metres. */
+    at: [number, number, number];
+    /** Where its beam lands, or how far along to draw it when it doesn't. */
+    end: [number, number, number] | null;
+    lands: boolean;
+    /** Where the beam passes the Height control's height, when pointing above the floor. */
+    crosses: [number, number, number] | null;
     selected: boolean;
   }
 
@@ -97,11 +103,17 @@
       const solution = solutionOf(fixture.id);
       if (!solution) return [];
       const position = outputPosition(fixture);
+      const end = position ? beamEnd(plan, solution, position[0], position[1]) : null;
       return [
         {
           fixture,
-          at: [solution.position[0], solution.position[1]] as [number, number],
-          lands: position ? landing(plan, solution, position[0], position[1]) : null,
+          at: [...solution.position] as [number, number, number],
+          end: end?.at ?? null,
+          lands: end?.lands ?? false,
+          crosses:
+            position && mode === "point" && height > 0
+              ? meets(plan, solution, position[0], position[1], height)
+              : null,
           selected: show.programmer.selection.includes(fixture.id),
         },
       ];
@@ -136,6 +148,14 @@
   // Up stage is at the top, so y is flipped on screen.
   const viewBox = $derived(`${view.left} ${-view.back} ${view.right - view.left} ${view.back - view.front}`);
   const unit = $derived(Math.max(view.right - view.left, view.back - view.front) / 100);
+
+  // The side view looks across the stage: front of stage on the left, up stage
+  // on the right, height going up.
+  const side = $derived.by(() => {
+    const low = -plan.riser - 0.3;
+    const high = Math.max(2.2, height + 0.5, ...drawn.map((d) => d.at[2] + 0.6));
+    return { low, high, box: `${view.front} ${-high} ${view.back - view.front} ${high - low}` };
+  });
 
   const gridLines = $derived.by(() => {
     const xs: number[] = [];
@@ -190,7 +210,7 @@
   }
 
   function planDown(p: DragPoint, element: EventTarget | null) {
-    if ((element as Element | null)?.closest?.("button")) return false;
+    if ((element as Element | null)?.closest?.("button, .side-wrap")) return false;
     const at = toStage(p);
     if (!at) return false;
     if (mode === "point") {
@@ -408,17 +428,36 @@
         {/each}
 
         {#each drawn as d (d.fixture.id)}
-          {#if d.lands}
+          {#if d.end}
+            {@const via = d.crosses ?? d.end}
             <line
               class="beam"
               class:selected={d.selected}
               x1={d.at[0]}
               y1={-d.at[1]}
-              x2={d.lands[0]}
-              y2={-d.lands[1]}
+              x2={via[0]}
+              y2={-via[1]}
               stroke-width={unit * 0.35}
             />
-            <circle class="spot" class:selected={d.selected} cx={d.lands[0]} cy={-d.lands[1]} r={unit * 1.3} />
+            {#if d.crosses || !d.lands}
+              <!-- On past the height it is aimed at, to the floor (or off into the distance). -->
+              <line
+                class="beam onward"
+                class:selected={d.selected}
+                x1={via[0]}
+                y1={-via[1]}
+                x2={d.end[0]}
+                y2={-d.end[1]}
+                stroke-width={unit * 0.3}
+                stroke-dasharray="{unit * 1.2} {unit * 0.9}"
+              />
+            {/if}
+            {#if d.lands}
+              <circle class="spot" class:selected={d.selected} class:past={!!d.crosses} cx={d.end[0]} cy={-d.end[1]} r={unit * 1.3} />
+            {/if}
+            {#if d.crosses}
+              <circle class="head" class:selected={d.selected} cx={d.crosses[0]} cy={-d.crosses[1]} r={unit * 1.5} stroke-width={unit * 0.45} />
+            {/if}
           {/if}
           <g class="mover" class:selected={d.selected} transform="translate({d.at[0]} {-d.at[1]})">
             <circle r={unit * 1.9} stroke-width={unit * 0.4} />
@@ -434,6 +473,36 @@
           </g>
         {/if}
       </svg>
+      <div class="side-wrap">
+      <svg class="side-view" viewBox={side.box} preserveAspectRatio="xMidYMid meet" aria-label="Side view">
+        <rect class="studio" x={view.front} y={-side.high} width={view.back - view.front} height={side.high - side.low} />
+        <line class="floor" x1={view.front} x2={view.back} y1={plan.riser} y2={plan.riser} />
+        <rect class="stage" x="0" y="0" width={plan.depth} height={Math.max(plan.riser, 0.04)} />
+        {#if mode === "point" && height > 0}
+          <line class="height-line" x1={view.front} x2={view.back} y1={-height} y2={-height} />
+        {/if}
+        {#if mode === "point" && target}
+          {@const floor = floorAt(plan, target.x, target.y)}
+          <!-- Someone standing on the spot, for scale. -->
+          <line class="person" x1={target.y} x2={target.y} y1={-floor} y2={-floor - 1.45} />
+          <circle class="person" cx={target.y} cy={-floor - 1.6} r="0.15" />
+        {/if}
+        {#each drawn as d (d.fixture.id)}
+          {#if d.end}
+            {@const via = d.crosses ?? d.end}
+            <line class="beam" class:selected={d.selected} x1={d.at[1]} y1={-d.at[2]} x2={via[1]} y2={-via[2]} />
+            {#if d.crosses || !d.lands}
+              <line class="beam onward" class:selected={d.selected} x1={via[1]} y1={-via[2]} x2={d.end[1]} y2={-d.end[2]} />
+            {/if}
+            {#if d.crosses}
+              <circle class="head" class:selected={d.selected} cx={d.crosses[1]} cy={-d.crosses[2]} r="0.12" />
+            {/if}
+          {/if}
+          <circle class="mover-dot" class:selected={d.selected} cx={d.at[1]} cy={-d.at[2]} r="0.18" />
+        {/each}
+      </svg>
+      <p class="side-caption">Side view · front of stage on the left</p>
+      </div>
     </div>
 
     <aside class="side scroll">
@@ -623,6 +692,71 @@
 
   .plan-area {
     touch-action: none;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .plan {
+    flex: 1;
+    min-height: 0;
+  }
+
+  .side-wrap {
+    flex: 0 0 26%;
+    min-height: 0;
+    position: relative;
+    display: grid;
+  }
+  .side-view {
+    width: 100%;
+    height: 100%;
+  }
+  .side-view * {
+    vector-effect: non-scaling-stroke;
+  }
+  .side-view .floor {
+    stroke: #4a5363;
+    stroke-width: 2;
+  }
+  .side-view .stage {
+    fill: #1a1f28;
+    stroke: #4a5363;
+    stroke-width: 2;
+  }
+  .side-view .beam {
+    stroke-width: 3;
+  }
+  .side-view .onward {
+    stroke-width: 2;
+    stroke-dasharray: 8 6;
+  }
+  .height-line {
+    stroke: var(--warning);
+    stroke-width: 1;
+    stroke-dasharray: 4 6;
+  }
+  .person {
+    stroke: var(--text);
+    stroke-width: 3;
+    fill: none;
+  }
+  .mover-dot {
+    fill: var(--panel-raised);
+    stroke: var(--muted);
+    stroke-width: 2;
+  }
+  .mover-dot.selected {
+    stroke: var(--f-position);
+  }
+  .side-caption {
+    position: absolute;
+    top: 6px;
+    left: 10px;
+    margin: 0;
+    pointer-events: none;
+    font-size: 0.8rem;
+    color: var(--muted);
   }
 
   .plan {
@@ -685,6 +819,20 @@
   }
   .spot.selected {
     fill: var(--f-position);
+  }
+  /* The floor spot behind someone the beam is aimed at. */
+  .spot.past {
+    fill: color-mix(in srgb, var(--f-position) 25%, transparent);
+  }
+  .head {
+    fill: none;
+    stroke: color-mix(in srgb, var(--warning) 50%, transparent);
+  }
+  .head.selected {
+    stroke: var(--warning);
+  }
+  .onward {
+    fill: none;
   }
   .mover circle {
     fill: var(--panel-raised);
