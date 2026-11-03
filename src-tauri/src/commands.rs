@@ -6,7 +6,7 @@ use std::time::Duration;
 use humlx_core::artnet::Node;
 use humlx_core::engine::{self, OutputSettings, OutputStatus};
 use humlx_core::fixture::{slug, Attribute, Family, Profile};
-use humlx_core::patch::{mode_of, FixtureChanges, FixtureUpdate, NewFixtures};
+use humlx_core::patch::{mode_of, FixtureChanges, FixtureOptions, FixtureUpdate, NewFixtures};
 use humlx_core::programmer::{next_id, Field, Group, Preset, Rgb, SelectMode, Values};
 use humlx_core::{ofl, qlc, Error, Result};
 use serde::Serialize;
@@ -25,6 +25,7 @@ pub struct FixtureView {
     /// Number of channels, or 0 when the profile is missing.
     footprint: usize,
     type_name: String,
+    options: FixtureOptions,
 }
 
 #[derive(Serialize)]
@@ -87,6 +88,7 @@ fn patch_view(app: &App) -> PatchView {
                 profile: fixture.profile.clone(),
                 mode: fixture.mode.clone(),
                 address: fixture.address,
+                options: fixture.options,
                 footprint: mode_of(&state.library, fixture).map_or(0, |m| m.channels.len()),
                 type_name: profile.map_or_else(
                     || format!("Missing type ({})", fixture.profile),
