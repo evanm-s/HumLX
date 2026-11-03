@@ -51,6 +51,15 @@ export interface Placed {
   z?: number | null;
 }
 
+/** Scenery drawn on the plan for reference, such as an LED wall: a line through its points. */
+export interface Scenery {
+  name: string;
+  /** Across and up stage, in metres. */
+  points: [number, number][];
+  /** How tall it stands, for the side view. */
+  height: number;
+}
+
 export interface Stage {
   width: number;
   depth: number;
@@ -62,6 +71,7 @@ export interface Stage {
   movers: Calibration[];
   /** Positions measured by hand; a mover with one only needs its heading worked out. */
   positions: Placed[];
+  scenery: Scenery[];
 }
 
 export type Plan = Omit<Stage, "movers" | "positions">;
@@ -91,7 +101,7 @@ export function defaultMarks(width: number, depth: number): Mark[] {
 }
 
 export function defaultStage(): Stage {
-  return { width: 8, depth: 6, margin: 2, riser: 0, marks: defaultMarks(8, 6), movers: [], positions: [] };
+  return { width: 8, depth: 6, margin: 2, riser: 0, marks: defaultMarks(8, 6), movers: [], positions: [], scenery: [] };
 }
 
 export function onStage(stage: Plan, x: number, y: number) {
