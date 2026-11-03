@@ -14,11 +14,13 @@
   import Playback from "./screens/Playback.svelte";
   import Programmer from "./screens/Programmer.svelte";
   import Settings from "./screens/Settings.svelte";
+  import Stage from "./screens/Stage.svelte";
 
   const screens = [
     { id: "programmer", label: "Programmer", icon: "◉" },
     { id: "playback", label: "Playback", icon: "▶" },
     { id: "cuelists", label: "Cue Lists", icon: "▤" },
+    { id: "stage", label: "Stage", icon: "◫" },
     { id: "patch", label: "Patch", icon: "▦" },
     { id: "test", label: "Channel test", icon: "☰" },
     { id: "output", label: "Settings", icon: "⚙" },
@@ -133,7 +135,7 @@
     <div class="screen">
       {#if show.loaded}
         {#key show.revision}
-          {#if screen === "programmer"}<Programmer />{:else if screen === "playback"}<Playback />{:else if screen === "cuelists"}<CueLists />{:else if screen === "patch"}<Patch />{:else if screen === "test"}<ChannelTest
+          {#if screen === "programmer"}<Programmer />{:else if screen === "playback"}<Playback />{:else if screen === "cuelists"}<CueLists />{:else if screen === "stage"}<Stage />{:else if screen === "patch"}<Patch />{:else if screen === "test"}<ChannelTest
             />{:else}<Settings />{/if}
         {/key}
       {/if}

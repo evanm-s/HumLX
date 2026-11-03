@@ -2,7 +2,7 @@ import type { Channel, Rgb } from "./types";
 
 // Mirrors nearest_wheel_slot in the engine (crates/humlx-core/src/programmer.rs),
 // so the Faders view shows the slot the picked colour sends a colour wheel to.
-const NAMED: [string, Rgb][] = [
+export const NAMED: [string, Rgb][] = [
   ["red", { r: 1, g: 0, b: 0 }],
   ["orange", { r: 1, g: 0.5, b: 0 }],
   ["amber", { r: 1, g: 0.75, b: 0 }],

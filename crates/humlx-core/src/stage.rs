@@ -138,6 +138,23 @@ pub struct Placed {
     pub y: Option<f32>,
     #[serde(default)]
     pub z: Option<f32>,
+    /// Where a fixed light points: a spot on the floor, across and up stage.
+    /// `None` points it straight down. Movers aim from their calibration.
+    #[serde(default)]
+    pub aim: Option<[f32; 2]>,
+    /// Beam width in degrees, for drawing; `None` uses a default for its type.
+    #[serde(default)]
+    pub beam: Option<f32>,
+}
+
+impl Placed {
+    fn known(&self) -> Known {
+        [self.x, self.y, self.z]
+    }
+
+    fn is_empty(&self) -> bool {
+        self.known().iter().all(Option::is_none) && self.aim.is_none() && self.beam.is_none()
+    }
 }
 
 impl Default for Stage {
@@ -300,18 +317,62 @@ impl Stage {
         if !position.iter().flatten().all(|v| v.is_finite() && v.abs() <= 500.0) {
             return Err(Error::InvalidStage("that position is out of range".into()));
         }
-        self.positions.retain(|p| p.fixture != fixture);
-        if position.iter().any(Option::is_some) {
-            let [x, y, z] = position;
-            self.positions.push(Placed { fixture, x, y, z });
+        let [x, y, z] = position;
+        let mut placed = self.placement(fixture);
+        (placed.x, placed.y, placed.z) = (x, y, z);
+        self.store(placed);
+        self.resolve(fixture, position);
+        Ok(())
+    }
+
+    /// Where a fixture is placed, with nothing set when it isn't.
+    pub fn placement(&self, fixture: u32) -> Placed {
+        self.positions
+            .iter()
+            .find(|p| p.fixture == fixture)
+            .copied()
+            .unwrap_or(Placed {
+                fixture,
+                x: None,
+                y: None,
+                z: None,
+                aim: None,
+                beam: None,
+            })
+    }
+
+    /// Places a fixture on the plan: where it hangs, where it points and how
+    /// wide its beam is. A mover is worked out again to suit its position.
+    pub fn set_placement(&mut self, placed: Placed) -> Result<()> {
+        let finite = |v: &f32| v.is_finite() && v.abs() <= 500.0;
+        if !placed.known().iter().flatten().all(finite) || !placed.aim.iter().flatten().all(finite) {
+            return Err(Error::InvalidStage("that position is out of range".into()));
+        }
+        if placed.beam.is_some_and(|b| !(1.0..=120.0).contains(&b)) {
+            return Err(Error::InvalidStage("the beam must be 1 to 120 degrees wide".into()));
+        }
+        let fixture = placed.fixture;
+        let position = placed.known();
+        self.store(placed);
+        self.resolve(fixture, position);
+        Ok(())
+    }
+
+    fn store(&mut self, placed: Placed) {
+        self.positions.retain(|p| p.fixture != placed.fixture);
+        if !placed.is_empty() {
+            self.positions.push(placed);
             self.positions.sort_by_key(|p| p.fixture);
         }
+    }
+
+    /// Works a mover's calibration out again for a newly measured position.
+    fn resolve(&mut self, fixture: u32, position: Known) {
         let marks = self.marks.clone();
         if let Some(calibration) = self.movers.iter_mut().find(|c| c.fixture == fixture) {
             let ranges = calibration.ranges();
             calibration.solution = solve(&marks, &calibration.readings, ranges, position);
         }
-        Ok(())
     }
 
     pub fn solution(&self, fixture: u32) -> Option<&Solution> {
@@ -810,6 +871,44 @@ impl Solution {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn placement_keeps_aim_and_beam_when_the_position_changes() {
+        let mut stage = Stage::default();
+        let placed = Placed {
+            fixture: 3,
+            x: Some(1.0),
+            y: Some(2.0),
+            z: Some(4.5),
+            aim: Some([0.0, 3.0]),
+            beam: Some(25.0),
+        };
+        stage.set_placement(placed).unwrap();
+        stage.set_position(3, [Some(1.5), Some(2.0), Some(4.5)]).unwrap();
+        let after = stage.placement(3);
+        assert_eq!(after.x, Some(1.5));
+        assert_eq!(after.aim, Some([0.0, 3.0]));
+        assert_eq!(after.beam, Some(25.0));
+        assert!(stage
+            .set_placement(Placed {
+                beam: Some(500.0),
+                ..placed
+            })
+            .is_err());
+        let cleared = Placed {
+            x: None,
+            y: None,
+            z: None,
+            aim: None,
+            beam: None,
+            ..placed
+        };
+        stage.set_placement(cleared).unwrap();
+        assert!(stage.positions.is_empty());
+        // Shows saved before placements had an aim still load.
+        let old: Placed = serde_json::from_str(r#"{"fixture":2,"z":4.5}"#).unwrap();
+        assert_eq!(old.aim, None);
+    }
 
     #[test]
     fn margin_reads_one_number_or_each_side() {

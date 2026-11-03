@@ -31,14 +31,16 @@
     onclose: () => void;
     /** Opens on Calibrate for this fixture, as the Patch page does. */
     fixture?: number;
+    /** Opens on this tab, such as Set up from the Stage page. */
+    startMode?: "point" | "calibrate" | "setup";
   }
 
-  let { onclose, fixture: startFixture }: Props = $props();
+  let { onclose, fixture: startFixture, startMode }: Props = $props();
 
   type Mode = "point" | "calibrate" | "setup";
   const MODE_KEY = "humlx.stage.mode";
   // svelte-ignore state_referenced_locally
-  let mode = $state<Mode>(startFixture != null ? "calibrate" : readMode());
+  let mode = $state<Mode>(startMode ?? (startFixture != null ? "calibrate" : readMode()));
   let stage = $state<Stage>(defaultStage());
 
   function readMode(): Mode {
@@ -68,6 +70,7 @@
     const loaded = await attempt(() => api.stage());
     if (loaded) stage = loaded;
     if (mode === "calibrate") startCalibrating();
+    if (mode === "setup") draft = copyPlan(stage);
   });
 
   // --- Fixtures -------------------------------------------------------------

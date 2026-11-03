@@ -25,7 +25,7 @@ import type {
   SurfaceStatus,
   Led,
 } from "./types";
-import type { Known, Plan, Stage } from "./stage";
+import type { Known, Placed, Plan, Stage } from "./stage";
 
 /** True when running inside the desktop app rather than a plain browser. */
 export const inApp = "__TAURI_INTERNALS__" in window;
@@ -101,6 +101,7 @@ export const api = {
   /** Sets where a fixture hangs, in metres; null for any part not measured. */
   setFixturePosition: (fixture: number, position: Known) =>
     invoke<Stage>("set_fixture_position", { fixture, position }),
+  setPlacement: (placed: Placed) => invoke<Stage>("set_placement", { placed }),
   /** Forgets one reading, or the fixture's whole calibration when `mark` is null. */
   forgetCalibration: (fixture: number, mark: number | null) =>
     invoke<Stage>("forget_calibration", { fixture, mark }),

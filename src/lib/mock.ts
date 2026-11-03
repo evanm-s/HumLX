@@ -27,7 +27,7 @@ import type {
   Layout,
 } from "./types";
 import { DEFAULT_OPTIONS, emptyLayout } from "./types";
-import { aim, defaultStage, floorAt, knownOf, minReadings, orient, unorient, type Known, type Solution, type Stage } from "./stage";
+import { aim, defaultStage, floorAt, knownOf, minReadings, orient, unorient, type Known, type Placed, type Solution, type Stage } from "./stage";
 
 const files = import.meta.glob<Omit<Profile, "id">>("../../crates/humlx-core/fixtures/*.json", {
   eager: true,
@@ -45,17 +45,31 @@ const profiles: Profile[] = Object.values(files).map((p) => ({
   id: `${slug(p.manufacturer)}/${slug(p.model)}`,
 }));
 
-const firstMode = profiles[0].modes[0];
-let fixtures: Fixture[] = [1, 2, 3, 4, 5, 6].map((id) => ({
-  id,
-  name: `F${id}`,
-  profile: profiles[0].id,
-  mode: firstMode.name,
-  address: 1 + (id - 1) * firstMode.channels.length,
-  footprint: firstMode.channels.length,
-  typeName: "x",
-  options: { ...DEFAULT_OPTIONS },
-}));
+// A rig like the studio's: movers, RGBW pars, bi-colour panels and dimmers.
+const rig: [string, string, number][] = [
+  ["event-lighting/lm6x15", "Mover", 4],
+  ["generic/rgbw-par", "Par", 4],
+  ["generic/bi-colour-led-panel", "Panel", 2],
+  ["generic/dimmer", "Dimmer", 2],
+];
+let fixtures: Fixture[] = [];
+for (const [id, name, count] of rig) {
+  const profile = profiles.find((p) => p.id === id) ?? profiles[0];
+  const mode = profile.modes[0];
+  for (let i = 1; i <= count; i++) {
+    const last = fixtures[fixtures.length - 1];
+    fixtures.push({
+      id: fixtures.length + 1,
+      name: `${name} ${i}`,
+      profile: profile.id,
+      mode: mode.name,
+      address: last ? last.address + last.footprint : 1,
+      footprint: mode.channels.length,
+      typeName: `${profile.manufacturer} ${profile.model}`,
+      options: { ...DEFAULT_OPTIONS },
+    });
+  }
+}
 let output: OutputSettings = { enabled: true, target: "255.255.255.255", universe: 0, rateHz: 40 };
 let blackout = false;
 let grandMaster = 1;
@@ -79,7 +93,27 @@ const beats = (): [number, number] =>
 const running = new Map<number, number>(); // cue list -> current cue
 const masters = new Map<number, number>();
 const layout: Layout = emptyLayout();
-let stage: Stage = defaultStage();
+let stage: Stage = {
+  ...defaultStage(),
+  width: 9.2,
+  depth: 6.6,
+  margin: { left: 4.6, right: 0, front: 5, back: 0 },
+  scenery: [{ name: "LED wall", points: [[-3.8, 3.05], [-1.0, 5.65], [0.3, 5.65], [3.15, 3.05]], height: 3 }],
+};
+// Movers calibrated, pars and panels placed by hand, dimmers not yet placed.
+stage.movers = [1, 2, 3, 4].map((fixture) => ({
+  fixture,
+  readings: [1, 2, 3, 4].map((mark) => ({ mark, pan: 0.5, tilt: 0.5 })),
+}));
+stage.positions = [
+  { fixture: 5, x: -3, y: 1, z: 4.5, aim: [-2.5, 2.5] },
+  { fixture: 6, x: -1, y: 1, z: 4.5, aim: [-0.8, 2.5] },
+  { fixture: 7, x: 1, y: 1, z: 4.5, aim: [0.8, 2.5] },
+  { fixture: 8, x: 3, y: 1, z: 4.5, aim: [2.5, 2.5] },
+  { fixture: 9, x: -2.5, y: -3, z: 3.5, aim: [-1, 1.5], beam: 60 },
+  { fixture: 10, x: 2.5, y: -3, z: 3.5, aim: [1, 1.5], beam: 60 },
+];
+for (const m of stage.movers) refit(m.fixture);
 
 function refit(fixture: number) {
   const c = stage.movers.find((m) => m.fixture === fixture);
@@ -508,10 +542,18 @@ const commands: Record<string, (args: Args) => unknown> = {
     return structuredClone(stage);
   },
   set_fixture_position: ({ fixture, position }) => {
-    stage.positions = stage.positions.filter((p) => p.fixture !== fixture);
     const [x, y, z] = position as Known;
-    if (x != null || y != null || z != null) stage.positions.push({ fixture: fixture as number, x, y, z });
-    refit(fixture as number);
+    const old = stage.positions.find((p) => p.fixture === fixture);
+    return commands.set_placement({ placed: { ...old, fixture, x, y, z } });
+  },
+  set_placement: ({ placed }) => {
+    const p = placed as Placed;
+    stage.positions = stage.positions.filter((q) => q.fixture !== p.fixture);
+    if ([p.x, p.y, p.z, p.aim, p.beam].some((v) => v != null)) {
+      stage.positions.push(structuredClone(p));
+      stage.positions.sort((a, b) => a.fixture - b.fixture);
+    }
+    refit(p.fixture);
     return structuredClone(stage);
   },
   forget_calibration: ({ fixture, mark }) => {
