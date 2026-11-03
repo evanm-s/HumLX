@@ -6,6 +6,7 @@ import { listen } from "@tauri-apps/api/event";
 import { api, inApp } from "./api";
 import { backspace, parse, typeDigit, type Token } from "./command";
 import { endSelectWindow } from "./selection";
+import { sheetPicks } from "./sheet.svelte";
 import { attempt, notify, show } from "./show.svelte";
 import type { Attribute, Led, ProgrammerView, SurfaceStatus } from "./types";
 
@@ -115,7 +116,8 @@ class Surface {
 
   /**
    * Clear, as on Onyx, so Clear Clear always clears the programmer. The first
-   * press empties the command line, cancels Record or Delete and deselects,
+   * press empties the command line, cancels Record or Delete, unpicks the
+   * programmer sheet and deselects,
    * leaving the values on stage. A second press straight after clears the
    * programmer. Fixture numbers and Enter after the first press clear just
    * those fixtures instead.
@@ -129,6 +131,7 @@ class Surface {
     }
     this.line = [];
     this.setMode(null);
+    sheetPicks.clear();
     endSelectWindow();
     if (show.programmer.selection.length > 0 && !(await show.program(() => api.select([], "set")))) return;
     this.clearedOnce = show.programmer;
@@ -177,6 +180,9 @@ class Surface {
         window.dispatchEvent(new CustomEvent(RECORD_EVENT, { detail: { cue: this.mode === "record" } }));
         return;
       case "delete":
+        // With values picked on the programmer sheet, Delete takes them out;
+        // otherwise it arms deleting a preset.
+        if (sheetPicks.delete()) return void this.setMode(null);
         this.setMode(this.mode === "delete" ? null : "delete");
         return;
       case "next":

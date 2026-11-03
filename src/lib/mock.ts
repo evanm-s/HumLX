@@ -19,6 +19,7 @@ import type {
   Preset,
   Profile,
   ProgrammerView,
+  ProgrammerField,
   Rgb,
   Shape,
   Values,
@@ -382,6 +383,22 @@ const commands: Record<string, (args: Args) => unknown> = {
       if (family === "beam") delete v.other;
       if (family === "colour") for (const a of [...COLOUR_ATTRIBUTES, "color_temperature" as const]) delete v.other?.[a];
     }
+    return programmer();
+  },
+  remove_from_programmer: ({ rows, cells }) => {
+    for (const [id, field] of cells as [number, ProgrammerField][]) {
+      const v = values[id];
+      if (!v) continue;
+      if (typeof field === "string") delete v[field];
+      else delete v.other?.[field.other];
+      if (v.other && Object.keys(v.other).length === 0) delete v.other;
+      if (Object.keys(v).length === 0) delete values[id];
+    }
+    const gone = rows as number[];
+    effects = effects
+      .map((e) => ({ ...e, fixtures: e.fixtures.filter((f) => !gone.includes(f)) }))
+      .filter((e) => e.fixtures.length > 0);
+    for (const id of gone) delete values[id];
     return programmer();
   },
   save_group: ({ name, id }) => {

@@ -9,7 +9,8 @@ up quickly.
 - **Programmer**: select fixtures or groups, then set intensity, colour (a
   colour disc and quick swatches), pan and tilt (a touch pad with a fine mode)
   and beam controls, all on screen at once. A programmer sheet lists every
-  value that's set. The screen is made of windows that can be moved, resized
+  value that's set: tap fixture numbers or single values to pick them, then
+  **Delete** (or Backspace) takes them out of the programmer. The screen is made of windows that can be moved, resized
   and hidden with **Edit layout**, and the layout is remembered. Colours work across RGB, RGBW, CMY and colour-wheel
   fixtures alike.
 - **Cues and cue lists**: tap **Record cue** on the Programmer or Playback

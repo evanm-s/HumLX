@@ -13,6 +13,7 @@ import type {
   PatchView,
   Profile,
   ProgrammerView,
+  ProgrammerField,
   Rgb,
   SelectMode,
   Family,
@@ -80,6 +81,9 @@ export const api = {
   /** Clears `family` (or everything) from `fixtures`, or from every fixture when `fixtures` is null. */
   clearProgrammer: (family: Family | null, fixtures: number[] | null = null) =>
     invoke<ProgrammerView>("clear_programmer", { family, fixtures }),
+  /** Takes whole fixtures (`rows`) and single values (`cells`) out of the programmer. */
+  removeFromProgrammer: (rows: number[], cells: [number, ProgrammerField][]) =>
+    invoke<ProgrammerView>("remove_from_programmer", { rows, cells }),
   saveGroup: (name: string, id: number | null) => invoke<ProgrammerView>("save_group", { name, id }),
   deleteGroup: (id: number) => invoke<ProgrammerView>("delete_group", { id }),
   recordPreset: (family: Family, name: string, id: number | null) =>

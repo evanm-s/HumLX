@@ -44,6 +44,17 @@ impl Rgb {
     }
 }
 
+/// One value in a fixture's [`Values`], as a column of the programmer sheet.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Field {
+    Intensity,
+    Colour,
+    Pan,
+    Tilt,
+    Other(Attribute),
+}
+
 /// What the programmer (or a preset) sets on one fixture. `None` and missing
 /// entries leave the fixture's channels at their resting level.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -103,6 +114,19 @@ impl Values {
             Family::Beam | Family::Control => {}
         }
         self.other.retain(|attribute, _| attribute.family() != family);
+    }
+
+    /// Removes one value.
+    pub fn remove(&mut self, field: Field) {
+        match field {
+            Field::Intensity => self.intensity = None,
+            Field::Colour => self.colour = None,
+            Field::Pan => self.pan = None,
+            Field::Tilt => self.tilt = None,
+            Field::Other(attribute) => {
+                self.other.remove(&attribute);
+            }
+        }
     }
 
     /// Overlays every value set in `other` onto this one.
@@ -373,6 +397,18 @@ impl Programmer {
             }
         }
         self.effects.retain(|e| !e.fixtures.is_empty());
+    }
+
+    /// Removes single values, such as fixture 3's pan, leaving the rest of
+    /// each fixture's values and any effects alone. A fixture left with no
+    /// values drops out of the programmer.
+    pub fn remove_values(&mut self, cells: &[(u32, Field)]) {
+        for (id, field) in cells {
+            if let Some(values) = self.values.get_mut(id) {
+                values.remove(*field);
+            }
+        }
+        self.values.retain(|_, v| !v.is_empty());
     }
 
     /// Drops fixtures that are no longer patched.
@@ -766,5 +802,33 @@ mod tests {
         assert_eq!(programmer.effects.len(), 1);
         assert_eq!(programmer.effects[0].fixtures, vec![1]);
         assert_eq!(programmer.selection, vec![1, 2]);
+    }
+
+    #[test]
+    fn removing_single_values() {
+        let mut programmer = Programmer::default();
+        programmer.select(&[1, 2], SelectMode::Set);
+        programmer.update(|v| {
+            v.intensity = Some(1.0);
+            v.pan = Some(0.2);
+            v.other.insert(Attribute::Zoom, 0.5);
+        });
+
+        programmer.remove_values(&[(1, Field::Pan), (2, Field::Other(Attribute::Zoom)), (9, Field::Colour)]);
+        assert_eq!(programmer.values[&1].pan, None);
+        assert_eq!(programmer.values[&1].intensity, Some(1.0));
+        assert_eq!(programmer.values[&1].other.get(&Attribute::Zoom), Some(&0.5));
+        assert_eq!(programmer.values[&2].pan, Some(0.2));
+        assert!(programmer.values[&2].other.is_empty());
+
+        programmer.remove_values(&[(1, Field::Intensity), (1, Field::Other(Attribute::Zoom))]);
+        assert!(!programmer.values.contains_key(&1));
+        assert_eq!(programmer.selection, vec![1, 2]);
+    }
+
+    #[test]
+    fn fields_read_from_the_ui() {
+        let cells: Vec<Field> = serde_json::from_str(r#"["colour", "tilt", {"other": "zoom"}]"#).unwrap();
+        assert_eq!(cells, vec![Field::Colour, Field::Tilt, Field::Other(Attribute::Zoom)]);
     }
 }

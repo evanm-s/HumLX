@@ -22,6 +22,7 @@
   import { endSelectWindow, restartSelectWindow, tapMode } from "../lib/selection";
   import { attempt, show } from "../lib/show.svelte";
   import { RECORD_EVENT, surface } from "../lib/surface.svelte";
+  import { sheetPicks } from "../lib/sheet.svelte";
   import type { Attribute, Channel, Family, Fixture, Rgb } from "../lib/types";
 
   const selection = $derived(show.programmer.selection);
@@ -315,7 +316,8 @@
   }
 
   // Keys, unless typing or a dialog is open: H toggles highlight, and R and
-  // Delete work like the control surface's Record and Delete for presets.
+  // Delete work like the control surface's Record and Delete. Delete (or
+  // Backspace) takes out what's picked on the programmer sheet.
   function keys(e: KeyboardEvent) {
     if (e.ctrlKey || e.metaKey || e.altKey || e.repeat || e.defaultPrevented) return;
     if (namingGroup || recordingCue) return;
@@ -325,6 +327,7 @@
     if (key === "h") setHighlight(!highlight);
     else if (key === "r") surface.press("record");
     else if (key === "delete") surface.press("delete");
+    else if (key === "backspace" && sheetPicks.count > 0) surface.press("delete");
     else if (key === "enter" && surface.mode) surface.confirm();
     else return;
     e.preventDefault();
@@ -348,6 +351,7 @@
   // Leaving it on would keep the rest of the rig dark from other screens.
   onDestroy(() => {
     surface.setMode(null);
+    sheetPicks.clear();
     if (show.live.highlight) setHighlight(false);
   });
 
@@ -369,6 +373,8 @@
       <span class="mode">Record: tap a preset slot, or Enter to record a cue. Esc cancels.</span>
     {:else if surface.mode === "delete"}
       <span class="mode">Delete: tap a preset, then Enter. Esc cancels.</span>
+    {:else if sheetPicks.count > 0}
+      <span class="mode">{sheetPicks.count} picked on the sheet: Delete takes them out. Esc unpicks.</span>
     {/if}
     <span class="spacer"></span>
     {#if editing}
@@ -413,6 +419,13 @@
   {#if id === "fixtures"}
     <button class="small" onclick={selectAll}>All</button>
     <button class="small" onclick={selectNone}>None</button>
+  {:else if id === "sheet"}
+    {#if sheetPicks.count > 0}
+      <button class="small" onclick={() => sheetPicks.clear()}>Unpick</button>
+      <button class="small danger" title="Take the picked values out of the programmer (Delete)" onclick={() => surface.press("delete")}>
+        Delete {sheetPicks.count}
+      </button>
+    {/if}
   {:else if id === "groups" && show.programmer.groups.length > 0}
     <button class="small" class:warn={editingGroups} onclick={() => (editingGroups = !editingGroups)}>
       {editingGroups ? "Done" : "Edit"}

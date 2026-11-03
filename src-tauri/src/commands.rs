@@ -7,7 +7,7 @@ use humlx_core::artnet::Node;
 use humlx_core::engine::{self, OutputSettings, OutputStatus};
 use humlx_core::fixture::{slug, Attribute, Family, Profile};
 use humlx_core::patch::{mode_of, FixtureChanges, FixtureUpdate, NewFixtures};
-use humlx_core::programmer::{next_id, Group, Preset, Rgb, SelectMode, Values};
+use humlx_core::programmer::{next_id, Field, Group, Preset, Rgb, SelectMode, Values};
 use humlx_core::{ofl, qlc, Error, Result};
 use serde::Serialize;
 use tauri::State;
@@ -390,6 +390,18 @@ pub fn clear_programmer(app: State<'_, App>, family: Option<Family>, fixtures: O
     change_programmer(&app, |state| match &fixtures {
         Some(fixtures) => state.programmer.clear_fixtures(family, fixtures),
         None => state.programmer.clear(family),
+    })
+}
+
+/// Takes whole fixtures (`rows`) and single values (`cells`) out of the
+/// programmer, as picked on the programmer sheet.
+#[tauri::command]
+pub fn remove_from_programmer(app: State<'_, App>, rows: Vec<u32>, cells: Vec<(u32, Field)>) -> ProgrammerView {
+    change_programmer(&app, |state| {
+        state.programmer.remove_values(&cells);
+        if !rows.is_empty() {
+            state.programmer.clear_fixtures(None, &rows);
+        }
     })
 }
 
