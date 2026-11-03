@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use crate::engine::OutputSettings;
 use crate::error::{Error, Result};
 use crate::fixture::Profile;
+use crate::layout::Layout;
 use crate::osc::OscSettings;
 use crate::patch::Patch;
 use crate::playback::{CueList, Effect};
@@ -28,6 +29,10 @@ pub struct Show {
     pub presets: Vec<Preset>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub cue_lists: Vec<CueList>,
+    /// Where cue lists sit on the Playback screen. Missing from shows saved
+    /// before the button grid and fader slots; loading makes one up.
+    #[serde(default)]
+    pub layout: Option<Layout>,
     /// Effects from before effects lived in cues. Loading turns each into a
     /// cue list of its own, so it can still be run from a fader.
     #[serde(default, skip_serializing)]
@@ -55,6 +60,7 @@ impl Default for Show {
             groups: Vec::new(),
             presets: Vec::new(),
             cue_lists: Vec::new(),
+            layout: Some(Layout::default()),
             effects: Vec::new(),
             osc: OscSettings::default(),
             highlight_colour: Rgb::WHITE,
@@ -90,6 +96,9 @@ impl Show {
                 }],
             });
         }
+        let mut layout = show.layout.take().unwrap_or_else(|| Layout::migrate(&show.cue_lists));
+        layout.tidy(|id| show.cue_lists.iter().any(|l| l.id == id));
+        show.layout = Some(layout);
         Ok(show)
     }
 
@@ -185,6 +194,17 @@ mod tests {
         let effect = &list.cues[0].effects[0];
         assert_eq!(effect.shape, crate::effect::Shape::Pulse);
         assert_eq!(effect.fixtures, vec![3, 4]);
+    }
+
+    #[test]
+    fn old_shows_get_a_layout() {
+        let json = r#"{"version": 1, "cueLists": [
+            {"id": 1, "name": "Main", "cues": [{"name": "A"}, {"name": "B"}]},
+            {"id": 2, "name": "Blue look", "cues": [{"name": "Blue"}]}]}"#;
+        let layout = Show::from_json(json).unwrap().layout.unwrap();
+        assert_eq!(&layout.slots[..3], &[Some(1), Some(2), None]);
+        assert_eq!(&layout.pages[0].buttons[..2], &[Some(2), None]);
+        assert_eq!(layout.selected, Some(1));
     }
 
     #[test]

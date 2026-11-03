@@ -4,6 +4,7 @@ use std::time::Instant;
 
 use humlx_core::effect::{lay_over, Direction, Effect, EffectSize, Layering, Pattern, Shape, Speed};
 use humlx_core::engine::State as EngineState;
+use humlx_core::layout::Layout;
 use humlx_core::playback::{Cue, CueList, CueMode};
 use humlx_core::programmer::next_id;
 use humlx_core::programmer::{Rgb, Values};
@@ -48,6 +49,8 @@ pub struct PlaybackView {
     speed_bpm: [f32; 2],
     /// Fader level of each cue list, by id.
     masters: Vec<(u32, f32)>,
+    /// The button grid, the fader slots and the selected list.
+    layout: Layout,
 }
 
 fn view(app: &App) -> PlaybackView {
@@ -57,6 +60,7 @@ fn view(app: &App) -> PlaybackView {
         effect_size: state.effect_size.0,
         speed_bpm: state.speed_masters.bpms(),
         masters: masters(&state),
+        layout: state.layout.clone(),
     }
 }
 
@@ -100,7 +104,49 @@ pub fn playback(app: State<'_, App>) -> PlaybackView {
 #[tauri::command]
 pub fn new_cue_list(app: State<'_, App>, name: String) -> Result<PlaybackView> {
     change(&app, true, |state| {
-        add_cue_list(state, &name);
+        state.layout.selected = Some(add_cue_list(state, &name));
+        Ok(())
+    })
+}
+
+/// Copies a cue list, with all its cues, to a new number, and selects the copy.
+#[tauri::command]
+pub fn duplicate_cue_list(app: State<'_, App>, id: u32) -> Result<PlaybackView> {
+    change(&app, true, |state| {
+        let mut copy = list_mut(state, id)?.clone();
+        copy.id = next_id(state.cue_lists.iter().map(|l| l.id));
+        copy.name = format!("{} copy", copy.name);
+        state.layout.selected = Some(copy.id);
+        state.cue_lists.push(copy);
+        Ok(())
+    })
+}
+
+/// Makes `list` the selected cue list, which GO, Back and Record act on.
+#[tauri::command]
+pub fn select_cue_list(app: State<'_, App>, list: Option<u32>) -> Result<PlaybackView> {
+    change(&app, true, |state| {
+        if let Some(id) = list {
+            list_mut(state, id)?;
+        }
+        state.layout.selected = list;
+        Ok(())
+    })
+}
+
+/// Loads `list` into fader slot `slot` (from 0), or empties the slot.
+#[tauri::command]
+pub fn set_slot(app: State<'_, App>, slot: usize, list: Option<u32>) -> Result<PlaybackView> {
+    change(&app, true, |state| {
+        if let Some(id) = list {
+            list_mut(state, id)?;
+        }
+        let place = state
+            .layout
+            .slots
+            .get_mut(slot)
+            .ok_or(Error::Unsupported("no such fader slot".into()))?;
+        *place = list;
         Ok(())
     })
 }
@@ -128,6 +174,7 @@ pub fn rename_cue_list(app: State<'_, App>, id: u32, name: String) -> Result<Pla
 pub fn delete_cue_list(app: State<'_, App>, id: u32) -> Result<PlaybackView> {
     change(&app, true, |state| {
         state.cue_lists.retain(|l| l.id != id);
+        state.layout.forget(id);
         state.playbacks.release(id);
         Ok(())
     })
@@ -160,8 +207,17 @@ pub fn record_cue(
         let effects = state.programmer.effects.clone();
         let list = match target {
             RecordTarget::List(id) => id,
-            RecordTarget::New(list_name) => add_cue_list(state, &list_name),
+            // A new list goes into the first free fader slot, so it can be
+            // seen and run on the Playback screen straight away.
+            RecordTarget::New(list_name) => {
+                let id = add_cue_list(state, &list_name);
+                if let Some(slot) = state.layout.free_slot() {
+                    state.layout.slots[slot] = Some(id);
+                }
+                id
+            }
         };
+        state.layout.selected = Some(list);
         let cue_list = list_mut(state, list)?;
         let index = after.map_or(cue_list.cues.len(), |i| (i + 1).min(cue_list.cues.len()));
         let name = match name.trim() {

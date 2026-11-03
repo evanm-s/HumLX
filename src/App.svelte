@@ -7,7 +7,9 @@
   import { attempt, show } from "./lib/show.svelte";
   import { lineText, surface } from "./lib/surface.svelte";
   import { updates } from "./lib/updates.svelte";
+  import { SCREEN_EVENT } from "./lib/cuelists.svelte";
   import ChannelTest from "./screens/ChannelTest.svelte";
+  import CueLists from "./screens/CueLists.svelte";
   import Patch from "./screens/Patch.svelte";
   import Playback from "./screens/Playback.svelte";
   import Programmer from "./screens/Programmer.svelte";
@@ -16,6 +18,7 @@
   const screens = [
     { id: "programmer", label: "Programmer", icon: "◉" },
     { id: "playback", label: "Playback", icon: "▶" },
+    { id: "cuelists", label: "Cue Lists", icon: "▤" },
     { id: "patch", label: "Patch", icon: "▦" },
     { id: "test", label: "Channel test", icon: "☰" },
     { id: "output", label: "Settings", icon: "⚙" },
@@ -40,7 +43,14 @@
     updates.start();
     const stopSurface = surface.start();
     const stopLive = show.startLive();
+    // Screens can ask for another screen, such as Playback's "Edit in Cue Lists".
+    const go = (e: Event) => {
+      const id = (e as CustomEvent<string>).detail;
+      if (screens.some((s) => s.id === id)) screen = id as ScreenId;
+    };
+    window.addEventListener(SCREEN_EVENT, go);
     return () => {
+      window.removeEventListener(SCREEN_EVENT, go);
       stopLive();
       stopSurface.then((stop) => stop());
     };
@@ -123,7 +133,7 @@
     <div class="screen">
       {#if show.loaded}
         {#key show.revision}
-          {#if screen === "programmer"}<Programmer />{:else if screen === "playback"}<Playback />{:else if screen === "patch"}<Patch />{:else if screen === "test"}<ChannelTest
+          {#if screen === "programmer"}<Programmer />{:else if screen === "playback"}<Playback />{:else if screen === "cuelists"}<CueLists />{:else if screen === "patch"}<Patch />{:else if screen === "test"}<ChannelTest
             />{:else}<Settings />{/if}
         {/key}
       {/if}

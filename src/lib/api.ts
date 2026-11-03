@@ -100,6 +100,9 @@ export const api = {
   newCueList: (name: string) => invoke<PlaybackView>("new_cue_list", { name }),
   renameCueList: (id: number, name: string) => invoke<PlaybackView>("rename_cue_list", { id, name }),
   deleteCueList: (id: number) => invoke<PlaybackView>("delete_cue_list", { id }),
+  duplicateCueList: (id: number) => invoke<PlaybackView>("duplicate_cue_list", { id }),
+  selectCueList: (list: number | null) => invoke<PlaybackView>("select_cue_list", { list }),
+  setSlot: (slot: number, list: number | null) => invoke<PlaybackView>("set_slot", { slot, list }),
   /** Records into an existing cue list, or a new one when `target` has a name. */
   recordCue: (target: RecordTarget, name: string, fade: number, after: number | null) =>
     invoke<PlaybackView>("record_cue", { target, name, fade, after }),

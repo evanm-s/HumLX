@@ -18,7 +18,19 @@
 
   let { list = null, after = null, onclose, onrecorded }: Props = $props();
 
-  const lists = $derived(show.playback.cueLists);
+  // With many lists, offer the suggested one, the target and those in fader
+  // slots, plus any that match a search.
+  let query = $state("");
+  const many = show.playback.cueLists.length > 8;
+  const lists = $derived.by(() => {
+    const all = show.playback.cueLists;
+    if (!many) return all;
+    const q = query.trim().toLowerCase();
+    const slots = new Set(show.playback.layout.slots);
+    return all.filter((l) =>
+      q ? l.name.toLowerCase().includes(q) || String(l.id) === q : l.id === list || l.id === target || slots.has(l.id),
+    );
+  });
   const programmed = $derived(Object.keys(show.programmer.values).length);
   const effects = $derived(show.programmer.effects.length);
 
@@ -32,7 +44,7 @@
   let name = $state("");
   let fade = $state<number | null>(2);
 
-  const into = $derived(lists.find((l) => l.id === target));
+  const into = $derived(show.playback.cueLists.find((l) => l.id === target));
   // Where the cue lands: after the picked cue in the suggested list, else at the end.
   const insertAfter = $derived(into && target === list ? after : null);
   const at = $derived(into ? Math.min(insertAfter == null ? into.cues.length : insertAfter + 1, into.cues.length) : 0);
@@ -51,6 +63,7 @@
 <Dialog title="Record cue" {onclose}>
   <div class="field">
     Cue list
+    {#if many}<input type="search" bind:value={query} placeholder="Search all cue lists" />{/if}
     <div class="segmented wrap">
       {#each lists as l (l.id)}
         <button aria-pressed={target === l.id} onclick={() => (target = l.id)}>
