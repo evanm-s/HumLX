@@ -26,7 +26,7 @@ import type {
   OscSettings,
   Layout,
 } from "./types";
-import { emptyLayout } from "./types";
+import { DEFAULT_OPTIONS, emptyLayout } from "./types";
 
 const files = import.meta.glob<Omit<Profile, "id">>("../../crates/humlx-core/fixtures/*.json", {
   eager: true,
@@ -44,7 +44,7 @@ const profiles: Profile[] = Object.values(files).map((p) => ({
   id: `${slug(p.manufacturer)}/${slug(p.model)}`,
 }));
 
-let fixtures: Fixture[] = [1,2,3,4,5,6].map((id) => ({ id, name: `F${id}`, profile: profiles[0].id, mode: profiles[0].modes[0].name, address: id, footprint: 1, typeName: "x" }));
+let fixtures: Fixture[] = [1,2,3,4,5,6].map((id) => ({ id, name: `F${id}`, profile: profiles[0].id, mode: profiles[0].modes[0].name, address: id, footprint: 1, typeName: "x", options: { ...DEFAULT_OPTIONS } }));
 let output: OutputSettings = { enabled: true, target: "255.255.255.255", universe: 0, rateHz: 40 };
 let blackout = false;
 let grandMaster = 1;
@@ -270,6 +270,7 @@ const commands: Record<string, (args: Args) => unknown> = {
         address: address + i * footprint,
         footprint,
         typeName: `${profile.manufacturer} ${profile.model}`,
+        options: { ...DEFAULT_OPTIONS },
       });
     }
     return view();

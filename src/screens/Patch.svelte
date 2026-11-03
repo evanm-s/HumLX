@@ -1,12 +1,13 @@
 <script lang="ts">
   import AddressMap from "../components/AddressMap.svelte";
   import Dialog from "../components/Dialog.svelte";
+  import FixtureOptionsForm from "../components/FixtureOptionsForm.svelte";
   import NumberField from "../components/NumberField.svelte";
   import { api } from "../lib/api";
   import { fixtureColour, range } from "../lib/format";
   import { formKeys } from "../lib/keys";
   import { attempt, notify, show } from "../lib/show.svelte";
-  import type { Fixture, FixtureChanges } from "../lib/types";
+  import { DEFAULT_OPTIONS, type Fixture, type FixtureChanges, type FixtureOptions } from "../lib/types";
 
   // Selected fixture numbers. One opens the edit form; more open bulk edit.
   let selectedIds = $state<number[]>([]);
@@ -56,6 +57,28 @@
     const ids = show.patch.fixtures.map((f) => f.id);
     if (selectedIds.some((id) => !ids.includes(id))) selectedIds = selectedIds.filter((id) => ids.includes(id));
   });
+
+  // Whether a fixture has pan or tilt, so the orientation controls apply.
+  function moves(fixture: Fixture): boolean {
+    const mode = show.profile(fixture.profile)?.modes.find((m) => m.name === fixture.mode);
+    return !!mode?.channels.some((c) => c.attribute === "pan" || c.attribute === "tilt");
+  }
+
+  const sameOptions = (a: FixtureOptions, b: FixtureOptions) =>
+    (Object.keys(DEFAULT_OPTIONS) as (keyof FixtureOptions)[]).every((k) => a[k] === b[k]);
+
+  // Short labels for the list, e.g. "85%" or "pan +90°".
+  function optionTags(o: FixtureOptions | undefined): string[] {
+    if (!o) return [];
+    const tags: string[] = [];
+    if (o.intensityLimit < 100) tags.push(`max ${o.intensityLimit}%`);
+    if (o.swapPanTilt) tags.push("swap");
+    if (o.invertPan) tags.push("inv pan");
+    if (o.invertTilt) tags.push("inv tilt");
+    if (o.panOffset) tags.push(`pan ${o.panOffset > 0 ? "+" : ""}${o.panOffset}°`);
+    if (o.tiltOffset) tags.push(`tilt ${o.tiltOffset > 0 ? "+" : ""}${o.tiltOffset}°`);
+    return tags;
+  }
 
   // Add form
   let profileId = $state<string | null>(null);
@@ -113,12 +136,24 @@
   }
 
   // Edit form, reset whenever a different fixture is selected.
-  let edit = $state({ id: 0 as number | null, name: "", mode: "", address: 1 as number | null });
+  let edit = $state({
+    id: 0 as number | null,
+    name: "",
+    mode: "",
+    address: 1 as number | null,
+    options: { ...DEFAULT_OPTIONS } as FixtureOptions,
+  });
   let confirmRemove = $state(false);
 
   $effect(() => {
     if (selected) {
-      edit = { id: selected.id, name: selected.name, mode: selected.mode, address: selected.address };
+      edit = {
+        id: selected.id,
+        name: selected.name,
+        mode: selected.mode,
+        address: selected.address,
+        options: { ...(selected.options ?? DEFAULT_OPTIONS) },
+      };
       confirmRemove = false;
     }
   });
@@ -129,7 +164,8 @@
       (edit.id !== selected.id ||
         edit.name.trim() !== selected.name ||
         edit.mode !== selected.mode ||
-        edit.address !== selected.address),
+        edit.address !== selected.address ||
+        !sameOptions(edit.options, selected.options ?? DEFAULT_OPTIONS)),
   );
 
   async function save() {
@@ -140,6 +176,7 @@
         name: edit.name,
         mode: edit.mode,
         address: edit.address ?? undefined,
+        options: edit.options,
       }),
     );
     if (patch) {
@@ -164,11 +201,19 @@
   // Bulk edit. Blank fields leave that property as it is.
   let bulk = $state({ firstId: null as number | null, address: null as number | null, name: "", mode: null as string | null });
   let confirmBulkRemove = $state(false);
+  // Options in bulk edit start from the fixtures' own when they all match,
+  // and set every selected fixture the same once touched.
+  let bulkOptions = $state<FixtureOptions>({ ...DEFAULT_OPTIONS });
+  let bulkOptionsTouched = $state(false);
   const selectionKey = $derived(selectedIds.join(","));
 
   $effect(() => {
     void selectionKey;
     bulk = { firstId: null, address: null, name: "", mode: null };
+    const first = selection[0]?.options ?? DEFAULT_OPTIONS;
+    const shared = selection.every((f) => sameOptions(f.options ?? DEFAULT_OPTIONS, first));
+    bulkOptions = { ...(shared ? first : DEFAULT_OPTIONS) };
+    bulkOptionsTouched = false;
     confirmBulkRemove = false;
   });
 
@@ -184,7 +229,10 @@
     ),
   );
   const bulkSpan = $derived(bulkFootprints.reduce((a, b) => a + b, 0));
-  const bulkDirty = $derived(bulk.firstId != null || bulk.address != null || bulk.name.trim() !== "" || bulk.mode != null);
+  const bulkDirty = $derived(
+    bulk.firstId != null || bulk.address != null || bulk.name.trim() !== "" || bulk.mode != null || bulkOptionsTouched,
+  );
+  const bulkMoves = $derived(selection.some(moves));
   const bulkLocated = $derived(selection.length > 0 && selection.every((f) => show.live.tested.includes(f.id)));
 
   async function saveBulk() {
@@ -196,6 +244,7 @@
       if (bulk.firstId != null) changes.id = bulk.firstId + i;
       if (baseName) changes.name = `${baseName} ${i + 1}`;
       if (bulk.mode) changes.mode = bulk.mode;
+      if (bulkOptionsTouched) changes.options = { ...bulkOptions };
       if (address != null) {
         changes.address = address;
         address += bulkFootprints[i];
@@ -291,7 +340,9 @@
           onclick={(e) => tap(fixture.id, e)}
         >
           <span class="num" style:--colour={fixtureColour(fixture.id)}>{fixture.id}</span>
-          <span class="name">{fixture.name}</span>
+          <span class="name"
+            >{fixture.name}{#each optionTags(fixture.options) as tag (tag)}<span class="tag">{tag}</span>{/each}</span
+          >
           <span class="type muted">{fixture.typeName} · {fixture.mode}</span>
           <span class="addr">{range(fixture.address, fixture.footprint)}</span>
         </button>
@@ -340,12 +391,14 @@
           </div>
         </div>
       {/if}
+      <FixtureOptionsForm bind:options={bulkOptions} moves={bulkMoves} onchange={() => (bulkOptionsTouched = true)} />
       {#if bulkDirty}
         <p class="muted summary">
           {#if bulk.firstId != null}Numbers {bulk.firstId}–{bulk.firstId + selection.length - 1}.{/if}
           {#if bulk.address != null}Back to back at {range(bulk.address, bulkSpan)}.{/if}
           {#if bulk.name.trim()}Named {bulk.name.trim()} 1 to {selection.length}.{/if}
           {#if bulk.mode}All set to {bulk.mode}.{/if}
+          {#if bulkOptionsTouched}Limits and orientation set the same on all {selection.length}.{/if}
         </p>
       {/if}
       <div class="row actions">
@@ -386,6 +439,7 @@
           </div>
         </div>
       {/if}
+      <FixtureOptionsForm bind:options={edit.options} moves={moves(selected)} />
       <div class="row actions">
         <button class="danger" onclick={remove}>{confirmRemove ? "Tap again to remove" : "Remove"}</button>
         <span class="spacer"></span>
@@ -560,6 +614,20 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .tag {
+    margin-left: 6px;
+    padding: 1px 5px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    font-size: 0.75rem;
+    color: var(--muted);
+  }
+
+  .fixture.selected .tag {
+    color: #4a5260;
+    border-color: #4a5260;
   }
 
   .addr {

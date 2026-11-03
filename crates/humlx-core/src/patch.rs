@@ -17,6 +17,101 @@ pub struct PatchedFixture {
     pub mode: String,
     /// First DMX channel, 1..=512.
     pub address: Address,
+    /// Output limits and orientation, applied as the universe is worked out.
+    #[serde(default, skip_serializing_if = "FixtureOptions::is_default")]
+    pub options: FixtureOptions,
+}
+
+/// Per-fixture output adjustments: an intensity limit and, for movers, how
+/// the fixture is hung. They apply at output, so cues and presets stay the
+/// same when a fixture is swapped or re-hung.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct FixtureOptions {
+    /// Highest intensity sent, in percent. Full scales down to this, so the
+    /// whole fader range still works.
+    pub intensity_limit: u8,
+    /// Programmer pan drives the tilt channel and tilt drives pan.
+    pub swap_pan_tilt: bool,
+    pub invert_pan: bool,
+    pub invert_tilt: bool,
+    /// Degrees added to every pan and tilt position, such as 90 for a mover
+    /// hung a quarter turn round from the others.
+    pub pan_offset: i16,
+    pub tilt_offset: i16,
+    /// The fixture's full pan and tilt travel in degrees, which turns the
+    /// offsets into DMX.
+    pub pan_range: u16,
+    pub tilt_range: u16,
+}
+
+impl Default for FixtureOptions {
+    fn default() -> Self {
+        Self {
+            intensity_limit: 100,
+            swap_pan_tilt: false,
+            invert_pan: false,
+            invert_tilt: false,
+            pan_offset: 0,
+            tilt_offset: 0,
+            pan_range: 540,
+            tilt_range: 270,
+        }
+    }
+}
+
+impl FixtureOptions {
+    pub fn is_default(&self) -> bool {
+        *self == Self::default()
+    }
+
+    /// True when pan and tilt are changed on the way out.
+    pub fn reorients(&self) -> bool {
+        self.swap_pan_tilt || self.invert_pan || self.invert_tilt || self.pan_offset != 0 || self.tilt_offset != 0
+    }
+
+    /// Scales a DMX intensity level down to the limit.
+    pub fn limit_intensity(&self, value: u8) -> u8 {
+        if self.intensity_limit >= 100 {
+            return value;
+        }
+        (f32::from(value) * f32::from(self.intensity_limit) / 100.0).round() as u8
+    }
+
+    /// Turns programmer pan and tilt (0 to 1) into what the fixture's own pan
+    /// and tilt channels should get: swapped, then inverted, then offset.
+    pub fn orient(&self, pan: f32, tilt: f32) -> (f32, f32) {
+        let (mut pan, mut tilt) = if self.swap_pan_tilt { (tilt, pan) } else { (pan, tilt) };
+        if self.invert_pan {
+            pan = 1.0 - pan;
+        }
+        if self.invert_tilt {
+            tilt = 1.0 - tilt;
+        }
+        let shift = |degrees: i16, range: u16| f32::from(degrees) / f32::from(range.max(1));
+        pan += shift(self.pan_offset, self.pan_range);
+        tilt += shift(self.tilt_offset, self.tilt_range);
+        (pan.clamp(0.0, 1.0), tilt.clamp(0.0, 1.0))
+    }
+
+    fn check(&self) -> Result<()> {
+        if self.intensity_limit > 100 {
+            return Err(Error::InvalidOptions(
+                "the intensity limit must be between 0 and 100%".into(),
+            ));
+        }
+        if self.pan_range == 0 || self.tilt_range == 0 {
+            return Err(Error::InvalidOptions(
+                "pan and tilt range must be more than 0 degrees".into(),
+            ));
+        }
+        if self.pan_offset.unsigned_abs() > self.pan_range || self.tilt_offset.unsigned_abs() > self.tilt_range {
+            return Err(Error::InvalidOptions(
+                "an offset cannot be more than the fixture's range".into(),
+            ));
+        }
+        Ok(())
+    }
 }
 
 /// A request to patch one or more fixtures of the same type.
@@ -45,6 +140,7 @@ pub struct FixtureChanges {
     pub name: Option<String>,
     pub mode: Option<String>,
     pub address: Option<Address>,
+    pub options: Option<FixtureOptions>,
 }
 
 /// Changes to the fixture currently numbered `id`, as part of a bulk edit.
@@ -62,6 +158,11 @@ pub struct Patch {
 impl Patch {
     pub fn fixtures(&self) -> &[PatchedFixture] {
         &self.fixtures
+    }
+
+    #[cfg(test)]
+    pub(crate) fn fixtures_mut(&mut self) -> &mut [PatchedFixture] {
+        &mut self.fixtures
     }
 
     pub fn get(&self, id: u32) -> Option<&PatchedFixture> {
@@ -111,6 +212,7 @@ impl Patch {
                 profile: request.profile.clone(),
                 mode: request.mode.clone(),
                 address: first_address.saturating_add(offset),
+                options: FixtureOptions::default(),
             };
             candidate.check(library, &fixture, None)?;
             candidate.fixtures.push(fixture);
@@ -135,6 +237,9 @@ impl Patch {
         }
         if let Some(address) = changes.address {
             updated.address = address;
+        }
+        if let Some(options) = changes.options {
+            updated.options = options;
         }
         self.check(library, &updated, Some(id))?;
         if let Some(slot) = self.fixtures.iter_mut().find(|f| f.id == id) {
@@ -169,6 +274,9 @@ impl Patch {
             }
             if let Some(address) = changes.address {
                 fixture.address = address;
+            }
+            if let Some(options) = changes.options {
+                fixture.options = options;
             }
             changed.push(index);
         }
@@ -223,6 +331,7 @@ impl Patch {
         if fixture.id == 0 {
             return Err(Error::InvalidFixtureId);
         }
+        fixture.options.check()?;
         let mode = library.mode(&fixture.profile, &fixture.mode)?;
         let others = || self.fixtures.iter().filter(|f| Some(f.id) != replacing);
         if others().any(|f| f.id == fixture.id) {
@@ -277,6 +386,38 @@ mod tests {
             address,
             name: None,
         }
+    }
+
+    #[test]
+    fn options_save_only_when_set_and_are_checked() {
+        let library = Library::with_bundled();
+        let mut patch = Patch::default();
+        patch.add(&library, &request(1, Some(1))).unwrap();
+        let json = serde_json::to_string(&patch).unwrap();
+        assert!(!json.contains("options"));
+        // Shows saved before options existed still load.
+        assert_eq!(serde_json::from_str::<Patch>(&json).unwrap(), patch);
+
+        let options = FixtureOptions {
+            intensity_limit: 85,
+            ..Default::default()
+        };
+        let changes = FixtureChanges {
+            options: Some(options),
+            ..Default::default()
+        };
+        patch.update(&library, 1, &changes).unwrap();
+        assert_eq!(patch.get(1).unwrap().options.intensity_limit, 85);
+
+        let bad = FixtureChanges {
+            options: Some(FixtureOptions {
+                pan_offset: 600,
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        assert!(patch.update(&library, 1, &bad).is_err());
+        assert_eq!(patch.get(1).unwrap().options, options);
     }
 
     #[test]

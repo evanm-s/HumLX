@@ -329,7 +329,21 @@ impl State {
                 continue;
             };
             let tests = self.test_levels.get(&fixture.id);
-            let programmed = look.get(&fixture.id).map(|v| v.render(mode));
+            let options = &fixture.options;
+            let programmed = if options.reorients() && has_position(mode) {
+                // Re-hung or rotated movers: turn pan and tilt round on the
+                // way out, including their resting position.
+                let mut values = look.get(&fixture.id).cloned().unwrap_or_default();
+                let (pan, tilt) = options.orient(
+                    values.pan.unwrap_or_else(|| resting(mode, Attribute::Pan)),
+                    values.tilt.unwrap_or_else(|| resting(mode, Attribute::Tilt)),
+                );
+                values.pan = Some(pan);
+                values.tilt = Some(tilt);
+                Some(values.render(mode))
+            } else {
+                look.get(&fixture.id).map(|v| v.render(mode))
+            };
             // Without a dimmer channel, blackout has to pull the colour mix down instead.
             let has_dimmer = mode.channels.iter().any(|c| c.attribute == Attribute::Intensity);
             let highlighted = self.highlight && self.programmer.selection.contains(&fixture.id);
@@ -355,6 +369,7 @@ impl State {
                     } else if self.grand_master.0 < 1.0 {
                         value = (f32::from(value) * self.grand_master.0).round() as u8;
                     }
+                    value = options.limit_intensity(value);
                 }
                 universe.set(fixture.address + i as u16, value);
             }
@@ -362,6 +377,20 @@ impl State {
         self.universe = universe;
         &self.universe
     }
+}
+
+fn has_position(mode: &Mode) -> bool {
+    mode.channels
+        .iter()
+        .any(|c| matches!(c.attribute, Attribute::Pan | Attribute::Tilt))
+}
+
+/// Where a pan or tilt channel rests, from 0 to 1.
+fn resting(mode: &Mode, attribute: Attribute) -> f32 {
+    mode.channels
+        .iter()
+        .find(|c| c.attribute == attribute && c.fine_of.is_none())
+        .map_or(0.5, |c| f32::from(c.default) / 255.0)
 }
 
 /// The zoom level, from 0 to 1, that gives `mode` its narrowest beam. Most
@@ -532,7 +561,7 @@ fn discovery_socket() -> Result<UdpSocket> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::patch::NewFixtures;
+    use crate::patch::{FixtureOptions, NewFixtures};
 
     fn state_with(profile: &str, mode: &str, address: u16) -> State {
         let library = Library::with_bundled();
@@ -825,6 +854,53 @@ mod tests {
         assert_eq!(state.grand_master.0, 1.0);
         state.grand_master.set(3.0);
         assert_eq!(state.grand_master.0, 1.0);
+    }
+
+    #[test]
+    fn intensity_limit_scales_output() {
+        let mut state = state_with("generic/rgbw-par", "6ch DRGBW Strobe", 1);
+        state.patch.fixtures_mut()[0].options.intensity_limit = 85;
+        state.programmer.select(&[1], crate::programmer::SelectMode::Set);
+        state.programmer.update(|v| v.intensity = Some(1.0));
+        state.compose();
+        assert_eq!(state.universe().get(1), 217); // 85% of full
+        state.programmer.update(|v| v.intensity = Some(0.5));
+        state.compose();
+        assert_eq!(state.universe().get(1), 109);
+        // Locating is limited too.
+        state.locate(1).unwrap();
+        state.compose();
+        assert_eq!(state.universe().get(1), 217);
+    }
+
+    #[test]
+    fn orientation_swaps_inverts_and_offsets() {
+        // Pan, pan fine, tilt, tilt fine at 101..=104.
+        let mut state = state_with("generic/moving-head-spot", "12ch", 101);
+        let options = &mut state.patch.fixtures_mut()[0].options;
+        options.pan_offset = 90;
+        state.compose();
+        // Resting pan 128 moves round 90 of 540 degrees.
+        assert_eq!(state.universe().get(101), 171);
+        assert_eq!(state.universe().get(103), 128);
+
+        let options = &mut state.patch.fixtures_mut()[0].options;
+        options.pan_offset = 0;
+        options.invert_tilt = true;
+        options.swap_pan_tilt = true;
+        state.programmer.select(&[1], crate::programmer::SelectMode::Set);
+        state.programmer.update(|v| {
+            v.pan = Some(0.25);
+            v.tilt = Some(0.0);
+        });
+        state.compose();
+        assert_eq!(state.universe().get(101), 0); // pan channel gets tilt
+        assert_eq!(state.universe().get(103), 191); // tilt channel gets 1 - pan
+
+        let mut plain = FixtureOptions::default();
+        assert!(!plain.reorients());
+        plain.pan_offset = 600;
+        assert_eq!(plain.orient(0.5, 0.5).0, 1.0);
     }
 
     #[test]
