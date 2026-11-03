@@ -5,8 +5,9 @@
 import { listen } from "@tauri-apps/api/event";
 import { api, inApp } from "./api";
 import { backspace, parse, typeDigit, type Token } from "./command";
+import { endSelectWindow } from "./selection";
 import { attempt, notify, show } from "./show.svelte";
-import type { Attribute, Led, SurfaceStatus } from "./types";
+import type { Attribute, Led, ProgrammerView, SurfaceStatus } from "./types";
 
 type SurfaceEvent = { kind: "key"; key: string; down: boolean } | { kind: "encoder"; index: number; delta: number };
 
@@ -48,6 +49,8 @@ class Surface {
   mode = $state<PresetMode | null>(null);
   /** In delete mode, the preset tapped and waiting for Enter. */
   pendingDelete = $state<number | null>(null);
+  /** The programmer as a first Clear left it, until anything else happens. */
+  private clearedOnce = $state.raw<ProgrammerView | null>(null);
 
   // Encoder turns not yet sent, and whether a send is under way, by encoder.
   private pending = [0, 0, 0, 0];
@@ -80,8 +83,12 @@ class Surface {
     if (show.live.highlight) leds.highlight = "blink";
     if (this.mode === "record") leds.record = "on";
     if (this.mode === "delete") leds.delete = "on";
-    // Clear has something to clear.
-    if (this.line.length > 0 || Object.keys(show.programmer.values).length > 0 || show.programmer.effects.length > 0) leds.clear = "on";
+    // Clear blinks when the next press clears the programmer, and is lit
+    // when there's anything for it to clear.
+    const { selection, values, effects } = show.programmer;
+    if (this.clearClears) leds.clear = "blink";
+    else if (this.line.length || this.mode || selection.length || Object.keys(values).length || effects.length)
+      leds.clear = "on";
     // The tap keys are always live.
     leds.fade = "on";
     leds.delay = "on";
@@ -94,6 +101,37 @@ class Surface {
     else if (event.down) this.press(event.key);
   }
 
+  /** Whether the next Clear clears the programmer: Clear was the last thing done. */
+  get clearClears(): boolean {
+    return this.clearedOnce != null && this.clearedOnce === show.programmer;
+  }
+
+  /** Any other action makes the next Clear a first press again. */
+  disarmClear() {
+    this.clearedOnce = null;
+  }
+
+  /**
+   * Clear, as on Onyx, so Clear Clear always clears the programmer. The first
+   * press empties the command line, cancels Record or Delete and deselects,
+   * leaving the values on stage. A second press straight after clears the
+   * programmer. Fixture numbers and Enter after the first press clear just
+   * those fixtures instead.
+   */
+  async clear() {
+    if (this.clearClears) {
+      this.clearedOnce = null;
+      this.line = [];
+      await show.program(() => api.clearProgrammer(null));
+      return;
+    }
+    this.line = [];
+    this.setMode(null);
+    endSelectWindow();
+    if (show.programmer.selection.length > 0 && !(await show.program(() => api.select([], "set")))) return;
+    this.clearedOnce = show.programmer;
+  }
+
   press(key: string) {
     // With a dialog open, Enter presses its main button and Clear cancels it.
     const dialog = document.querySelector<HTMLElement>("[role=dialog]");
@@ -102,6 +140,11 @@ class Surface {
       else window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
       return;
     }
+    if (key === "clear") return void this.clear();
+    const afterClear = this.clearClears;
+    this.clearedOnce = null;
+    // Numbers straight after Clear pick fixtures to clear: Clear 1 + 3 Enter.
+    if (afterClear && (/^[0-9]$/.test(key) || key === "point")) this.line = ["Clear"];
     if (/^[0-9]$/.test(key)) return void (this.line = typeDigit(this.line, key));
     if (key in WORD_KEYS) return void (this.line = [...this.line, WORD_KEYS[key]]);
     switch (key) {
@@ -118,11 +161,6 @@ class Surface {
       case "enter":
         if (this.mode && this.line.length === 0) return this.confirm();
         return this.enter();
-      case "clear":
-        if (this.line.length > 0) this.line = [];
-        else if (this.mode) this.setMode(null);
-        else show.program(() => api.clearProgrammer(null));
-        return;
       // Fade and Delay tap speed masters A and B.
       case "fade":
       case "delay":
@@ -180,6 +218,11 @@ class Surface {
       show.programmer.groups.map((g) => g.id),
     );
     if (typeof command === "string") return notify(command, "warning");
+
+    if (command.kind === "clear") {
+      show.program(() => api.clearProgrammer(null, command.fixtures));
+      return;
+    }
 
     if (command.kind === "cue") {
       const list = show.playback.cueLists.find((l) => l.id === (this.cueList ?? show.playback.cueLists[0]?.id));

@@ -386,8 +386,11 @@ pub fn set_attribute(app: State<'_, App>, attribute: Attribute, value: f32) -> P
 }
 
 #[tauri::command]
-pub fn clear_programmer(app: State<'_, App>, family: Option<Family>) -> ProgrammerView {
-    change_programmer(&app, |state| state.programmer.clear(family))
+pub fn clear_programmer(app: State<'_, App>, family: Option<Family>, fixtures: Option<Vec<u32>>) -> ProgrammerView {
+    change_programmer(&app, |state| match &fixtures {
+        Some(fixtures) => state.programmer.clear_fixtures(family, fixtures),
+        None => state.programmer.clear(family),
+    })
 }
 
 /// Saves the selection as a group, replacing group `id` when given.

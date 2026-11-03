@@ -345,17 +345,21 @@ const commands: Record<string, (args: Args) => unknown> = {
       if (tilt != null) v.tilt = tilt;
     }),
   set_attribute: ({ attribute, value }) => update((v) => ((v.other ??= {})[attribute as Attribute] = value)),
-  clear_programmer: ({ family }) => {
-    if (family == null) {
-      values = {};
-      effects = [];
-    } else {
-      effects = effects.filter((e) => SHAPES[e.shape].family !== family);
-      for (const v of Object.values(values)) {
-        for (const key of Object.keys(FAMILY)) if (FAMILY[key] === family) delete v[key as keyof Values];
-        if (family === "beam") delete v.other;
-        if (family === "colour") for (const a of [...COLOUR_ATTRIBUTES, "color_temperature" as const]) delete v.other?.[a];
+  clear_programmer: ({ family, fixtures: only }) => {
+    const hit = (id: number) => only == null || only.includes(id);
+    const ofFamily = (e: Effect) => family == null || SHAPES[e.shape].family === family;
+    effects = effects
+      .map((e) => (ofFamily(e) ? { ...e, fixtures: e.fixtures.filter((f) => !hit(f)) } : e))
+      .filter((e) => e.fixtures.length > 0);
+    for (const [id, v] of Object.entries(values)) {
+      if (!hit(Number(id))) continue;
+      if (family == null) {
+        delete values[Number(id)];
+        continue;
       }
+      for (const key of Object.keys(FAMILY)) if (FAMILY[key] === family) delete v[key as keyof Values];
+      if (family === "beam") delete v.other;
+      if (family === "colour") for (const a of [...COLOUR_ATTRIBUTES, "color_temperature" as const]) delete v.other?.[a];
     }
     return programmer();
   },

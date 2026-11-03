@@ -46,6 +46,16 @@
     };
   });
 
+  // Esc is the keyboard's Clear key, unless typing or a dialog is open
+  // (dialogs close on Esc themselves).
+  function keys(e: KeyboardEvent) {
+    if (e.key !== "Escape" || e.defaultPrevented || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (document.querySelector("[role=dialog]")) return;
+    if ((e.target as HTMLElement).closest?.("input, textarea, select")) return;
+    e.preventDefault();
+    surface.press("clear");
+  }
+
   const status = $derived(
     !show.output.enabled
       ? { kind: "off", text: "Output off" }
@@ -57,6 +67,8 @@
           },
   );
 </script>
+
+<svelte:window onkeydown={keys} />
 
 <div class="shell">
   <nav class="rail" aria-label="Screens">

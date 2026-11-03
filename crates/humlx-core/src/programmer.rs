@@ -357,6 +357,24 @@ impl Programmer {
         }
     }
 
+    /// Clears one family, or everything when `None`, from just `fixtures`,
+    /// taking them out of effects too. Other fixtures keep their values.
+    pub fn clear_fixtures(&mut self, family: Option<Family>, fixtures: &[u32]) {
+        for id in fixtures {
+            if let (Some(family), Some(values)) = (family, self.values.get_mut(id)) {
+                values.clear(family);
+            }
+        }
+        self.values
+            .retain(|id, v| !v.is_empty() && !(family.is_none() && fixtures.contains(id)));
+        for effect in &mut self.effects {
+            if family.is_none_or(|f| effect.family() == f) {
+                effect.fixtures.retain(|id| !fixtures.contains(id));
+            }
+        }
+        self.effects.retain(|e| !e.fixtures.is_empty());
+    }
+
     /// Drops fixtures that are no longer patched.
     pub fn retain(&mut self, patched: impl Fn(u32) -> bool) {
         self.selection.retain(|id| patched(*id));
@@ -720,5 +738,33 @@ mod tests {
         assert_eq!(next_id([].into_iter()), 1);
         assert_eq!(next_id([1, 2, 4].into_iter()), 3);
         assert_eq!(next_id([2, 3].into_iter()), 1);
+    }
+
+    #[test]
+    fn clearing_fixtures_leaves_the_others() {
+        use crate::effect::Shape;
+        let mut programmer = Programmer::default();
+        programmer.select(&[1, 2], SelectMode::Set);
+        programmer.update(|v| {
+            v.intensity = Some(1.0);
+            v.pan = Some(0.2);
+        });
+        let mut effect = crate::effect::Effect::new(1, "Pulse".into(), Shape::Pulse, &[], vec![1, 2]);
+        programmer.effects.push(effect.clone());
+        effect.shape = Shape::Circle;
+        programmer.effects.push(effect);
+
+        programmer.clear_fixtures(Some(Family::Intensity), &[1]);
+        assert_eq!(programmer.values[&1].intensity, None);
+        assert_eq!(programmer.values[&1].pan, Some(0.2));
+        assert_eq!(programmer.values[&2].intensity, Some(1.0));
+        assert_eq!(programmer.effects[0].fixtures, vec![2]);
+        assert_eq!(programmer.effects[1].fixtures, vec![1, 2]);
+
+        programmer.clear_fixtures(None, &[2]);
+        assert!(!programmer.values.contains_key(&2));
+        assert_eq!(programmer.effects.len(), 1);
+        assert_eq!(programmer.effects[0].fixtures, vec![1]);
+        assert_eq!(programmer.selection, vec![1, 2]);
     }
 }
