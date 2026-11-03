@@ -455,11 +455,21 @@ impl Playbacks {
     /// `effect_size`. Intensity takes the highest level (after each master);
     /// everything else comes from the most recently moved playback.
     pub fn output_with_effects(&self, now: Instant, effect_size: f32, beats: &Beats) -> Look {
+        self.combine(|p| p.look_with_effects(now, effect_size, beats))
+    }
+
+    /// The combined values of every running playback, leaving their effects
+    /// out entirely, as Load puts them in the programmer.
+    pub fn values(&self, now: Instant) -> Look {
+        self.combine(|p| p.look(now))
+    }
+
+    fn combine(&self, look: impl Fn(&Playback) -> Look) -> Look {
         let mut playbacks: Vec<&Playback> = self.active.values().collect();
         playbacks.sort_by_key(|p| p.order);
         let mut out = Look::new();
         for playback in playbacks {
-            for (fixture, mut values) in playback.look_with_effects(now, effect_size, beats) {
+            for (fixture, mut values) in look(playback) {
                 values.intensity = values.intensity.map(|i| i * playback.master);
                 let entry = out.entry(fixture).or_default();
                 let highest = match (entry.intensity, values.intensity) {

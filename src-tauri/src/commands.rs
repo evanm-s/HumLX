@@ -393,6 +393,16 @@ pub fn clear_programmer(app: State<'_, App>, family: Option<Family>, fixtures: O
     })
 }
 
+/// Load: copies what the running cue lists put out for `fixtures` (every
+/// fixture when `None`) into the programmer.
+#[tauri::command]
+pub fn load_live(app: State<'_, App>, fixtures: Option<Vec<u32>>) -> Result<ProgrammerView> {
+    app.engine
+        .state()
+        .load_live(fixtures.as_deref(), std::time::Instant::now())?;
+    Ok(programmer_view(&app))
+}
+
 /// Saves the selection as a group, replacing group `id` when given.
 #[tauri::command]
 pub fn save_group(app: State<'_, App>, name: String, id: Option<u32>) -> Result<ProgrammerView> {

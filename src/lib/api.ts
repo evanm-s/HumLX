@@ -80,6 +80,8 @@ export const api = {
   /** Clears `family` (or everything) from `fixtures`, or from every fixture when `fixtures` is null. */
   clearProgrammer: (family: Family | null, fixtures: number[] | null = null) =>
     invoke<ProgrammerView>("clear_programmer", { family, fixtures }),
+  /** Load: what running cue lists put out for `fixtures`, or every fixture when null, into the programmer. */
+  loadLive: (fixtures: number[] | null) => invoke<ProgrammerView>("load_live", { fixtures }),
   saveGroup: (name: string, id: number | null) => invoke<ProgrammerView>("save_group", { name, id }),
   deleteGroup: (id: number) => invoke<ProgrammerView>("delete_group", { id }),
   recordPreset: (family: Family, name: string, id: number | null) =>
