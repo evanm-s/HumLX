@@ -3,6 +3,7 @@
   import Dialog from "../components/Dialog.svelte";
   import FixtureOptionsForm from "../components/FixtureOptionsForm.svelte";
   import NumberField from "../components/NumberField.svelte";
+  import StageWindow from "../components/StageWindow.svelte";
   import { api } from "../lib/api";
   import { fixtureColour, range } from "../lib/format";
   import { formKeys } from "../lib/keys";
@@ -288,6 +289,16 @@
 
   // Import
   let importing = $state(false);
+
+  // Calibrate opens the stage window on this mover. Locate's test levels
+  // would hold it still, so they are let go first.
+  let calibrating = $state<number | null>(null);
+  const canPoint = (f: Fixture) => show.channels(f).some((c) => c.attribute === "pan");
+
+  async function calibrate(fixture: Fixture) {
+    if (show.live.tested.includes(fixture.id)) await attempt(() => api.release(fixture.id));
+    calibrating = fixture.id;
+  }
   let manufacturer = $state("");
   let fileInput = $state<HTMLInputElement>();
 
@@ -413,6 +424,9 @@
       <div class="row">
         <h2>Fixture {selected.id}</h2>
         <span class="spacer"></span>
+        {#if canPoint(selected)}
+          <button onclick={() => calibrate(selected)}>Calibrate</button>
+        {/if}
         <button
           aria-pressed={show.live.tested.includes(selected.id)}
           class:locating={show.live.tested.includes(selected.id)}
@@ -510,6 +524,10 @@
     />
   </section>
 </div>
+
+{#if calibrating != null}
+  <StageWindow fixture={calibrating} onclose={() => (calibrating = null)} />
+{/if}
 
 {#if importing}
   <Dialog title="Import fixture type" onclose={() => (importing = false)}>

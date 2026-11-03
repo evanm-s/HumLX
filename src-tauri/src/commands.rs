@@ -521,6 +521,15 @@ pub fn calibrate_mark(app: State<'_, App>, fixture: u32, mark: u32) -> Result<St
     Ok(app.engine.state().stage.clone())
 }
 
+/// Sets where a fixture hangs, measured by hand: across, up stage and height,
+/// each `None` when not measured.
+#[tauri::command]
+pub fn set_fixture_position(app: State<'_, App>, fixture: u32, position: [Option<f32>; 3]) -> Result<Stage> {
+    app.engine.state().stage.set_position(fixture, position)?;
+    app.save()?;
+    Ok(app.engine.state().stage.clone())
+}
+
 /// Forgets one of a mover's readings, or all of them when `mark` is `None`.
 #[tauri::command]
 pub fn forget_calibration(app: State<'_, App>, fixture: u32, mark: Option<u32>) -> Result<Stage> {
