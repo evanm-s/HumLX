@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import Fader from "./components/Fader.svelte";
   import Toasts from "./components/Toasts.svelte";
   import UpdateButton from "./components/UpdateButton.svelte";
   import { api, inApp } from "./lib/api";
@@ -19,6 +20,13 @@
     { id: "test", label: "Channel test", icon: "☰" },
     { id: "output", label: "Settings", icon: "⚙" },
   ] as const;
+
+  const grandMaster = $derived(Math.round(show.live.grandMaster * 100));
+
+  function setGrandMaster(percent: number) {
+    show.live.grandMaster = percent / 100;
+    attempt(() => api.setGrandMaster(percent / 100));
+  }
 
   type ScreenId = (typeof screens)[number]["id"];
   let screen = $state<ScreenId>("programmer");
@@ -76,6 +84,17 @@
     <button class="status {status.kind}" onclick={() => (screen = "output")} title={show.live.status.lastError ?? ""}>
       <span class="led"></span>{status.text}
     </button>
+    <div class="grand-master" title="Grand master: scales all intensity output">
+      <Fader
+        max={100}
+        value={grandMaster}
+        label="Grand master"
+        colour="var(--f-intensity)"
+        active={grandMaster < 100}
+        format={(v) => `${v}%`}
+        onchange={setGrandMaster}
+      />
+    </div>
     <button
       class="blackout"
       aria-pressed={show.live.blackout}
@@ -128,6 +147,8 @@
     padding: 14px 8px;
     background: var(--panel);
     border-right: 1px solid var(--line);
+    min-height: 0;
+    overflow-y: auto;
   }
 
   .brand {
@@ -199,6 +220,33 @@
 
   .status {
     font-family: var(--mono);
+  }
+
+  /* Takes the rail's spare height, up to a comfortable throw, so Blackout
+     stays on screen on a laptop. */
+  .grand-master {
+    flex: 1 1 0;
+    min-height: 170px;
+    max-height: 300px;
+    display: flex;
+    justify-content: center;
+  }
+
+  .grand-master :global(.fader) {
+    gap: 4px;
+  }
+
+  .grand-master :global(.track) {
+    min-height: 90px;
+  }
+
+  .grand-master :global(.detail) {
+    display: none;
+  }
+
+  /* Down from full is worth noticing: the rail's outline turns amber. */
+  .grand-master :global(.fader.active .track) {
+    box-shadow: inset 0 0 0 2px var(--f-intensity);
   }
 
   .blackout {

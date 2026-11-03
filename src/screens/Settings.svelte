@@ -228,6 +228,7 @@
         <tr><td><code>/humlx/cuelist/{example}/master</code> 0.5</td><td>Set the master, from 0 to 1</td></tr>
         <tr><td><code>/humlx/releaseall</code></td><td>Release everything</td></tr>
         <tr><td><code>/humlx/blackout</code> 1 or 0</td><td>Blackout on or off</td></tr>
+        <tr><td><code>/humlx/grandmaster</code> 0.5</td><td>Set the grand master, from 0 to 1</td></tr>
       </tbody>
     </table>
     <p class="muted hint">

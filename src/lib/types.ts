@@ -100,6 +100,8 @@ export interface Live {
   universe: number[];
   status: OutputStatus;
   blackout: boolean;
+  /** Grand master level from 0 to 1, scaling all intensity. */
+  grandMaster: number;
   /** Selected fixtures picked out, everything else out. */
   highlight: boolean;
   tested: number[];
