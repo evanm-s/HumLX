@@ -150,9 +150,21 @@ function nextId(ids: number[]) {
   return n;
 }
 
+/** GO, releasing the lists it replaces straight away (the app fades them). */
+function go(list: number) {
+  const l = cueLists.find((x) => x.id === list)!;
+  if (!l.cues.length) throw "cue 1 does not exist";
+  const current = running.get(list);
+  running.set(list, current == null || current + 1 >= l.cues.length ? 0 : current + 1);
+  for (const id of [...running.keys()]) {
+    const other = cueLists.find((x) => x.id === id);
+    if (id !== list && other && (l.solo || (l.releaseOnNextGo && other.releaseOnNextGo))) running.delete(id);
+  }
+}
+
 function addCueList(name: string) {
   const id = nextId(cueLists.map((l) => l.id));
-  cueLists.push({ id, name: name.trim() || `Cue list ${id}`, cues: [] });
+  cueLists.push({ id, name: name.trim() || `Cue list ${id}`, cues: [], releaseOnNextGo: true, solo: false });
   return id;
 }
 
@@ -298,7 +310,7 @@ const commands: Record<string, (args: Args) => unknown> = {
     grandMaster,
     highlight,
     tested: [...tests.keys()].sort((a, b) => a - b),
-    playbacks: [...running].map(([list, current]) => ({ list, current, fading: false, followIn: null })),
+    playbacks: [...running].map(([list, current]) => ({ list, current, fading: false, followIn: null, releasing: false })),
     masters: cueLists.map((l) => [l.id, masters.get(l.id) ?? 1]),
     speedBpm: [...speedBpm] as [number, number],
     beats: beats(),
@@ -469,11 +481,16 @@ const commands: Record<string, (args: Args) => unknown> = {
     return playback();
   },
   delete_cue: ({ list, index }) => (cueLists.find((x) => x.id === list)!.cues.splice(index, 1), playback()),
-  go: ({ list }) => {
+  go: ({ list }) => (go(list), playback()),
+  tap_cue_list: ({ list }) => {
     const l = cueLists.find((x) => x.id === list)!;
-    if (!l.cues.length) throw "cue 1 does not exist";
-    const current = running.get(list);
-    running.set(list, current == null || current + 1 >= l.cues.length ? 0 : current + 1);
+    layout.selected = list;
+    if (l.cues.length === 1 && running.has(list)) running.delete(list);
+    else go(list);
+    return playback();
+  },
+  set_cue_list_options: ({ id, releaseOnNextGo, solo }) => {
+    Object.assign(cueLists.find((l) => l.id === id)!, { releaseOnNextGo, solo });
     return playback();
   },
   back: ({ list }) => (running.has(list) && running.set(list, Math.max(0, running.get(list)! - 1)), playback()),

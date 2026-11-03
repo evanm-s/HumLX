@@ -75,11 +75,36 @@ fn default_fade() -> f32 {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CueList {
     pub id: u32,
     pub name: String,
     #[serde(default)]
     pub cues: Vec<Cue>,
+    /// GO on this list fades out other running lists that have this on too,
+    /// so looks replace each other rather than stacking, as Onyx's "Release
+    /// on next go". Off for lists meant to layer on top.
+    #[serde(default = "yes")]
+    pub release_on_next_go: bool,
+    /// GO on this list fades out every other running list.
+    #[serde(default)]
+    pub solo: bool,
+}
+
+fn yes() -> bool {
+    true
+}
+
+impl Default for CueList {
+    fn default() -> Self {
+        Self {
+            id: 0,
+            name: String::new(),
+            cues: Vec::new(),
+            release_on_next_go: true,
+            solo: false,
+        }
+    }
 }
 
 impl CueList {
@@ -182,6 +207,8 @@ pub struct Playback {
     entered: Instant,
     /// When the next cue follows, for a follow cue gone to with GO.
     follow_at: Option<Instant>,
+    /// Fading out after being released; gone once the fade is done.
+    pub releasing: bool,
 }
 
 impl Playback {
@@ -285,6 +312,7 @@ impl Playbacks {
             fade: Duration::from_secs_f32(cue.fade.max(0.0)),
             entered: now,
             follow_at: cue.follow_time().map(|t| now + t),
+            releasing: false,
         };
         self.active.insert(list.id, playback);
         Ok(())
@@ -296,8 +324,9 @@ impl Playbacks {
         if list.cues.is_empty() {
             return Err(Error::UnknownCue(1));
         }
+        // A list fading out after a release starts again from the top.
         let next = match self.active.get(&list.id) {
-            Some(p) if p.current + 1 < list.cues.len() => p.current + 1,
+            Some(p) if !p.releasing && p.current + 1 < list.cues.len() => p.current + 1,
             _ => 0,
         };
         self.go_to(list, next, now)
@@ -307,6 +336,7 @@ impl Playbacks {
     /// cue starts when the follow was due, so timing holds between frames.
     /// A follow on the last cue loops round to the first, which makes a chase.
     pub fn follow(&mut self, lists: &[CueList], now: Instant) {
+        self.active.retain(|_, p| !(p.releasing && !p.fading(now)));
         let due: Vec<(u32, Instant)> = self
             .active
             .iter()
@@ -327,7 +357,7 @@ impl Playbacks {
     /// Goes back to the previous cue, quickly. Follows don't run after Back,
     /// so it stays on the cue it went back to.
     pub fn back(&mut self, list: &CueList, now: Instant) -> Result<()> {
-        let Some(playback) = self.active.get(&list.id) else {
+        let Some(playback) = self.active.get(&list.id).filter(|p| !p.releasing) else {
             return Ok(());
         };
         let previous = playback.current.saturating_sub(1);
@@ -343,6 +373,47 @@ impl Playbacks {
         self.active.remove(&list);
     }
 
+    /// Fades a running list out over `fade`, then releases it. Its
+    /// intensities fade to zero; everything else holds until it's gone.
+    pub fn fade_out(&mut self, list: u32, fade: Duration, now: Instant) {
+        if fade.is_zero() {
+            return self.release(list);
+        }
+        let Some(p) = self.active.get_mut(&list).filter(|p| !p.releasing) else {
+            return;
+        };
+        p.from = p.look(now);
+        p.from_effects = std::mem::take(&mut p.to_effects);
+        p.to = Look::new();
+        p.started = now;
+        p.fade = fade;
+        p.follow_at = None;
+        p.releasing = true;
+    }
+
+    /// After GO on `list`: fades out the lists it replaces, over the fade of
+    /// the cue it went to. A solo list replaces every other list; a list with
+    /// release on next go replaces the others that have it too.
+    pub fn release_others(&mut self, list: &CueList, lists: &[CueList], now: Instant) {
+        if !list.solo && !list.release_on_next_go {
+            return;
+        }
+        let Some(current) = self.active.get(&list.id).map(|p| p.current) else {
+            return;
+        };
+        let fade = Duration::from_secs_f32(list.cues.get(current).map_or(0.0, |c| c.fade.max(0.0)));
+        let others: Vec<u32> = self
+            .active
+            .iter()
+            .filter(|(id, p)| **id != list.id && !p.releasing)
+            .filter(|(id, _)| list.solo || lists.iter().any(|l| l.id == **id && l.release_on_next_go))
+            .map(|(id, _)| *id)
+            .collect();
+        for id in others {
+            self.fade_out(id, fade, now);
+        }
+    }
+
     pub fn release_all(&mut self) {
         self.active.clear();
     }
@@ -353,6 +424,7 @@ impl Playbacks {
         if let Some((index, entered, armed)) = self
             .active
             .get(&list.id)
+            .filter(|p| !p.releasing)
             .map(|p| (p.current, p.entered, p.follow_at.is_some()))
         {
             if index < list.cues.len() {
@@ -445,7 +517,81 @@ mod tests {
                     effects: Vec::new(),
                 },
             ],
+            ..Default::default()
         }
+    }
+
+    /// A one-cue list setting fixture 1 to `level` with a 2 second fade.
+    fn look(id: u32, level: f32, release_on_next_go: bool, solo: bool) -> CueList {
+        CueList {
+            id,
+            name: format!("Look {id}"),
+            cues: vec![Cue {
+                fade: 2.0,
+                values: [(1, values(level))].into(),
+                ..Default::default()
+            }],
+            release_on_next_go,
+            solo,
+        }
+    }
+
+    #[test]
+    fn looks_replace_each_other_with_a_fade() {
+        let lists = [
+            look(1, 1.0, true, false),
+            look(2, 0.5, true, false),
+            look(3, 0.8, false, false),
+        ];
+        let mut playbacks = Playbacks::default();
+        let start = Instant::now();
+        let at = |ms: u64| start + Duration::from_millis(ms);
+        for list in [&lists[0], &lists[2]] {
+            playbacks.go(list, start).unwrap();
+            playbacks.release_others(list, &lists, start);
+        }
+        // Look 3 doesn't release on next go, so look 1 stays under it.
+        assert!(playbacks.get(1).is_some_and(|p| !p.releasing));
+        playbacks.go(&lists[1], at(3000)).unwrap();
+        playbacks.release_others(&lists[1], &lists, at(3000));
+        // Look 1 fades out over look 2's fade; look 3 layers on, untouched.
+        assert!(playbacks.get(1).unwrap().releasing);
+        assert!(!playbacks.get(3).unwrap().releasing);
+        let level = playbacks.get(1).unwrap().look(at(4000))[&1].intensity.unwrap();
+        assert!((level - 0.5).abs() < 1e-6, "{level}");
+        playbacks.follow(&lists, at(5100));
+        assert!(playbacks.get(1).is_none());
+        assert!(playbacks.get(3).is_some());
+
+        // GO on a list that's fading out starts it again.
+        playbacks.go(&lists[1], at(6000)).unwrap();
+        playbacks.fade_out(2, Duration::from_secs(2), at(6000));
+        playbacks.go(&lists[1], at(6500)).unwrap();
+        assert!(!playbacks.get(2).unwrap().releasing);
+    }
+
+    #[test]
+    fn solo_releases_everything_else() {
+        let lists = [
+            look(1, 1.0, false, false),
+            look(2, 0.5, true, false),
+            look(3, 0.8, true, true),
+        ];
+        let mut playbacks = Playbacks::default();
+        let now = Instant::now();
+        for list in &lists {
+            playbacks.go(list, now).unwrap();
+            playbacks.release_others(list, &lists, now);
+        }
+        assert!(playbacks.get(1).unwrap().releasing);
+        assert!(playbacks.get(2).unwrap().releasing);
+        assert!(!playbacks.get(3).unwrap().releasing);
+    }
+
+    #[test]
+    fn old_lists_release_on_next_go() {
+        let list: CueList = serde_json::from_str(r#"{"id": 1, "name": "Main"}"#).unwrap();
+        assert!(list.release_on_next_go && !list.solo);
     }
 
     #[test]
@@ -610,6 +756,7 @@ mod tests {
                 values: [(1, values(0.8))].into(),
                 effects: Vec::new(),
             }],
+            ..Default::default()
         };
         let mut b = a.clone();
         b.id = 2;

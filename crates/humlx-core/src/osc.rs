@@ -11,12 +11,17 @@
 //! | `/humlx/cuelist/{list}/goto`     | cue number       | Go to a cue (numbered from 1) |
 //! | `/humlx/cuelist/{list}/goto/{n}` |                  | Go to cue `n`                 |
 //! | `/humlx/cuelist/{list}/master`   | level 0.0 to 1.0 | Set the cue list's master     |
+//! | `/humlx/selected/{action}`       | as above         | The same on the selected list |
+//! | `/humlx/slot/{n}/{action}`       | as above         | The same on fader slot `n`    |
+//! | `/humlx/grid/{page}/{button}`    |                  | Tap grid button (from 1)      |
 //! | `/humlx/releaseall`              |                  | Release everything            |
 //! | `/humlx/blackout`                | 1 or 0           | Blackout on or off            |
 //! | `/humlx/grandmaster`             | level 0.0 to 1.0 | Set the grand master          |
 //!
 //! `{list}` is the cue list's number or its name (any case, spaces allowed
-//! as `_` or `-`). Buttons on most controllers send 1 when pressed and 0 when
+//! as `_` or `-`). `{action}` is any of go, back, release, goto, goto/{n} and
+//! master. A grid button acts as tapping it on screen: it selects its list and
+//! plays it, or releases a live one-cue look. Buttons on most controllers send 1 when pressed and 0 when
 //! let go, so a trigger whose first argument is 0 is ignored.
 
 use std::net::{Ipv4Addr, UdpSocket};
@@ -188,14 +193,33 @@ fn bad(message: impl Into<String>) -> Error {
 
 // --- Commands --------------------------------------------------------------
 
+/// Which cue list a command is for.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Target {
+    /// By number or name.
+    List(String),
+    /// The selected list.
+    Selected,
+    /// The list in a fader slot, counted from 1.
+    Slot(usize),
+}
+
+impl From<&str> for Target {
+    fn from(key: &str) -> Self {
+        Target::List(key.to_string())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Command {
-    Go(String),
-    Back(String),
-    Release(String),
+    Go(Target),
+    Back(Target),
+    Release(Target),
     /// A cue number, counted from 1.
-    GoTo(String, usize),
-    Master(String, f32),
+    GoTo(Target, usize),
+    Master(Target, f32),
+    /// A tap of a grid button: page and button, counted from 1.
+    Button(usize, usize),
     ReleaseAll,
     Blackout(bool),
     GrandMaster(f32),
@@ -235,30 +259,55 @@ pub fn command(message: &Message) -> Result<Option<Command>> {
                 _ => return unknown(),
             }
         }
-        ["humlx", "cuelist", list, action @ ..] => {
-            let list = list.to_string();
-            match action {
-                ["go"] => pressed.then_some(Command::Go(list)),
-                ["back"] => pressed.then_some(Command::Back(list)),
-                ["release"] => pressed.then_some(Command::Release(list)),
-                ["goto"] => {
-                    let cue = first.ok_or_else(|| bad("goto needs a cue number"))?;
-                    (cue >= 1.0).then(|| Command::GoTo(list, cue.round() as usize))
-                }
-                ["goto", n] => {
-                    let cue: usize = n.parse().map_err(|_| bad(format!("\"{n}\" is not a cue number")))?;
-                    (pressed && cue >= 1).then_some(Command::GoTo(list, cue))
-                }
-                ["master"] => {
-                    let level = first.ok_or_else(|| bad("master needs a level from 0 to 1"))?;
-                    Some(Command::Master(list, level.clamp(0.0, 1.0)))
-                }
-                _ => return unknown(),
-            }
+        ["humlx", "grid", page, button] => {
+            let number = |n: &str| match n.parse::<usize>() {
+                Ok(n) if n >= 1 => Ok(n),
+                _ => Err(bad(format!("\"{n}\" is not a grid page or button number"))),
+            };
+            let (page, button) = (number(page)?, number(button)?);
+            pressed.then_some(Command::Button(page, button))
+        }
+        ["humlx", "cuelist", list, action @ ..] => list_command(Target::from(*list), action, first, pressed, message)?,
+        ["humlx", "selected", action @ ..] => list_command(Target::Selected, action, first, pressed, message)?,
+        ["humlx", "slot", n, action @ ..] => {
+            let slot = n
+                .parse::<usize>()
+                .ok()
+                .filter(|n| *n >= 1)
+                .ok_or_else(|| bad(format!("\"{n}\" is not a slot number")))?;
+            list_command(Target::Slot(slot), action, first, pressed, message)?
         }
         _ => return unknown(),
     };
     Ok(command)
+}
+
+/// The command for `action` on a cue list, such as `go` or `goto/3`.
+fn list_command(
+    list: Target,
+    action: &[&str],
+    first: Option<f32>,
+    pressed: bool,
+    message: &Message,
+) -> Result<Option<Command>> {
+    Ok(match action {
+        ["go"] => pressed.then_some(Command::Go(list)),
+        ["back"] => pressed.then_some(Command::Back(list)),
+        ["release"] => pressed.then_some(Command::Release(list)),
+        ["goto"] => {
+            let cue = first.ok_or_else(|| bad("goto needs a cue number"))?;
+            (cue >= 1.0).then(|| Command::GoTo(list, cue.round() as usize))
+        }
+        ["goto", n] => {
+            let cue: usize = n.parse().map_err(|_| bad(format!("\"{n}\" is not a cue number")))?;
+            (pressed && cue >= 1).then_some(Command::GoTo(list, cue))
+        }
+        ["master"] => {
+            let level = first.ok_or_else(|| bad("master needs a level from 0 to 1"))?;
+            Some(Command::Master(list, level.clamp(0.0, 1.0)))
+        }
+        _ => return Err(bad(format!("unknown address {}", message.address))),
+    })
 }
 
 /// Finds a cue list by number or by name, ignoring case and treating `_` and
@@ -275,15 +324,23 @@ pub fn find_list<'a>(lists: &'a [CueList], key: &str) -> Option<&'a CueList> {
 }
 
 pub fn apply(state: &mut State, command: &Command, now: Instant) -> Result<()> {
-    let list = |key: &str| {
-        find_list(&state.cue_lists, key)
-            .cloned()
-            .ok_or_else(|| bad(format!("no cue list \"{key}\"")))
+    let list = |target: &Target| {
+        let by_id = |id: u32| state.cue_lists.iter().find(|l| l.id == id);
+        let found = match target {
+            Target::List(key) => find_list(&state.cue_lists, key),
+            Target::Selected => state.layout.selected.and_then(by_id),
+            Target::Slot(n) => state.layout.slots.get(n - 1).copied().flatten().and_then(by_id),
+        };
+        found.cloned().ok_or_else(|| match target {
+            Target::List(key) => bad(format!("no cue list \"{key}\"")),
+            Target::Selected => bad("no cue list is selected"),
+            Target::Slot(n) => bad(format!("fader slot {n} is empty")),
+        })
     };
     match command {
         Command::Go(key) => {
             let l = list(key)?;
-            state.playbacks.go(&l, now)
+            state.go(l.id, now)
         }
         Command::Back(key) => {
             let l = list(key)?;
@@ -296,12 +353,23 @@ pub fn apply(state: &mut State, command: &Command, now: Instant) -> Result<()> {
         }
         Command::GoTo(key, cue) => {
             let l = list(key)?;
-            state.playbacks.go_to(&l, cue - 1, now)
+            state.go_to(l.id, cue - 1, now)
         }
         Command::Master(key, level) => {
             let l = list(key)?;
             state.playbacks.set_master(l.id, *level);
             Ok(())
+        }
+        Command::Button(page, button) => {
+            let id = state
+                .layout
+                .pages
+                .get(page - 1)
+                .and_then(|p| p.buttons.get(button - 1))
+                .copied()
+                .flatten()
+                .ok_or_else(|| bad(format!("grid button {page}/{button} is empty")))?;
+            state.tap(id, now)
         }
         Command::ReleaseAll => {
             state.playbacks.release_all();
@@ -473,6 +541,7 @@ mod tests {
             id: 3,
             name: "Walk In".into(),
             cues: vec![cue("A"), cue("B"), cue("C")],
+            ..Default::default()
         });
         state
     }
@@ -581,6 +650,42 @@ mod tests {
 
         handle(&mut state, &encode("/humlx/cuelist/9/go", &[]), now);
         assert!(state.osc.last.as_deref().unwrap().contains("no cue list"));
+    }
+
+    #[test]
+    fn runs_the_selected_list_slots_and_grid_buttons() {
+        let mut state = state();
+        let now = Instant::now();
+        let msg = |address: &str, args: Vec<Arg>| Message {
+            address: address.into(),
+            args,
+        };
+        assert_eq!(
+            command(&msg("/humlx/slot/2/goto/3", vec![])).unwrap(),
+            Some(Command::GoTo(Target::Slot(2), 3))
+        );
+        assert_eq!(
+            command(&msg("/humlx/grid/1/12", vec![Arg::Int(1)])).unwrap(),
+            Some(Command::Button(1, 12))
+        );
+        assert!(command(&msg("/humlx/slot/0/go", vec![])).is_err());
+
+        handle(&mut state, &encode("/humlx/selected/go", &[]), now);
+        assert!(state.osc.last.as_deref().unwrap().contains("selected"));
+        state.layout.selected = Some(3);
+        handle(&mut state, &encode("/humlx/selected/go", &[]), now);
+        assert_eq!(state.playbacks.get(3).unwrap().current, 0);
+        state.layout.slots[1] = Some(3);
+        handle(&mut state, &encode("/humlx/slot/2/go", &[]), now);
+        assert_eq!(state.playbacks.get(3).unwrap().current, 1);
+        handle(&mut state, &encode("/humlx/slot/3/go", &[]), now);
+        assert!(state.osc.last.as_deref().unwrap().contains("slot 3 is empty"));
+
+        state.layout.pages[0].buttons[11] = Some(3);
+        state.layout.selected = None;
+        handle(&mut state, &encode("/humlx/grid/1/12", &[]), now);
+        assert_eq!(state.layout.selected, Some(3));
+        assert_eq!(state.playbacks.get(3).unwrap().current, 2);
     }
 
     #[test]

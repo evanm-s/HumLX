@@ -65,11 +65,11 @@
       dialog = { assign: i };
       return;
     }
-    selectList(list.id);
-    if (list.cues.length === 0) return;
-    // A live one-cue look toggles off; anything else goes on to its next cue.
-    const live = status(list.id);
-    play(() => (live && list.cues.length === 1 ? api.releaseCueList(list.id) : api.go(list.id)));
+    if (list.cues.length === 0) return void selectList(list.id);
+    // Selects it, then a live one-cue look fades off; anything else GOes,
+    // fading out the looks it replaces.
+    show.playback.layout.selected = list.id;
+    play(() => api.tapCueList(list.id));
   }
 
   async function assign(button: number, list: number | null) {
@@ -152,12 +152,14 @@
   <div class="grid" style:--cols={GRID_COLUMNS} style:--rows={GRID_ROWS}>
     {#each buttons as id, i (i)}
       {@const list = listOf(id)}
-      {@const live = list ? status(list.id) : undefined}
+      {@const running = list ? status(list.id) : undefined}
+      {@const live = running?.releasing ? undefined : running}
       <button
         class="cell"
         class:empty={!list}
         class:live={live != null}
         class:fading={live?.fading}
+        class:releasing={running?.releasing}
         class:selected={list != null && list.id === layout.selected}
         class:picked={editing && picked === i}
         onclick={() => tap(i)}
@@ -292,6 +294,12 @@
     to {
       opacity: 0.65;
     }
+  }
+
+  /* Fading out: an outline in the playback colour until it's gone. */
+  .cell.releasing {
+    border-top-color: var(--f-playback);
+    box-shadow: inset 0 0 0 2px var(--f-playback);
   }
 
   .cell.selected {

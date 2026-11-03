@@ -217,6 +217,10 @@ export interface CueList {
   id: number;
   name: string;
   cues: Cue[];
+  /** GO fades out other running lists that have this on too, so looks replace each other. */
+  releaseOnNextGo: boolean;
+  /** GO fades out every other running list. */
+  solo: boolean;
 }
 
 /** Where a recorded cue goes: an existing cue list, or a new one with this name. */
@@ -333,6 +337,8 @@ export interface PlaybackStatus {
   fading: boolean;
   /** Seconds until the next cue follows, when the current cue is a follow cue. */
   followIn: number | null;
+  /** Fading out after being released. */
+  releasing: boolean;
 }
 
 /** Whether the NX-K control surface is plugged in and usable. */

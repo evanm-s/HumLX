@@ -23,6 +23,8 @@ pub struct PlaybackStatus {
     fading: bool,
     /// Seconds until the next cue follows, when the current cue is a follow cue.
     follow_in: Option<f32>,
+    /// Fading out after being released.
+    releasing: bool,
 }
 
 pub fn statuses(state: &EngineState) -> Vec<PlaybackStatus> {
@@ -35,6 +37,7 @@ pub fn statuses(state: &EngineState) -> Vec<PlaybackStatus> {
             current: playback.current,
             fading: playback.fading(now),
             follow_in: playback.follow_in(now),
+            releasing: playback.releasing,
         })
         .collect()
 }
@@ -219,7 +222,12 @@ fn add_cue_list(state: &mut EngineState, name: &str) -> u32 {
         "" => format!("Cue list {id}"),
         n => n.to_string(),
     };
-    state.cue_lists.push(CueList { id, name, cues: vec![] });
+    state.cue_lists.push(CueList {
+        id,
+        name,
+        cues: vec![],
+        ..Default::default()
+    });
     id
 }
 
@@ -312,7 +320,7 @@ pub fn record_cue(
         );
         let snapshot = cue_list.clone();
         state.programmer.clear(None);
-        state.playbacks.go_to(&snapshot, index, Instant::now())?;
+        state.go_to(snapshot.id, index, Instant::now())?;
         state.playbacks.refresh(&snapshot, Instant::now());
         Ok(())
     })
@@ -406,7 +414,7 @@ fn with_list(app: &App, list: u32, f: impl FnOnce(&mut EngineState, &CueList) ->
 
 #[tauri::command]
 pub fn go(app: State<'_, App>, list: u32) -> Result<PlaybackView> {
-    with_list(&app, list, |state, l| state.playbacks.go(l, Instant::now()))
+    change(&app, false, |state| state.go(list, Instant::now()))
 }
 
 #[tauri::command]
@@ -416,7 +424,30 @@ pub fn back(app: State<'_, App>, list: u32) -> Result<PlaybackView> {
 
 #[tauri::command]
 pub fn go_to(app: State<'_, App>, list: u32, index: usize) -> Result<PlaybackView> {
-    with_list(&app, list, |state, l| state.playbacks.go_to(l, index, Instant::now()))
+    change(&app, false, |state| state.go_to(list, index, Instant::now()))
+}
+
+/// A tap of a grid button: selects the list, then fades a live one-cue look
+/// out, or else GOes.
+#[tauri::command]
+pub fn tap_cue_list(app: State<'_, App>, list: u32) -> Result<PlaybackView> {
+    change(&app, true, |state| state.tap(list, Instant::now()))
+}
+
+/// Sets whether GO on a list fades out the other lists (see `CueList`).
+#[tauri::command]
+pub fn set_cue_list_options(
+    app: State<'_, App>,
+    id: u32,
+    release_on_next_go: bool,
+    solo: bool,
+) -> Result<PlaybackView> {
+    change(&app, true, |state| {
+        let list = list_mut(state, id)?;
+        list.release_on_next_go = release_on_next_go;
+        list.solo = solo;
+        Ok(())
+    })
 }
 
 #[tauri::command]
