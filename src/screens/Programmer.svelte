@@ -314,8 +314,8 @@
     return attempt(() => api.setHighlight(on));
   }
 
-  // Keys, unless typing or a dialog is open: H toggles highlight, and R and
-  // Delete work like the control surface's Record and Delete for presets.
+  // Keys, unless typing or a dialog is open: H toggles highlight, L is Load,
+  // and R and Delete work like the control surface's Record and Delete for presets.
   function keys(e: KeyboardEvent) {
     if (e.ctrlKey || e.metaKey || e.altKey || e.repeat || e.defaultPrevented) return;
     if (namingGroup || recordingCue) return;
@@ -324,6 +324,7 @@
     const key = e.key.toLowerCase();
     if (key === "h") setHighlight(!highlight);
     else if (key === "r") surface.press("record");
+    else if (key === "l") return void (e.preventDefault(), surface.press("load"));
     else if (key === "delete") surface.press("delete");
     else if (key === "enter" && surface.mode) surface.confirm();
     else return;
@@ -394,6 +395,14 @@
         onclick={() => (recordingCue = true)}
       >
         ● Record cue
+      </button>
+      <button
+        class="load"
+        class:armed={surface.loadLoadsAll && show.programmer.selection.length > 0}
+        title="Load what's on stage from running cues into the programmer: the selected fixtures, and Load again for everything (L)"
+        onclick={() => surface.press("load")}
+      >
+        {surface.loadLoadsAll ? "Load all" : "Load"}
       </button>
       <button
         class="danger"
@@ -662,6 +671,13 @@
 {/if}
 
 <style>
+  /* The next Load loads every fixture. */
+  button.load.armed {
+    background: var(--accent);
+    color: var(--accent-text);
+    font-weight: 600;
+  }
+
   /* The next Clear clears the programmer. */
   button.danger.armed {
     background: var(--danger);

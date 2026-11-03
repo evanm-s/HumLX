@@ -12,14 +12,14 @@ use serde::{Deserialize, Serialize};
 
 use crate::artnet;
 use crate::dmx::Universe;
-use crate::effect::{EffectSize, SpeedMasters};
+use crate::effect::{Effect, EffectSize, SpeedMasters};
 use crate::error::{Error, Result};
 use crate::fixture::{Attribute, Library, Mode};
 use crate::layout::Layout;
 use crate::osc::{OscSettings, OscStatus};
 use crate::patch::{mode_of, Patch};
-use crate::playback::{CueList, Playbacks, RunningEffects};
-use crate::programmer::{Group, Preset, Programmer, Rgb, Values};
+use crate::playback::{CueList, Playback, Playbacks, RunningEffects};
+use crate::programmer::{next_id, Group, Preset, Programmer, Rgb, Values};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
@@ -169,6 +169,54 @@ impl State {
         } else {
             self.go(list, now)
         }
+    }
+
+    /// Load: copies what running cue lists are putting out for `fixtures`
+    /// (every fixture when `None`) into the programmer, so it can be tweaked
+    /// and recorded. Values are as on stage right now, mid-fade included and
+    /// intensity scaled by each list's master, but before the grand master
+    /// and blackout. The cues' effects come along for those fixtures.
+    /// Programmer values already set stay on top, as they're what's on stage.
+    /// Returns how many fixtures got values.
+    pub fn load_live(&mut self, fixtures: Option<&[u32]>, now: Instant) -> Result<usize> {
+        let wanted = |id: u32| fixtures.is_none_or(|f| f.contains(&id)) && self.patch.get(id).is_some();
+        let live: Vec<(u32, Values)> = self
+            .playbacks
+            .values(now)
+            .into_iter()
+            .filter(|(id, values)| wanted(*id) && !values.is_empty())
+            .collect();
+        let mut playbacks: Vec<&Playback> = self
+            .playbacks
+            .running()
+            .map(|(_, p)| p)
+            .filter(|p| !p.releasing)
+            .collect();
+        playbacks.sort_by_key(|p| p.order);
+        let effects: Vec<Effect> = playbacks
+            .iter()
+            .flat_map(|p| p.effects())
+            .filter_map(|effect| {
+                let mut effect = effect.clone();
+                effect.fixtures.retain(|id| wanted(*id));
+                (!effect.fixtures.is_empty()).then_some(effect)
+            })
+            .collect();
+        if live.is_empty() && effects.is_empty() {
+            return Err(Error::NothingLive);
+        }
+        let count = live.len();
+        for (id, values) in live {
+            let entry = self.programmer.values.entry(id).or_default();
+            let mut loaded = values;
+            loaded.merge(entry);
+            *entry = loaded;
+        }
+        for mut effect in effects {
+            effect.id = next_id(self.programmer.effects.iter().map(|e| e.id));
+            crate::effect::lay_over(&mut self.programmer.effects, effect);
+        }
+        Ok(count)
     }
 
     pub fn new(library: Library, patch: Patch, output: OutputSettings) -> Self {
@@ -555,6 +603,76 @@ mod tests {
         state.blackout = true;
         state.compose();
         assert_eq!(state.universe().get(1), 0);
+    }
+
+    #[test]
+    fn load_pulls_live_values_into_programmer() {
+        use crate::effect::{Effect, Shape};
+        use crate::playback::{Cue, CueList};
+        let library = Library::with_bundled();
+        let mut patch = Patch::default();
+        patch
+            .add(
+                &library,
+                &NewFixtures {
+                    profile: "generic/dimmer".into(),
+                    mode: "1ch".into(),
+                    count: 3,
+                    first_id: Some(1),
+                    address: Some(1),
+                    name: None,
+                },
+            )
+            .unwrap();
+        let mut state = State::new(library, patch, OutputSettings::default());
+        let now = Instant::now();
+        assert!(matches!(state.load_live(None, now), Err(Error::NothingLive)));
+
+        let full = Values {
+            intensity: Some(1.0),
+            ..Default::default()
+        };
+        state.cue_lists.push(CueList {
+            id: 1,
+            name: "Main".into(),
+            cues: vec![Cue {
+                name: "Look".into(),
+                fade: 0.0,
+                values: [(1, full.clone()), (2, full.clone())].into(),
+                effects: vec![Effect::new(1, "Chase".into(), Shape::Chase, &[], vec![1, 2, 3])],
+                ..Default::default()
+            }],
+            ..Default::default()
+        });
+        state.go(1, now).unwrap();
+        state.playbacks.set_master(1, 0.5);
+        state.programmer.values.insert(
+            2,
+            Values {
+                intensity: Some(0.1),
+                ..Default::default()
+            },
+        );
+
+        // Selected fixtures only: values as scaled by the master, and the
+        // cue's effect on just those fixtures.
+        assert_eq!(state.load_live(Some(&[1]), now).unwrap(), 1);
+        assert_eq!(state.programmer.values[&1].intensity, Some(0.5));
+        assert_eq!(state.programmer.values[&2].intensity, Some(0.1));
+        assert_eq!(state.programmer.effects.len(), 1);
+        assert_eq!(state.programmer.effects[0].fixtures, vec![1]);
+
+        // Everything: programmer values already set stay on top, and the
+        // effect now covers every fixture it runs on.
+        assert_eq!(state.load_live(None, now).unwrap(), 2);
+        assert_eq!(state.programmer.values[&2].intensity, Some(0.1));
+        assert!(!state.programmer.values.contains_key(&3));
+        assert_eq!(state.programmer.effects.len(), 1);
+        assert_eq!(state.programmer.effects[0].fixtures, vec![1, 2, 3]);
+
+        // Nothing live for an unlit fixture with no effect on it.
+        state.playbacks.release_all();
+        assert!(matches!(state.load_live(Some(&[3]), now), Err(Error::NothingLive)));
     }
 
     #[test]

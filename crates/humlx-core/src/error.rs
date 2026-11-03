@@ -34,6 +34,8 @@ pub enum Error {
     UnknownEffect(u32),
     #[error("there is nothing in the programmer to record")]
     NothingToRecord,
+    #[error("nothing is live to load")]
+    NothingLive,
     #[error("invalid fixture profile: {0}")]
     InvalidProfile(String),
     #[error("not supported yet: {0}")]
