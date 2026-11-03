@@ -75,7 +75,9 @@ export const api = {
   setColour: (colour: Rgb) => invoke<ProgrammerView>("set_colour", { colour }),
   setPosition: (pan: number | null, tilt: number | null) => invoke<ProgrammerView>("set_position", { pan, tilt }),
   setAttribute: (attribute: Attribute, value: number) => invoke<ProgrammerView>("set_attribute", { attribute, value }),
-  clearProgrammer: (family: Family | null) => invoke<ProgrammerView>("clear_programmer", { family }),
+  /** Clears `family` (or everything) from `fixtures`, or from every fixture when `fixtures` is null. */
+  clearProgrammer: (family: Family | null, fixtures: number[] | null = null) =>
+    invoke<ProgrammerView>("clear_programmer", { family, fixtures }),
   saveGroup: (name: string, id: number | null) => invoke<ProgrammerView>("save_group", { name, id }),
   deleteGroup: (id: number) => invoke<ProgrammerView>("delete_group", { id }),
   recordPreset: (family: Family, name: string, id: number | null) =>
