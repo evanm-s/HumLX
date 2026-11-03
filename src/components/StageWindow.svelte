@@ -1136,8 +1136,15 @@
     gap: 14px;
     min-height: 0;
   }
+  /* Nothing in the side panel gets squashed: it scrolls instead. */
+  .side > :global(*) {
+    flex-shrink: 0;
+  }
+  /* The pan and tilt pad stays square and big enough to use, but leaves room
+     for Confirm and the marks on a short screen. */
   .side :global(.pad) {
-    width: 100%;
+    width: min(100%, max(240px, 40vh));
+    align-self: center;
   }
 
   .lead {
