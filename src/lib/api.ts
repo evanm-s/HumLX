@@ -25,6 +25,7 @@ import type {
   SurfaceStatus,
   Led,
 } from "./types";
+import type { Plan, Stage } from "./stage";
 
 /** True when running inside the desktop app rather than a plain browser. */
 export const inApp = "__TAURI_INTERNALS__" in window;
@@ -92,6 +93,16 @@ export const api = {
     invoke<ProgrammerView>("record_preset", { family, name, id }),
   applyPreset: (id: number) => invoke<ProgrammerView>("apply_preset", { id }),
   deletePreset: (id: number) => invoke<ProgrammerView>("delete_preset", { id }),
+
+  stage: () => invoke<Stage>("stage"),
+  setStagePlan: (plan: Plan) => invoke<Stage>("set_stage_plan", { plan }),
+  /** Records that the fixture, where the programmer has it now, is on the mark. */
+  calibrateMark: (fixture: number, mark: number) => invoke<Stage>("calibrate_mark", { fixture, mark }),
+  /** Forgets one reading, or the fixture's whole calibration when `mark` is null. */
+  forgetCalibration: (fixture: number, mark: number | null) =>
+    invoke<Stage>("forget_calibration", { fixture, mark }),
+  /** Points the selected, calibrated movers at a spot, `height` above the floor there. */
+  pointAt: (x: number, y: number, height: number) => invoke<ProgrammerView>("point_at", { x, y, height }),
 
   oscSettings: () => invoke<OscSettings>("osc_settings"),
   setOsc: (settings: OscSettings) => invoke<OscSettings>("set_osc", { settings }),

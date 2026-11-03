@@ -94,6 +94,22 @@ impl FixtureOptions {
         (pan.clamp(0.0, 1.0), tilt.clamp(0.0, 1.0))
     }
 
+    /// The other way round from [`orient`](Self::orient): the programmer pan
+    /// and tilt that send the fixture these values.
+    pub fn unorient(&self, pan: f32, tilt: f32) -> (f32, f32) {
+        let shift = |degrees: i16, range: u16| f32::from(degrees) / f32::from(range.max(1));
+        let mut pan = pan - shift(self.pan_offset, self.pan_range);
+        let mut tilt = tilt - shift(self.tilt_offset, self.tilt_range);
+        if self.invert_pan {
+            pan = 1.0 - pan;
+        }
+        if self.invert_tilt {
+            tilt = 1.0 - tilt;
+        }
+        let (pan, tilt) = if self.swap_pan_tilt { (tilt, pan) } else { (pan, tilt) };
+        (pan.clamp(0.0, 1.0), tilt.clamp(0.0, 1.0))
+    }
+
     fn check(&self) -> Result<()> {
         if self.intensity_limit > 100 {
             return Err(Error::InvalidOptions(
@@ -376,6 +392,20 @@ fn footprint(library: &Library, fixture: &PatchedFixture) -> Option<usize> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn unorient_undoes_orient() {
+        let options = FixtureOptions {
+            swap_pan_tilt: true,
+            invert_pan: true,
+            pan_offset: 90,
+            tilt_offset: -20,
+            ..FixtureOptions::default()
+        };
+        let (pan, tilt) = options.orient(0.3, 0.6);
+        let (pan, tilt) = options.unorient(pan, tilt);
+        assert!((pan - 0.3).abs() < 1e-6 && (tilt - 0.6).abs() < 1e-6);
+    }
 
     fn request(count: u32, address: Option<Address>) -> NewFixtures {
         NewFixtures {

@@ -116,6 +116,8 @@ pub struct State {
     pub speed_masters: SpeedMasters,
     pub osc_settings: OscSettings,
     pub osc: OscStatus,
+    /// The stage plan and where each mover hangs.
+    pub stage: crate::stage::Stage,
     /// Raw channel levels set from the channel test screen, by fixture
     /// number and channel index within the fixture.
     test_levels: HashMap<u32, HashMap<usize, u8>>,
