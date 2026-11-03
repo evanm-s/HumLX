@@ -30,3 +30,18 @@ export function restartSelectWindow() {
 export function endSelectWindow() {
   lastTap = -Infinity;
 }
+
+/**
+ * The select mode for a tap on a fixture or group whose fixtures are
+ * `targets`. Within the window a tap toggles: a target that is wholly
+ * selected is deselected, otherwise its missing fixtures are added. After a
+ * pause it starts a new selection, except that tapping exactly what is
+ * already selected deselects it rather than doing nothing.
+ */
+export function tapSelectMode(targets: number[], selection: number[]): SelectMode {
+  const chosen = new Set(selection);
+  const whole = targets.length > 0 && targets.every((id) => chosen.has(id));
+  const mode = tapMode(whole ? "toggle" : "add");
+  if (mode === "set" && whole && chosen.size === new Set(targets).size) return "toggle";
+  return mode;
+}
