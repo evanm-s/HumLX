@@ -54,6 +54,8 @@ class Surface {
   pendingDelete = $state<number | null>(null);
   /** The programmer as a first Clear left it, until anything else happens. */
   private clearedOnce = $state.raw<ProgrammerView | null>(null);
+  /** The programmer as a first Load left it, until anything else happens. */
+  private loadedOnce = $state.raw<ProgrammerView | null>(null);
 
   // Encoder turns not yet sent, and whether a send is under way, by encoder.
   private pending = [0, 0, 0, 0];
@@ -109,9 +111,31 @@ class Surface {
     return this.clearedOnce != null && this.clearedOnce === show.programmer;
   }
 
-  /** Any other action makes the next Clear a first press again. */
+  /** Any other action makes the next Clear (or Load) a first press again. */
   disarmClear() {
     this.clearedOnce = null;
+    this.loadedOnce = null;
+  }
+
+  /** Whether the next Load loads every fixture: nothing is selected, or Load was the last thing done. */
+  get loadLoadsAll(): boolean {
+    return show.programmer.selection.length === 0 || (this.loadedOnce != null && this.loadedOnce === show.programmer);
+  }
+
+  /**
+   * Load, like Clear in reverse: the first press copies what the running cue
+   * lists put out for the selected fixtures into the programmer, and a second
+   * press straight after loads every fixture. With nothing selected, one
+   * press loads everything.
+   */
+  async load() {
+    if (this.loadLoadsAll) {
+      this.loadedOnce = null;
+      await show.program(() => api.loadLive(null));
+      return;
+    }
+    await show.program(() => api.loadLive([...show.programmer.selection]));
+    this.loadedOnce = show.programmer;
   }
 
   /**
@@ -145,7 +169,12 @@ class Surface {
       else window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
       return;
     }
+    if (key !== "load") this.loadedOnce = null;
     if (key === "clear") return void this.clear();
+    if (key === "load") {
+      this.clearedOnce = null;
+      return void this.load();
+    }
     const afterClear = this.clearClears;
     this.clearedOnce = null;
     // Numbers straight after Clear pick fixtures to clear: Clear 1 + 3 Enter.

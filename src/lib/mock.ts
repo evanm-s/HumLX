@@ -84,6 +84,18 @@ const playback = (): PlaybackView => ({
 
 /** Playbacks (tracked, no fades) with the programmer on top. */
 function combined(): Record<number, Values> {
+  const out = live();
+  for (const [f, v] of Object.entries(values)) out[+f] = { ...out[+f], ...v };
+  if (highlight)
+    for (const f of fixtures)
+      out[f.id] = selection.includes(f.id)
+        ? { ...out[f.id], intensity: 1, colour: highlightColour, other: { ...out[f.id]?.other, zoom: 0 } }
+        : { ...out[f.id], intensity: 0 };
+  return out;
+}
+
+/** What the running playbacks put out (tracked, no fades). */
+function live(): Record<number, Values> {
   const out: Record<number, Values> = {};
   for (const [id, current] of running) {
     const list = cueLists.find((l) => l.id === id);
@@ -94,12 +106,6 @@ function combined(): Record<number, Values> {
         out[+f] = { ...out[+f], ...Object.fromEntries(Object.entries(scaled).filter(([, x]) => x !== undefined)) };
       }
   }
-  for (const [f, v] of Object.entries(values)) out[+f] = { ...out[+f], ...v };
-  if (highlight)
-    for (const f of fixtures)
-      out[f.id] = selection.includes(f.id)
-        ? { ...out[f.id], intensity: 1, colour: highlightColour, other: { ...out[f.id]?.other, zoom: 0 } }
-        : { ...out[f.id], intensity: 0 };
   return out;
 }
 
@@ -399,6 +405,12 @@ const commands: Record<string, (args: Args) => unknown> = {
       .map((e) => ({ ...e, fixtures: e.fixtures.filter((f) => !gone.includes(f)) }))
       .filter((e) => e.fixtures.length > 0);
     for (const id of gone) delete values[id];
+    return programmer();
+  },
+  load_live: ({ fixtures: only }) => {
+    const loaded = Object.entries(live()).filter(([f]) => only == null || only.includes(+f));
+    if (!loaded.length) throw "nothing is live to load";
+    for (const [f, v] of loaded) values[+f] = { ...structuredClone(v), ...values[+f] };
     return programmer();
   },
   save_group: ({ name, id }) => {

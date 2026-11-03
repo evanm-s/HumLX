@@ -84,6 +84,8 @@ export const api = {
   /** Takes whole fixtures (`rows`) and single values (`cells`) out of the programmer. */
   removeFromProgrammer: (rows: number[], cells: [number, ProgrammerField][]) =>
     invoke<ProgrammerView>("remove_from_programmer", { rows, cells }),
+  /** Load: what running cue lists put out for `fixtures`, or every fixture when null, into the programmer. */
+  loadLive: (fixtures: number[] | null) => invoke<ProgrammerView>("load_live", { fixtures }),
   saveGroup: (name: string, id: number | null) => invoke<ProgrammerView>("save_group", { name, id }),
   deleteGroup: (id: number) => invoke<ProgrammerView>("delete_group", { id }),
   recordPreset: (family: Family, name: string, id: number | null) =>
