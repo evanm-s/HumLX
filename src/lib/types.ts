@@ -69,7 +69,34 @@ export interface Fixture {
   address: number;
   footprint: number;
   typeName: string;
+  options: FixtureOptions;
 }
+
+/** Per-fixture output adjustments, applied as DMX goes out. */
+export interface FixtureOptions {
+  /** Highest intensity sent, in percent; full scales down to it. */
+  intensityLimit: number;
+  swapPanTilt: boolean;
+  invertPan: boolean;
+  invertTilt: boolean;
+  /** Degrees added to every pan and tilt position. */
+  panOffset: number;
+  tiltOffset: number;
+  /** Full pan and tilt travel in degrees. */
+  panRange: number;
+  tiltRange: number;
+}
+
+export const DEFAULT_OPTIONS: FixtureOptions = {
+  intensityLimit: 100,
+  swapPanTilt: false,
+  invertPan: false,
+  invertTilt: false,
+  panOffset: 0,
+  tiltOffset: 0,
+  panRange: 540,
+  tiltRange: 270,
+};
 
 export interface PatchView {
   fixtures: Fixture[];
@@ -141,6 +168,7 @@ export interface FixtureChanges {
   name?: string;
   mode?: string;
   address?: number;
+  options?: FixtureOptions;
 }
 
 export interface FixtureUpdate {
