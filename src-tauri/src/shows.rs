@@ -42,11 +42,18 @@ pub fn save_show_as(app: State<'_, App>, path: String) -> Result<String> {
 }
 
 /// Replaces the current show with one from a file. Fixture types inside it
-/// that this computer doesn't have are kept for next time.
+/// that this computer doesn't have are kept for next time. The Art-Net output
+/// and OSC settings stay as they are on this computer, so a show set up on a
+/// laptop over Wi-Fi opens on the desk PC still sending where the desk PC does.
 #[tauri::command]
 pub fn open_show(app: State<'_, App>, path: String) -> Result<String> {
     let path = PathBuf::from(path);
-    let show = Show::load(&path)?;
+    let mut show = Show::load(&path)?;
+    {
+        let state = app.engine.state();
+        show.output = state.output.clone();
+        show.osc = state.osc_settings.clone();
+    }
     std::fs::create_dir_all(&app.paths.fixtures)?;
     for profile in &show.profiles {
         let file = app.paths.fixtures.join(format!(

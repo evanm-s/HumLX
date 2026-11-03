@@ -143,7 +143,8 @@
     </div>
     <p class="muted">
       Everything saves automatically on this computer. Save a show file to keep a copy, move it to another computer
-      or keep different setups. Fixture types you imported are saved inside it.
+      or keep different setups. Fixture types you imported, the stage plan and calibration are saved inside it.
+      Opening one keeps this computer's Art-Net and OSC settings.
       {#if file}<br />Last saved or opened: <strong>{file}</strong>{/if}
     </p>
   </section>
