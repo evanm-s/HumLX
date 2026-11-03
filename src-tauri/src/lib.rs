@@ -186,6 +186,7 @@ pub fn run() {
             commands::live,
             commands::set_output,
             commands::set_blackout,
+            commands::set_grand_master,
             commands::set_highlight,
             commands::highlight_colour,
             commands::set_highlight_colour,

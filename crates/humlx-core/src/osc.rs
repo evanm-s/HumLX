@@ -13,6 +13,7 @@
 //! | `/humlx/cuelist/{list}/master`   | level 0.0 to 1.0 | Set the cue list's master     |
 //! | `/humlx/releaseall`              |                  | Release everything            |
 //! | `/humlx/blackout`                | 1 or 0           | Blackout on or off            |
+//! | `/humlx/grandmaster`             | level 0.0 to 1.0 | Set the grand master          |
 //!
 //! `{list}` is the cue list's number or its name (any case, spaces allowed
 //! as `_` or `-`). Buttons on most controllers send 1 when pressed and 0 when
@@ -197,6 +198,7 @@ pub enum Command {
     Master(String, f32),
     ReleaseAll,
     Blackout(bool),
+    GrandMaster(f32),
     /// A tap of speed master 0 (A) or 1 (B).
     Tap(usize),
     /// Sets speed master 0 (A) or 1 (B) to a BPM.
@@ -214,6 +216,10 @@ pub fn command(message: &Message) -> Result<Option<Command>> {
     let command = match parts.as_slice() {
         ["humlx", "releaseall"] => pressed.then_some(Command::ReleaseAll),
         ["humlx", "blackout"] => Some(Command::Blackout(first.is_none_or(|v| v != 0.0))),
+        ["humlx", "grandmaster"] => {
+            let level = first.ok_or_else(|| bad("grandmaster needs a level from 0 to 1"))?;
+            Some(Command::GrandMaster(level.clamp(0.0, 1.0)))
+        }
         ["humlx", "speed", master, action] => {
             let index = match master.to_ascii_lowercase().as_str() {
                 "a" | "1" => 0,
@@ -303,6 +309,10 @@ pub fn apply(state: &mut State, command: &Command, now: Instant) -> Result<()> {
         }
         Command::Blackout(on) => {
             state.blackout = *on;
+            Ok(())
+        }
+        Command::GrandMaster(level) => {
+            state.grand_master.set(*level);
             Ok(())
         }
         Command::Tap(index) => {
@@ -530,6 +540,11 @@ mod tests {
             command(&msg("/humlx/blackout", vec![Arg::Int(0)])).unwrap(),
             Some(Command::Blackout(false))
         );
+        assert_eq!(
+            command(&msg("/humlx/grandmaster", vec![Arg::Float(0.25)])).unwrap(),
+            Some(Command::GrandMaster(0.25))
+        );
+        assert!(command(&msg("/humlx/grandmaster", vec![])).is_err());
         assert!(command(&msg("/humlx/cuelist/1/dance", vec![])).is_err());
         assert_eq!(
             command(&msg("/humlx/speed/a/tap", vec![])).unwrap(),

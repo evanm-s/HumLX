@@ -63,6 +63,8 @@ export const api = {
   live: () => invoke<Live>("live"),
   setOutput: (settings: OutputSettings) => invoke<OutputSettings>("set_output", { settings }),
   setBlackout: (on: boolean) => invoke<void>("set_blackout", { on }),
+  /** Scales all intensity output, from 0 to 1. */
+  setGrandMaster: (level: number) => invoke<void>("set_grand_master", { level }),
   setHighlight: (on: boolean) => invoke<void>("set_highlight", { on }),
   highlightColour: () => invoke<Rgb>("highlight_colour"),
   setHighlightColour: (colour: Rgb) => invoke<Rgb>("set_highlight_colour", { colour }),

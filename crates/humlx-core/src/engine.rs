@@ -66,6 +66,22 @@ pub struct OutputStatus {
     pub last_error: Option<String>,
 }
 
+/// The grand master level, from 0 to 1. Full unless someone pulls it down.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct GrandMaster(pub f32);
+
+impl Default for GrandMaster {
+    fn default() -> Self {
+        Self(1.0)
+    }
+}
+
+impl GrandMaster {
+    pub fn set(&mut self, level: f32) {
+        self.0 = if level.is_finite() { level.clamp(0.0, 1.0) } else { 1.0 };
+    }
+}
+
 /// Everything the output thread reads. Locked briefly by each tick and by
 /// each UI command.
 #[derive(Debug, Default)]
@@ -75,6 +91,9 @@ pub struct State {
     pub output: OutputSettings,
     pub status: OutputStatus,
     pub blackout: bool,
+    /// Scales every fixture's intensity, from 0 to 1, after everything else.
+    /// Colour, position and beam are left alone.
+    pub grand_master: GrandMaster,
     /// Picks out the selected fixtures: full, in the highlight colour and
     /// tight, with every other fixture out. A temporary override that is never
     /// recorded.
@@ -231,8 +250,12 @@ impl State {
                 } else {
                     channel.attribute.is_colour_mix()
                 };
-                if self.blackout && dims {
-                    value = 0;
+                if dims {
+                    if self.blackout {
+                        value = 0;
+                    } else if self.grand_master.0 < 1.0 {
+                        value = (f32::from(value) * self.grand_master.0).round() as u8;
+                    }
                 }
                 universe.set(fixture.address + i as u16, value);
             }
@@ -607,6 +630,31 @@ mod tests {
         state.highlight = true;
         state.compose();
         assert_eq!(&wash(&state, 1)[5..], &[255, 255, 255, 0, 255, 0, 0]);
+    }
+
+    #[test]
+    fn grand_master_scales_intensity_only() {
+        let mut state = state_with("generic/rgbw-par", "6ch DRGBW Strobe", 1);
+        state.locate(1).unwrap();
+        state.grand_master.set(0.5);
+        state.compose();
+        assert_eq!(state.universe().get(1), 128); // dimmer scaled
+        assert_eq!(state.universe().get(2), 255); // colour kept
+
+        // Without a dimmer, the colour mix is what dims.
+        let mut state = state_with("generic/rgb-par", "3ch RGB", 1);
+        state.locate(1).unwrap();
+        state.grand_master.set(0.0);
+        state.compose();
+        assert_eq!(
+            (1..=3).map(|a| state.universe().get(a)).collect::<Vec<_>>(),
+            vec![0, 0, 0]
+        );
+
+        state.grand_master.set(f32::NAN);
+        assert_eq!(state.grand_master.0, 1.0);
+        state.grand_master.set(3.0);
+        assert_eq!(state.grand_master.0, 1.0);
     }
 
     #[test]

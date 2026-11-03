@@ -58,6 +58,8 @@ pub struct Live {
     universe: Vec<u8>,
     status: OutputStatus,
     blackout: bool,
+    /// Grand master level from 0 to 1, which OSC can change too.
+    grand_master: f32,
     highlight: bool,
     /// Fixtures with channel test levels applied.
     tested: Vec<u32>,
@@ -226,6 +228,7 @@ pub fn live(app: State<'_, App>) -> Live {
         universe: state.universe().as_bytes().to_vec(),
         status: state.status.clone(),
         blackout: state.blackout,
+        grand_master: state.grand_master.0,
         highlight: state.highlight,
         tested: state.tested_fixtures(),
         playbacks: crate::playback::statuses(&state),
@@ -247,6 +250,11 @@ pub fn set_output(app: State<'_, App>, settings: OutputSettings) -> Result<Outpu
 #[tauri::command]
 pub fn set_blackout(app: State<'_, App>, on: bool) {
     app.engine.state().blackout = on;
+}
+
+#[tauri::command]
+pub fn set_grand_master(app: State<'_, App>, level: f32) {
+    app.engine.state().grand_master.set(level);
 }
 
 #[tauri::command]

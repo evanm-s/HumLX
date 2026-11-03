@@ -44,6 +44,7 @@ const profiles: Profile[] = Object.values(files).map((p) => ({
 let fixtures: Fixture[] = [1,2,3,4,5,6].map((id) => ({ id, name: `F${id}`, profile: profiles[0].id, mode: profiles[0].modes[0].name, address: id, footprint: 1, typeName: "x" }));
 let output: OutputSettings = { enabled: true, target: "255.255.255.255", universe: 0, rateHz: 40 };
 let blackout = false;
+let grandMaster = 1;
 let highlight = false;
 let highlightColour: Rgb = { r: 1, g: 1, b: 1 };
 const tests = new Map<number, Map<number, number>>();
@@ -214,7 +215,7 @@ function universe(): number[] {
     mode.channels.forEach((c, i) => {
       let value = tests.get(f.id)?.get(i) ?? prog[i] ?? c.default ?? 0;
       const mix = ["red", "green", "blue", "white", "amber", "uv"].includes(c.attribute);
-      if (blackout && (hasDimmer ? c.attribute === "intensity" : mix)) value = 0;
+      if (hasDimmer ? c.attribute === "intensity" : mix) value = blackout ? 0 : Math.round(value * grandMaster);
       data[f.address - 1 + i] = value;
     });
   }
@@ -285,6 +286,7 @@ const commands: Record<string, (args: Args) => unknown> = {
     universe: universe(),
     status: { packetsSent: (packets += 4), lastError: null },
     blackout,
+    grandMaster,
     highlight,
     tested: [...tests.keys()].sort((a, b) => a - b),
     playbacks: [...running].map(([list, current]) => ({ list, current, fading: false, followIn: null })),
@@ -317,6 +319,7 @@ const commands: Record<string, (args: Args) => unknown> = {
   },
   set_output: ({ settings }) => (output = settings),
   set_blackout: ({ on }) => (blackout = on),
+  set_grand_master: ({ level }) => (grandMaster = Math.max(0, Math.min(1, level))),
   set_highlight: ({ on }) => (highlight = on),
   highlight_colour: () => highlightColour,
   set_highlight_colour: ({ colour }) => (highlightColour = colour),
