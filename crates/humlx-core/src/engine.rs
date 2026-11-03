@@ -834,6 +834,21 @@ mod tests {
     }
 
     #[test]
+    fn highlight_zooms_tight_on_movers_that_zoom_wide_to_narrow() {
+        // The LM6X15 is narrowest at full, so Highlight sends zoom 255.
+        let library = Library::with_bundled();
+        for mode in ["15ch", "13ch"] {
+            let mode = library.mode("event-lighting/lm6x15", mode).unwrap();
+            assert_eq!(tightest_zoom(mode), 1.0);
+        }
+        // Fixtures that zoom narrow to wide still go to 0.
+        let wash = library
+            .mode("philips-showline/sl-wash-180-rgbw", "8-bit (16ch)")
+            .unwrap();
+        assert_eq!(tightest_zoom(wash), 0.0);
+    }
+
+    #[test]
     fn grand_master_scales_intensity_only() {
         let mut state = state_with("generic/rgbw-par", "6ch DRGBW Strobe", 1);
         state.locate(1).unwrap();

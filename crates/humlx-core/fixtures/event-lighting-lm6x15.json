@@ -81,7 +81,14 @@
         },
         {
           "name": "Zoom",
-          "attribute": "zoom"
+          "attribute": "zoom",
+          "capabilities": [
+            {
+              "from": 0,
+              "to": 255,
+              "label": "Wide to narrow"
+            }
+          ]
         },
         {
           "name": "Pan/Tilt speed",
@@ -391,7 +398,14 @@
         },
         {
           "name": "Zoom",
-          "attribute": "zoom"
+          "attribute": "zoom",
+          "capabilities": [
+            {
+              "from": 0,
+              "to": 255,
+              "label": "Wide to narrow"
+            }
+          ]
         },
         {
           "name": "Pan/Tilt speed",
