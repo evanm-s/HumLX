@@ -1,0 +1,1850 @@
+{
+  "manufacturer": "Philips Showline",
+  "model": "SL Wash 180 RGBW",
+  "categories": [
+    "Moving Head"
+  ],
+  "modes": [
+    {
+      "name": "8-bit (16ch)",
+      "channels": [
+        {
+          "name": "Pan",
+          "attribute": "pan",
+          "default": 128
+        },
+        {
+          "name": "Pan fine",
+          "attribute": "pan",
+          "fineOf": "Pan"
+        },
+        {
+          "name": "Tilt",
+          "attribute": "tilt",
+          "default": 128
+        },
+        {
+          "name": "Tilt fine",
+          "attribute": "tilt",
+          "fineOf": "Tilt"
+        },
+        {
+          "name": "Dimmer",
+          "attribute": "intensity"
+        },
+        {
+          "name": "Colour presets",
+          "attribute": "color_wheel",
+          "default": 0,
+          "capabilities": [
+            {
+              "from": 0,
+              "to": 4,
+              "label": "Off (RGBW channels)"
+            },
+            {
+              "from": 5,
+              "to": 6,
+              "label": "User preset 0 (off)"
+            },
+            {
+              "from": 7,
+              "to": 8,
+              "label": "User preset 1"
+            },
+            {
+              "from": 9,
+              "to": 10,
+              "label": "User preset 2"
+            },
+            {
+              "from": 11,
+              "to": 12,
+              "label": "User preset 3"
+            },
+            {
+              "from": 13,
+              "to": 14,
+              "label": "User preset 4"
+            },
+            {
+              "from": 15,
+              "to": 16,
+              "label": "User preset 5"
+            },
+            {
+              "from": 17,
+              "to": 18,
+              "label": "User preset 6"
+            },
+            {
+              "from": 19,
+              "to": 20,
+              "label": "User preset 7"
+            },
+            {
+              "from": 21,
+              "to": 22,
+              "label": "User preset 8"
+            },
+            {
+              "from": 23,
+              "to": 24,
+              "label": "User preset 9"
+            },
+            {
+              "from": 25,
+              "to": 26,
+              "label": "User preset 10"
+            },
+            {
+              "from": 27,
+              "to": 28,
+              "label": "User preset 11"
+            },
+            {
+              "from": 29,
+              "to": 30,
+              "label": "User preset 12"
+            },
+            {
+              "from": 31,
+              "to": 32,
+              "label": "User preset 13"
+            },
+            {
+              "from": 33,
+              "to": 34,
+              "label": "User preset 14"
+            },
+            {
+              "from": 35,
+              "to": 36,
+              "label": "User preset 15"
+            },
+            {
+              "from": 37,
+              "to": 38,
+              "label": "User preset 16"
+            },
+            {
+              "from": 39,
+              "to": 40,
+              "label": "User preset 17"
+            },
+            {
+              "from": 41,
+              "to": 42,
+              "label": "User preset 18"
+            },
+            {
+              "from": 43,
+              "to": 44,
+              "label": "User preset 19"
+            },
+            {
+              "from": 45,
+              "to": 46,
+              "label": "User preset 20"
+            },
+            {
+              "from": 47,
+              "to": 48,
+              "label": "User preset 21"
+            },
+            {
+              "from": 49,
+              "to": 50,
+              "label": "User preset 22"
+            },
+            {
+              "from": 51,
+              "to": 52,
+              "label": "User preset 23"
+            },
+            {
+              "from": 53,
+              "to": 54,
+              "label": "User preset 24"
+            },
+            {
+              "from": 55,
+              "to": 56,
+              "label": "User preset 25"
+            },
+            {
+              "from": 57,
+              "to": 58,
+              "label": "User preset 26"
+            },
+            {
+              "from": 59,
+              "to": 60,
+              "label": "User preset 27"
+            },
+            {
+              "from": 61,
+              "to": 62,
+              "label": "User preset 28"
+            },
+            {
+              "from": 63,
+              "to": 64,
+              "label": "User preset 29"
+            },
+            {
+              "from": 65,
+              "to": 66,
+              "label": "User preset 30"
+            },
+            {
+              "from": 67,
+              "to": 68,
+              "label": "User preset 31"
+            },
+            {
+              "from": 69,
+              "to": 70,
+              "label": "Color off"
+            },
+            {
+              "from": 71,
+              "to": 72,
+              "label": "White 10000K"
+            },
+            {
+              "from": 73,
+              "to": 74,
+              "label": "White 8000K"
+            },
+            {
+              "from": 75,
+              "to": 76,
+              "label": "White 6500K"
+            },
+            {
+              "from": 77,
+              "to": 78,
+              "label": "White 5600K"
+            },
+            {
+              "from": 79,
+              "to": 80,
+              "label": "White 5000K"
+            },
+            {
+              "from": 81,
+              "to": 82,
+              "label": "White 4500K"
+            },
+            {
+              "from": 83,
+              "to": 84,
+              "label": "White 4000K"
+            },
+            {
+              "from": 85,
+              "to": 86,
+              "label": "White 3200K"
+            },
+            {
+              "from": 87,
+              "to": 88,
+              "label": "White 3000K"
+            },
+            {
+              "from": 89,
+              "to": 90,
+              "label": "White 2700K"
+            },
+            {
+              "from": 91,
+              "to": 92,
+              "label": "Moroccan Pink"
+            },
+            {
+              "from": 93,
+              "to": 94,
+              "label": "Pink"
+            },
+            {
+              "from": 95,
+              "to": 96,
+              "label": "Flesh Pink"
+            },
+            {
+              "from": 97,
+              "to": 98,
+              "label": "Bright Rose"
+            },
+            {
+              "from": 99,
+              "to": 100,
+              "label": "Follies Pink"
+            },
+            {
+              "from": 101,
+              "to": 102,
+              "label": "Fuchsia Pink"
+            },
+            {
+              "from": 103,
+              "to": 104,
+              "label": "Surprise Pink"
+            },
+            {
+              "from": 105,
+              "to": 106,
+              "label": "Congo Blue"
+            },
+            {
+              "from": 107,
+              "to": 108,
+              "label": "Blue"
+            },
+            {
+              "from": 109,
+              "to": 110,
+              "label": "Virgin Blue"
+            },
+            {
+              "from": 111,
+              "to": 112,
+              "label": "Midnight Maya"
+            },
+            {
+              "from": 113,
+              "to": 114,
+              "label": "Double CT Blue"
+            },
+            {
+              "from": 115,
+              "to": 116,
+              "label": "Slate Blue"
+            },
+            {
+              "from": 117,
+              "to": 118,
+              "label": "Regal Blue"
+            },
+            {
+              "from": 119,
+              "to": 120,
+              "label": "Full CT Blue"
+            },
+            {
+              "from": 121,
+              "to": 122,
+              "label": "Steel Blue"
+            },
+            {
+              "from": 123,
+              "to": 124,
+              "label": "Lighter Blue"
+            },
+            {
+              "from": 125,
+              "to": 126,
+              "label": "Cyan"
+            },
+            {
+              "from": 127,
+              "to": 128,
+              "label": "Marine Blue"
+            },
+            {
+              "from": 129,
+              "to": 130,
+              "label": "Soft Green"
+            },
+            {
+              "from": 131,
+              "to": 132,
+              "label": "Moss Green"
+            },
+            {
+              "from": 133,
+              "to": 134,
+              "label": "Green"
+            },
+            {
+              "from": 135,
+              "to": 136,
+              "label": "Fern Green"
+            },
+            {
+              "from": 137,
+              "to": 138,
+              "label": "JAS Green"
+            },
+            {
+              "from": 139,
+              "to": 140,
+              "label": "Pale Green"
+            },
+            {
+              "from": 141,
+              "to": 142,
+              "label": "Spring Yellow"
+            },
+            {
+              "from": 143,
+              "to": 144,
+              "label": "Yellow"
+            },
+            {
+              "from": 145,
+              "to": 146,
+              "label": "Deep Amber"
+            },
+            {
+              "from": 147,
+              "to": 148,
+              "label": "Chrome Orange"
+            },
+            {
+              "from": 149,
+              "to": 150,
+              "label": "Orange"
+            },
+            {
+              "from": 151,
+              "to": 152,
+              "label": "Magenta"
+            },
+            {
+              "from": 153,
+              "to": 154,
+              "label": "Flame Red"
+            },
+            {
+              "from": 155,
+              "to": 156,
+              "label": "Purple"
+            },
+            {
+              "from": 157,
+              "to": 171,
+              "label": "Rotate CW fast to slow"
+            },
+            {
+              "from": 172,
+              "to": 186,
+              "label": "Rotate CCW slow to fast"
+            },
+            {
+              "from": 187,
+              "to": 201,
+              "label": "Random colour fast to slow"
+            },
+            {
+              "from": 202,
+              "to": 204,
+              "label": "Chase 1"
+            },
+            {
+              "from": 205,
+              "to": 207,
+              "label": "Chase 2"
+            },
+            {
+              "from": 208,
+              "to": 210,
+              "label": "Chase 3"
+            },
+            {
+              "from": 211,
+              "to": 213,
+              "label": "Chase 4"
+            },
+            {
+              "from": 214,
+              "to": 216,
+              "label": "Chase 5"
+            },
+            {
+              "from": 217,
+              "to": 219,
+              "label": "Chase 6"
+            },
+            {
+              "from": 220,
+              "to": 222,
+              "label": "Chase 7"
+            },
+            {
+              "from": 223,
+              "to": 225,
+              "label": "Chase 8"
+            },
+            {
+              "from": 226,
+              "to": 228,
+              "label": "Chase 9"
+            },
+            {
+              "from": 229,
+              "to": 231,
+              "label": "Chase 10"
+            },
+            {
+              "from": 232,
+              "to": 234,
+              "label": "User chase 1"
+            },
+            {
+              "from": 235,
+              "to": 237,
+              "label": "User chase 2"
+            },
+            {
+              "from": 238,
+              "to": 240,
+              "label": "User chase 3"
+            },
+            {
+              "from": 241,
+              "to": 243,
+              "label": "User chase 4"
+            },
+            {
+              "from": 244,
+              "to": 246,
+              "label": "User chase 5"
+            },
+            {
+              "from": 247,
+              "to": 249,
+              "label": "User chase 6"
+            },
+            {
+              "from": 250,
+              "to": 252,
+              "label": "User chase 7"
+            },
+            {
+              "from": 253,
+              "to": 255,
+              "label": "User chase 8"
+            }
+          ]
+        },
+        {
+          "name": "Strobe",
+          "attribute": "shutter",
+          "default": 0,
+          "capabilities": [
+            {
+              "from": 0,
+              "to": 2,
+              "label": "Open"
+            },
+            {
+              "from": 3,
+              "to": 5,
+              "label": "Closed"
+            },
+            {
+              "from": 6,
+              "to": 7,
+              "label": "Random slow"
+            },
+            {
+              "from": 8,
+              "to": 10,
+              "label": "Random medium"
+            },
+            {
+              "from": 11,
+              "to": 12,
+              "label": "Random fast"
+            },
+            {
+              "from": 13,
+              "to": 127,
+              "label": "Strobe slow to fast"
+            },
+            {
+              "from": 128,
+              "to": 129,
+              "label": "Pulse + random slow"
+            },
+            {
+              "from": 130,
+              "to": 131,
+              "label": "Pulse + random medium"
+            },
+            {
+              "from": 132,
+              "to": 133,
+              "label": "Pulse + random fast"
+            },
+            {
+              "from": 134,
+              "to": 191,
+              "label": "Pulse + slow to fast"
+            },
+            {
+              "from": 192,
+              "to": 193,
+              "label": "Pulse - random slow"
+            },
+            {
+              "from": 194,
+              "to": 195,
+              "label": "Pulse - random medium"
+            },
+            {
+              "from": 196,
+              "to": 197,
+              "label": "Pulse - random fast"
+            },
+            {
+              "from": 198,
+              "to": 255,
+              "label": "Pulse - slow to fast"
+            }
+          ]
+        },
+        {
+          "name": "Strobe duration",
+          "attribute": "speed",
+          "capabilities": [
+            {
+              "from": 0,
+              "to": 255,
+              "label": "Flash duration short to long"
+            }
+          ]
+        },
+        {
+          "name": "Zoom",
+          "attribute": "zoom",
+          "capabilities": [
+            {
+              "from": 0,
+              "to": 255,
+              "label": "Narrow to wide (12 to 45 degrees)"
+            }
+          ]
+        },
+        {
+          "name": "Position (focus) timing",
+          "attribute": "control",
+          "default": 255,
+          "capabilities": [
+            {
+              "from": 0,
+              "to": 0,
+              "label": "No fade (full speed)"
+            },
+            {
+              "from": 1,
+              "to": 254,
+              "label": "Fade time"
+            },
+            {
+              "from": 255,
+              "to": 255,
+              "label": "Follow console (default)"
+            }
+          ]
+        },
+        {
+          "name": "Timing",
+          "attribute": "control",
+          "default": 255,
+          "capabilities": [
+            {
+              "from": 0,
+              "to": 0,
+              "label": "No fade (full speed)"
+            },
+            {
+              "from": 1,
+              "to": 254,
+              "label": "Fade time"
+            },
+            {
+              "from": 255,
+              "to": 255,
+              "label": "Follow console (default)"
+            }
+          ]
+        },
+        {
+          "name": "Control (hold 5s)",
+          "attribute": "control",
+          "default": 0,
+          "capabilities": [
+            {
+              "from": 0,
+              "to": 4,
+              "label": "No function"
+            },
+            {
+              "from": 5,
+              "to": 9,
+              "label": "Dim response normal"
+            },
+            {
+              "from": 10,
+              "to": 14,
+              "label": "Dim response incandescent"
+            },
+            {
+              "from": 30,
+              "to": 34,
+              "label": "Dimming curve linear"
+            },
+            {
+              "from": 35,
+              "to": 39,
+              "label": "Dimming curve square"
+            },
+            {
+              "from": 40,
+              "to": 44,
+              "label": "Dimming curve S-curve"
+            },
+            {
+              "from": 45,
+              "to": 49,
+              "label": "Dimming curve PL-curve"
+            },
+            {
+              "from": 70,
+              "to": 74,
+              "label": "Calibration (Harmonize) off"
+            },
+            {
+              "from": 75,
+              "to": 79,
+              "label": "Calibration (Harmonize) on"
+            },
+            {
+              "from": 100,
+              "to": 104,
+              "label": "Map RGBW 16-bit"
+            },
+            {
+              "from": 105,
+              "to": 109,
+              "label": "Map RGBW 8-bit"
+            },
+            {
+              "from": 110,
+              "to": 114,
+              "label": "Map HSIC"
+            }
+          ]
+        },
+        {
+          "name": "Red",
+          "attribute": "red"
+        },
+        {
+          "name": "Green",
+          "attribute": "green"
+        },
+        {
+          "name": "Blue",
+          "attribute": "blue"
+        },
+        {
+          "name": "White",
+          "attribute": "white"
+        }
+      ]
+    },
+    {
+      "name": "16-bit (23ch)",
+      "channels": [
+        {
+          "name": "Pan",
+          "attribute": "pan",
+          "default": 128
+        },
+        {
+          "name": "Pan fine",
+          "attribute": "pan",
+          "fineOf": "Pan"
+        },
+        {
+          "name": "Tilt",
+          "attribute": "tilt",
+          "default": 128
+        },
+        {
+          "name": "Tilt fine",
+          "attribute": "tilt",
+          "fineOf": "Tilt"
+        },
+        {
+          "name": "Dimmer",
+          "attribute": "intensity"
+        },
+        {
+          "name": "Dimmer fine",
+          "attribute": "intensity",
+          "fineOf": "Dimmer"
+        },
+        {
+          "name": "Colour presets",
+          "attribute": "color_wheel",
+          "default": 0,
+          "capabilities": [
+            {
+              "from": 0,
+              "to": 4,
+              "label": "Off (RGBW channels)"
+            },
+            {
+              "from": 5,
+              "to": 6,
+              "label": "User preset 0 (off)"
+            },
+            {
+              "from": 7,
+              "to": 8,
+              "label": "User preset 1"
+            },
+            {
+              "from": 9,
+              "to": 10,
+              "label": "User preset 2"
+            },
+            {
+              "from": 11,
+              "to": 12,
+              "label": "User preset 3"
+            },
+            {
+              "from": 13,
+              "to": 14,
+              "label": "User preset 4"
+            },
+            {
+              "from": 15,
+              "to": 16,
+              "label": "User preset 5"
+            },
+            {
+              "from": 17,
+              "to": 18,
+              "label": "User preset 6"
+            },
+            {
+              "from": 19,
+              "to": 20,
+              "label": "User preset 7"
+            },
+            {
+              "from": 21,
+              "to": 22,
+              "label": "User preset 8"
+            },
+            {
+              "from": 23,
+              "to": 24,
+              "label": "User preset 9"
+            },
+            {
+              "from": 25,
+              "to": 26,
+              "label": "User preset 10"
+            },
+            {
+              "from": 27,
+              "to": 28,
+              "label": "User preset 11"
+            },
+            {
+              "from": 29,
+              "to": 30,
+              "label": "User preset 12"
+            },
+            {
+              "from": 31,
+              "to": 32,
+              "label": "User preset 13"
+            },
+            {
+              "from": 33,
+              "to": 34,
+              "label": "User preset 14"
+            },
+            {
+              "from": 35,
+              "to": 36,
+              "label": "User preset 15"
+            },
+            {
+              "from": 37,
+              "to": 38,
+              "label": "User preset 16"
+            },
+            {
+              "from": 39,
+              "to": 40,
+              "label": "User preset 17"
+            },
+            {
+              "from": 41,
+              "to": 42,
+              "label": "User preset 18"
+            },
+            {
+              "from": 43,
+              "to": 44,
+              "label": "User preset 19"
+            },
+            {
+              "from": 45,
+              "to": 46,
+              "label": "User preset 20"
+            },
+            {
+              "from": 47,
+              "to": 48,
+              "label": "User preset 21"
+            },
+            {
+              "from": 49,
+              "to": 50,
+              "label": "User preset 22"
+            },
+            {
+              "from": 51,
+              "to": 52,
+              "label": "User preset 23"
+            },
+            {
+              "from": 53,
+              "to": 54,
+              "label": "User preset 24"
+            },
+            {
+              "from": 55,
+              "to": 56,
+              "label": "User preset 25"
+            },
+            {
+              "from": 57,
+              "to": 58,
+              "label": "User preset 26"
+            },
+            {
+              "from": 59,
+              "to": 60,
+              "label": "User preset 27"
+            },
+            {
+              "from": 61,
+              "to": 62,
+              "label": "User preset 28"
+            },
+            {
+              "from": 63,
+              "to": 64,
+              "label": "User preset 29"
+            },
+            {
+              "from": 65,
+              "to": 66,
+              "label": "User preset 30"
+            },
+            {
+              "from": 67,
+              "to": 68,
+              "label": "User preset 31"
+            },
+            {
+              "from": 69,
+              "to": 70,
+              "label": "Color off"
+            },
+            {
+              "from": 71,
+              "to": 72,
+              "label": "White 10000K"
+            },
+            {
+              "from": 73,
+              "to": 74,
+              "label": "White 8000K"
+            },
+            {
+              "from": 75,
+              "to": 76,
+              "label": "White 6500K"
+            },
+            {
+              "from": 77,
+              "to": 78,
+              "label": "White 5600K"
+            },
+            {
+              "from": 79,
+              "to": 80,
+              "label": "White 5000K"
+            },
+            {
+              "from": 81,
+              "to": 82,
+              "label": "White 4500K"
+            },
+            {
+              "from": 83,
+              "to": 84,
+              "label": "White 4000K"
+            },
+            {
+              "from": 85,
+              "to": 86,
+              "label": "White 3200K"
+            },
+            {
+              "from": 87,
+              "to": 88,
+              "label": "White 3000K"
+            },
+            {
+              "from": 89,
+              "to": 90,
+              "label": "White 2700K"
+            },
+            {
+              "from": 91,
+              "to": 92,
+              "label": "Moroccan Pink"
+            },
+            {
+              "from": 93,
+              "to": 94,
+              "label": "Pink"
+            },
+            {
+              "from": 95,
+              "to": 96,
+              "label": "Flesh Pink"
+            },
+            {
+              "from": 97,
+              "to": 98,
+              "label": "Bright Rose"
+            },
+            {
+              "from": 99,
+              "to": 100,
+              "label": "Follies Pink"
+            },
+            {
+              "from": 101,
+              "to": 102,
+              "label": "Fuchsia Pink"
+            },
+            {
+              "from": 103,
+              "to": 104,
+              "label": "Surprise Pink"
+            },
+            {
+              "from": 105,
+              "to": 106,
+              "label": "Congo Blue"
+            },
+            {
+              "from": 107,
+              "to": 108,
+              "label": "Blue"
+            },
+            {
+              "from": 109,
+              "to": 110,
+              "label": "Virgin Blue"
+            },
+            {
+              "from": 111,
+              "to": 112,
+              "label": "Midnight Maya"
+            },
+            {
+              "from": 113,
+              "to": 114,
+              "label": "Double CT Blue"
+            },
+            {
+              "from": 115,
+              "to": 116,
+              "label": "Slate Blue"
+            },
+            {
+              "from": 117,
+              "to": 118,
+              "label": "Regal Blue"
+            },
+            {
+              "from": 119,
+              "to": 120,
+              "label": "Full CT Blue"
+            },
+            {
+              "from": 121,
+              "to": 122,
+              "label": "Steel Blue"
+            },
+            {
+              "from": 123,
+              "to": 124,
+              "label": "Lighter Blue"
+            },
+            {
+              "from": 125,
+              "to": 126,
+              "label": "Cyan"
+            },
+            {
+              "from": 127,
+              "to": 128,
+              "label": "Marine Blue"
+            },
+            {
+              "from": 129,
+              "to": 130,
+              "label": "Soft Green"
+            },
+            {
+              "from": 131,
+              "to": 132,
+              "label": "Moss Green"
+            },
+            {
+              "from": 133,
+              "to": 134,
+              "label": "Green"
+            },
+            {
+              "from": 135,
+              "to": 136,
+              "label": "Fern Green"
+            },
+            {
+              "from": 137,
+              "to": 138,
+              "label": "JAS Green"
+            },
+            {
+              "from": 139,
+              "to": 140,
+              "label": "Pale Green"
+            },
+            {
+              "from": 141,
+              "to": 142,
+              "label": "Spring Yellow"
+            },
+            {
+              "from": 143,
+              "to": 144,
+              "label": "Yellow"
+            },
+            {
+              "from": 145,
+              "to": 146,
+              "label": "Deep Amber"
+            },
+            {
+              "from": 147,
+              "to": 148,
+              "label": "Chrome Orange"
+            },
+            {
+              "from": 149,
+              "to": 150,
+              "label": "Orange"
+            },
+            {
+              "from": 151,
+              "to": 152,
+              "label": "Magenta"
+            },
+            {
+              "from": 153,
+              "to": 154,
+              "label": "Flame Red"
+            },
+            {
+              "from": 155,
+              "to": 156,
+              "label": "Purple"
+            },
+            {
+              "from": 157,
+              "to": 171,
+              "label": "Rotate CW fast to slow"
+            },
+            {
+              "from": 172,
+              "to": 186,
+              "label": "Rotate CCW slow to fast"
+            },
+            {
+              "from": 187,
+              "to": 201,
+              "label": "Random colour fast to slow"
+            },
+            {
+              "from": 202,
+              "to": 204,
+              "label": "Chase 1"
+            },
+            {
+              "from": 205,
+              "to": 207,
+              "label": "Chase 2"
+            },
+            {
+              "from": 208,
+              "to": 210,
+              "label": "Chase 3"
+            },
+            {
+              "from": 211,
+              "to": 213,
+              "label": "Chase 4"
+            },
+            {
+              "from": 214,
+              "to": 216,
+              "label": "Chase 5"
+            },
+            {
+              "from": 217,
+              "to": 219,
+              "label": "Chase 6"
+            },
+            {
+              "from": 220,
+              "to": 222,
+              "label": "Chase 7"
+            },
+            {
+              "from": 223,
+              "to": 225,
+              "label": "Chase 8"
+            },
+            {
+              "from": 226,
+              "to": 228,
+              "label": "Chase 9"
+            },
+            {
+              "from": 229,
+              "to": 231,
+              "label": "Chase 10"
+            },
+            {
+              "from": 232,
+              "to": 234,
+              "label": "User chase 1"
+            },
+            {
+              "from": 235,
+              "to": 237,
+              "label": "User chase 2"
+            },
+            {
+              "from": 238,
+              "to": 240,
+              "label": "User chase 3"
+            },
+            {
+              "from": 241,
+              "to": 243,
+              "label": "User chase 4"
+            },
+            {
+              "from": 244,
+              "to": 246,
+              "label": "User chase 5"
+            },
+            {
+              "from": 247,
+              "to": 249,
+              "label": "User chase 6"
+            },
+            {
+              "from": 250,
+              "to": 252,
+              "label": "User chase 7"
+            },
+            {
+              "from": 253,
+              "to": 255,
+              "label": "User chase 8"
+            }
+          ]
+        },
+        {
+          "name": "Strobe",
+          "attribute": "shutter",
+          "default": 0,
+          "capabilities": [
+            {
+              "from": 0,
+              "to": 2,
+              "label": "Open"
+            },
+            {
+              "from": 3,
+              "to": 5,
+              "label": "Closed"
+            },
+            {
+              "from": 6,
+              "to": 7,
+              "label": "Random slow"
+            },
+            {
+              "from": 8,
+              "to": 10,
+              "label": "Random medium"
+            },
+            {
+              "from": 11,
+              "to": 12,
+              "label": "Random fast"
+            },
+            {
+              "from": 13,
+              "to": 127,
+              "label": "Strobe slow to fast"
+            },
+            {
+              "from": 128,
+              "to": 129,
+              "label": "Pulse + random slow"
+            },
+            {
+              "from": 130,
+              "to": 131,
+              "label": "Pulse + random medium"
+            },
+            {
+              "from": 132,
+              "to": 133,
+              "label": "Pulse + random fast"
+            },
+            {
+              "from": 134,
+              "to": 191,
+              "label": "Pulse + slow to fast"
+            },
+            {
+              "from": 192,
+              "to": 193,
+              "label": "Pulse - random slow"
+            },
+            {
+              "from": 194,
+              "to": 195,
+              "label": "Pulse - random medium"
+            },
+            {
+              "from": 196,
+              "to": 197,
+              "label": "Pulse - random fast"
+            },
+            {
+              "from": 198,
+              "to": 255,
+              "label": "Pulse - slow to fast"
+            }
+          ]
+        },
+        {
+          "name": "Strobe duration",
+          "attribute": "speed",
+          "capabilities": [
+            {
+              "from": 0,
+              "to": 255,
+              "label": "Flash duration short to long"
+            }
+          ]
+        },
+        {
+          "name": "Zoom",
+          "attribute": "zoom",
+          "capabilities": [
+            {
+              "from": 0,
+              "to": 255,
+              "label": "Narrow to wide (12 to 45 degrees)"
+            }
+          ]
+        },
+        {
+          "name": "Position (focus) timing",
+          "attribute": "control",
+          "default": 255,
+          "capabilities": [
+            {
+              "from": 0,
+              "to": 0,
+              "label": "No fade (full speed)"
+            },
+            {
+              "from": 1,
+              "to": 254,
+              "label": "Fade time"
+            },
+            {
+              "from": 255,
+              "to": 255,
+              "label": "Follow console (default)"
+            }
+          ]
+        },
+        {
+          "name": "Intensity timing",
+          "attribute": "control",
+          "default": 255,
+          "capabilities": [
+            {
+              "from": 0,
+              "to": 0,
+              "label": "No fade (full speed)"
+            },
+            {
+              "from": 1,
+              "to": 254,
+              "label": "Fade time"
+            },
+            {
+              "from": 255,
+              "to": 255,
+              "label": "Follow console (default)"
+            }
+          ]
+        },
+        {
+          "name": "Colour timing",
+          "attribute": "control",
+          "default": 255,
+          "capabilities": [
+            {
+              "from": 0,
+              "to": 0,
+              "label": "No fade (full speed)"
+            },
+            {
+              "from": 1,
+              "to": 254,
+              "label": "Fade time"
+            },
+            {
+              "from": 255,
+              "to": 255,
+              "label": "Follow console (default)"
+            }
+          ]
+        },
+        {
+          "name": "Zoom timing",
+          "attribute": "control",
+          "default": 255,
+          "capabilities": [
+            {
+              "from": 0,
+              "to": 0,
+              "label": "No fade (full speed)"
+            },
+            {
+              "from": 1,
+              "to": 254,
+              "label": "Fade time"
+            },
+            {
+              "from": 255,
+              "to": 255,
+              "label": "Follow console (default)"
+            }
+          ]
+        },
+        {
+          "name": "Control (hold 5s)",
+          "attribute": "control",
+          "default": 0,
+          "capabilities": [
+            {
+              "from": 0,
+              "to": 4,
+              "label": "No function"
+            },
+            {
+              "from": 5,
+              "to": 9,
+              "label": "Dim response normal"
+            },
+            {
+              "from": 10,
+              "to": 14,
+              "label": "Dim response incandescent"
+            },
+            {
+              "from": 30,
+              "to": 34,
+              "label": "Dimming curve linear"
+            },
+            {
+              "from": 35,
+              "to": 39,
+              "label": "Dimming curve square"
+            },
+            {
+              "from": 40,
+              "to": 44,
+              "label": "Dimming curve S-curve"
+            },
+            {
+              "from": 45,
+              "to": 49,
+              "label": "Dimming curve PL-curve"
+            },
+            {
+              "from": 70,
+              "to": 74,
+              "label": "Calibration (Harmonize) off"
+            },
+            {
+              "from": 75,
+              "to": 79,
+              "label": "Calibration (Harmonize) on"
+            },
+            {
+              "from": 80,
+              "to": 84,
+              "label": "Fan auto"
+            },
+            {
+              "from": 85,
+              "to": 89,
+              "label": "Fan off"
+            }
+          ]
+        },
+        {
+          "name": "Red",
+          "attribute": "red"
+        },
+        {
+          "name": "Red fine",
+          "attribute": "red",
+          "fineOf": "Red"
+        },
+        {
+          "name": "Green",
+          "attribute": "green"
+        },
+        {
+          "name": "Green fine",
+          "attribute": "green",
+          "fineOf": "Green"
+        },
+        {
+          "name": "Blue",
+          "attribute": "blue"
+        },
+        {
+          "name": "Blue fine",
+          "attribute": "blue",
+          "fineOf": "Blue"
+        },
+        {
+          "name": "White",
+          "attribute": "white"
+        },
+        {
+          "name": "White fine",
+          "attribute": "white",
+          "fineOf": "White"
+        }
+      ]
+    },
+    {
+      "name": "HSIC (16ch)",
+      "channels": [
+        {
+          "name": "Pan",
+          "attribute": "pan",
+          "default": 128
+        },
+        {
+          "name": "Pan fine",
+          "attribute": "pan",
+          "fineOf": "Pan"
+        },
+        {
+          "name": "Tilt",
+          "attribute": "tilt",
+          "default": 128
+        },
+        {
+          "name": "Tilt fine",
+          "attribute": "tilt",
+          "fineOf": "Tilt"
+        },
+        {
+          "name": "Dimmer",
+          "attribute": "intensity"
+        },
+        {
+          "name": "Strobe",
+          "attribute": "shutter",
+          "default": 0,
+          "capabilities": [
+            {
+              "from": 0,
+              "to": 2,
+              "label": "Open"
+            },
+            {
+              "from": 3,
+              "to": 5,
+              "label": "Closed"
+            },
+            {
+              "from": 6,
+              "to": 7,
+              "label": "Random slow"
+            },
+            {
+              "from": 8,
+              "to": 10,
+              "label": "Random medium"
+            },
+            {
+              "from": 11,
+              "to": 12,
+              "label": "Random fast"
+            },
+            {
+              "from": 13,
+              "to": 127,
+              "label": "Strobe slow to fast"
+            },
+            {
+              "from": 128,
+              "to": 129,
+              "label": "Pulse + random slow"
+            },
+            {
+              "from": 130,
+              "to": 131,
+              "label": "Pulse + random medium"
+            },
+            {
+              "from": 132,
+              "to": 133,
+              "label": "Pulse + random fast"
+            },
+            {
+              "from": 134,
+              "to": 191,
+              "label": "Pulse + slow to fast"
+            },
+            {
+              "from": 192,
+              "to": 193,
+              "label": "Pulse - random slow"
+            },
+            {
+              "from": 194,
+              "to": 195,
+              "label": "Pulse - random medium"
+            },
+            {
+              "from": 196,
+              "to": 197,
+              "label": "Pulse - random fast"
+            },
+            {
+              "from": 198,
+              "to": 255,
+              "label": "Pulse - slow to fast"
+            }
+          ]
+        },
+        {
+          "name": "Strobe duration",
+          "attribute": "speed",
+          "capabilities": [
+            {
+              "from": 0,
+              "to": 255,
+              "label": "Flash duration short to long"
+            }
+          ]
+        },
+        {
+          "name": "Zoom",
+          "attribute": "zoom",
+          "capabilities": [
+            {
+              "from": 0,
+              "to": 255,
+              "label": "Narrow to wide (12 to 45 degrees)"
+            }
+          ]
+        },
+        {
+          "name": "Position (focus) timing",
+          "attribute": "control",
+          "default": 255,
+          "capabilities": [
+            {
+              "from": 0,
+              "to": 0,
+              "label": "No fade (full speed)"
+            },
+            {
+              "from": 1,
+              "to": 254,
+              "label": "Fade time"
+            },
+            {
+              "from": 255,
+              "to": 255,
+              "label": "Follow console (default)"
+            }
+          ]
+        },
+        {
+          "name": "Timing",
+          "attribute": "control",
+          "default": 255,
+          "capabilities": [
+            {
+              "from": 0,
+              "to": 0,
+              "label": "No fade (full speed)"
+            },
+            {
+              "from": 1,
+              "to": 254,
+              "label": "Fade time"
+            },
+            {
+              "from": 255,
+              "to": 255,
+              "label": "Follow console (default)"
+            }
+          ]
+        },
+        {
+          "name": "Control (hold 5s)",
+          "attribute": "control",
+          "default": 0,
+          "capabilities": [
+            {
+              "from": 0,
+              "to": 4,
+              "label": "No function"
+            },
+            {
+              "from": 5,
+              "to": 9,
+              "label": "Dim response normal"
+            },
+            {
+              "from": 10,
+              "to": 14,
+              "label": "Dim response incandescent"
+            },
+            {
+              "from": 30,
+              "to": 34,
+              "label": "Dimming curve linear"
+            },
+            {
+              "from": 35,
+              "to": 39,
+              "label": "Dimming curve square"
+            },
+            {
+              "from": 40,
+              "to": 44,
+              "label": "Dimming curve S-curve"
+            },
+            {
+              "from": 45,
+              "to": 49,
+              "label": "Dimming curve PL-curve"
+            },
+            {
+              "from": 70,
+              "to": 74,
+              "label": "Calibration (Harmonize) off"
+            },
+            {
+              "from": 75,
+              "to": 79,
+              "label": "Calibration (Harmonize) on"
+            },
+            {
+              "from": 100,
+              "to": 104,
+              "label": "Map RGBW 16-bit"
+            },
+            {
+              "from": 105,
+              "to": 109,
+              "label": "Map RGBW 8-bit"
+            },
+            {
+              "from": 110,
+              "to": 114,
+              "label": "Map HSIC"
+            }
+          ]
+        },
+        {
+          "name": "Hue",
+          "attribute": "generic"
+        },
+        {
+          "name": "Hue fine",
+          "attribute": "generic",
+          "fineOf": "Hue"
+        },
+        {
+          "name": "Saturation",
+          "attribute": "generic"
+        },
+        {
+          "name": "Colour intensity",
+          "attribute": "generic",
+          "default": 255
+        },
+        {
+          "name": "CCT",
+          "attribute": "color_temperature",
+          "capabilities": [
+            {
+              "from": 0,
+              "to": 5,
+              "label": "Off"
+            },
+            {
+              "from": 6,
+              "to": 255,
+              "label": "2700K to 6500K"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

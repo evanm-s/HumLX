@@ -196,6 +196,7 @@ pub fn bundled() -> Vec<Profile> {
         include_str!("../fixtures/generic-moving-head-wash.json"),
         include_str!("../fixtures/generic-bi-colour-panel.json"),
         include_str!("../fixtures/event-lighting-lm6x15.json"),
+        include_str!("../fixtures/philips-showline-sl-wash-180-rgbw.json"),
     ];
     SOURCES
         .iter()
@@ -251,7 +252,11 @@ mod tests {
     #[test]
     fn bundled_profiles_load() {
         let library = Library::with_bundled();
-        assert_eq!(library.profiles().len(), 7);
+        assert_eq!(library.profiles().len(), 8);
+        let wash = library.get("philips-showline/sl-wash-180-rgbw").expect("sl wash 180");
+        assert_eq!(wash.mode("8-bit (16ch)").unwrap().channels.len(), 16);
+        assert_eq!(wash.mode("16-bit (23ch)").unwrap().channels.len(), 23);
+        assert_eq!(wash.mode("HSIC (16ch)").unwrap().channels.len(), 16);
         let par = library.get("generic/rgbw-par").expect("rgbw par");
         assert_eq!(par.mode("4ch RGBW").unwrap().channels.len(), 4);
     }
@@ -268,7 +273,7 @@ mod tests {
         let mut dimmer = library.get("generic/dimmer").unwrap().clone();
         dimmer.categories = vec!["Replaced".into()];
         library.insert(dimmer);
-        assert_eq!(library.profiles().len(), 7);
+        assert_eq!(library.profiles().len(), 8);
         assert_eq!(library.get("generic/dimmer").unwrap().categories, vec!["Replaced"]);
     }
 
