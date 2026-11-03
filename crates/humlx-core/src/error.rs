@@ -46,6 +46,8 @@ pub enum Error {
     InvalidOptions(String),
     #[error("{0}")]
     InvalidOsc(String),
+    #[error("{0}")]
+    InvalidStage(String),
     #[error(transparent)]
     Io(#[from] std::io::Error),
 }

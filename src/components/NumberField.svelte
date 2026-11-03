@@ -9,6 +9,8 @@
     placeholder?: string;
     /** Allow fractions, such as fade times. Otherwise typed values are rounded. */
     fractional?: boolean;
+    /** How much − and + change the value. */
+    increment?: number;
     onchange?: (value: number | null) => void;
   }
 
@@ -19,6 +21,7 @@
     max = Number.MAX_SAFE_INTEGER,
     placeholder,
     fractional = false,
+    increment = 1,
     onchange,
   }: Props = $props();
 
@@ -29,7 +32,7 @@
 
   function step(delta: number) {
     const base = value ?? (placeholder && !Number.isNaN(Number(placeholder)) ? Number(placeholder) : min);
-    set(value == null && delta > 0 ? base : base + delta);
+    set(value == null && delta > 0 ? base : round(base + delta));
   }
 
   const round = (n: number) => (fractional ? Math.round(n * 100) / 100 : Math.round(n));
@@ -43,7 +46,7 @@
 <label class="field">
   {label}
   <span class="number">
-    <button type="button" aria-label="Decrease {label}" onclick={() => step(-1)}>−</button>
+    <button type="button" aria-label="Decrease {label}" onclick={() => step(-increment)}>−</button>
     <input
       type="text"
       inputmode={fractional ? "decimal" : "numeric"}
@@ -52,7 +55,7 @@
       {placeholder}
       onchange={input}
     />
-    <button type="button" aria-label="Increase {label}" onclick={() => step(1)}>+</button>
+    <button type="button" aria-label="Increase {label}" onclick={() => step(increment)}>+</button>
   </span>
 </label>
 

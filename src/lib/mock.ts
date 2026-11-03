@@ -27,6 +27,7 @@ import type {
   Layout,
 } from "./types";
 import { DEFAULT_OPTIONS, emptyLayout } from "./types";
+import { aim, defaultStage, floorAt, MIN_READINGS, orient, unorient, type Solution, type Stage } from "./stage";
 
 const files = import.meta.glob<Omit<Profile, "id">>("../../crates/humlx-core/fixtures/*.json", {
   eager: true,
@@ -44,7 +45,17 @@ const profiles: Profile[] = Object.values(files).map((p) => ({
   id: `${slug(p.manufacturer)}/${slug(p.model)}`,
 }));
 
-let fixtures: Fixture[] = [1,2,3,4,5,6].map((id) => ({ id, name: `F${id}`, profile: profiles[0].id, mode: profiles[0].modes[0].name, address: id, footprint: 1, typeName: "x", options: { ...DEFAULT_OPTIONS } }));
+const firstMode = profiles[0].modes[0];
+let fixtures: Fixture[] = [1, 2, 3, 4, 5, 6].map((id) => ({
+  id,
+  name: `F${id}`,
+  profile: profiles[0].id,
+  mode: firstMode.name,
+  address: 1 + (id - 1) * firstMode.channels.length,
+  footprint: firstMode.channels.length,
+  typeName: "x",
+  options: { ...DEFAULT_OPTIONS },
+}));
 let output: OutputSettings = { enabled: true, target: "255.255.255.255", universe: 0, rateHz: 40 };
 let blackout = false;
 let grandMaster = 1;
@@ -68,6 +79,25 @@ const beats = (): [number, number] =>
 const running = new Map<number, number>(); // cue list -> current cue
 const masters = new Map<number, number>();
 const layout: Layout = emptyLayout();
+let stage: Stage = defaultStage();
+
+/** The preview can't fit movers, so it pretends each hangs over the front of the stage. */
+function pretendSolution(fixture: number): Solution {
+  const c = Math.cos((fixture * Math.PI) / 3);
+  const s = Math.sin((fixture * Math.PI) / 3);
+  return {
+    position: [((fixture % 4) - 1.5) * 2, -1, 4.5],
+    // Hung, axis down, turned round by fixture number.
+    rotation: [
+      [c, s, 0],
+      [s, -c, 0],
+      [0, 0, -1],
+    ],
+    panRange: 540,
+    tiltRange: 270,
+    errors: [],
+  };
+}
 const forget = (id: number) => {
   for (const page of layout.pages) page.buttons = page.buttons.map((b) => (b === id ? null : b));
   layout.slots = layout.slots.map((s) => (s === id ? null : s));
@@ -447,6 +477,51 @@ const commands: Record<string, (args: Args) => unknown> = {
       const family = SHAPES[e.shape].family;
       effects = effects.filter((x) => SHAPES[x.shape].family !== family || !x.fixtures.some((f) => selection.includes(f)));
       effects.push({ ...structuredClone(e), id: nextId(effects.map((x) => x.id)), fixtures: [...selection] });
+    }
+    return programmer();
+  },
+  stage: () => structuredClone(stage),
+  set_stage_plan: ({ plan }) => {
+    stage = { ...stage, ...structuredClone(plan as Omit<Stage, "movers">) };
+    return structuredClone(stage);
+  },
+  calibrate_mark: ({ fixture, mark }) => {
+    const v = values[fixture as number];
+    if (v?.pan == null || v?.tilt == null) throw "move the mover onto the mark with the pad first";
+    const options = fixtures.find((f) => f.id === fixture)?.options ?? DEFAULT_OPTIONS;
+    const [pan, tilt] = orient(options, v.pan, v.tilt);
+    let c = stage.movers.find((m) => m.fixture === fixture);
+    if (!c) stage.movers.push((c = { fixture: fixture as number, readings: [] }));
+    c.readings = [...c.readings.filter((r) => r.mark !== mark), { mark: mark as number, pan, tilt }];
+    c.readings.sort((a, b) => a.mark - b.mark);
+    c.solution =
+      c.readings.length >= MIN_READINGS
+        ? { ...pretendSolution(c.fixture), errors: c.readings.map((r) => ({ mark: r.mark, metres: 0.03 })) }
+        : null;
+    return structuredClone(stage);
+  },
+  forget_calibration: ({ fixture, mark }) => {
+    if (mark == null) stage.movers = stage.movers.filter((m) => m.fixture !== fixture);
+    else {
+      const c = stage.movers.find((m) => m.fixture === fixture);
+      if (c) {
+        c.readings = c.readings.filter((r) => r.mark !== mark);
+        if (c.readings.length < MIN_READINGS) c.solution = null;
+      }
+    }
+    return structuredClone(stage);
+  },
+  point_at: ({ x, y, height }) => {
+    const z = floorAt(stage, x as number, y as number) + (height as number);
+    for (const id of selection) {
+      const solution = stage.movers.find((m) => m.fixture === id)?.solution;
+      if (!solution) continue;
+      const options = fixtures.find((f) => f.id === id)?.options ?? DEFAULT_OPTIONS;
+      const v = (values[id] ??= {});
+      const current = orient(options, v.pan ?? 0.5, v.tilt ?? 0.5);
+      const [pan, tilt] = unorient(options, ...aim(solution, [x as number, y as number, z], current));
+      v.pan = pan;
+      v.tilt = tilt;
     }
     return programmer();
   },

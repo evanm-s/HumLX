@@ -11,6 +11,7 @@
   import Fader from "../components/Fader.svelte";
   import PositionPad from "../components/PositionPad.svelte";
   import RecordCue from "../components/RecordCue.svelte";
+  import StageWindow from "../components/StageWindow.svelte";
   import WhiteBalance from "../components/WhiteBalance.svelte";
   import Workspace from "../components/Workspace.svelte";
   import PresetPool from "../components/programmer/PresetPool.svelte";
@@ -124,6 +125,8 @@
   // --- Controls ------------------------------------------------------------
 
   let fine = $state(false);
+  // The stage plan pops out over everything, big enough to aim precisely.
+  let stageOpen = $state(false);
 
   // The Position window shows either the XY pad or separate pan and tilt
   // faders; remembered per machine.
@@ -424,6 +427,7 @@
     {/if}
   </header>
 
+  {#if stageOpen}<StageWindow onclose={() => (stageOpen = false)} />{/if}
   <Workspace bind:this={workspace} {windows} {layout} grid={GRID} {editing} onchange={setLayout} {body} {tools} />
 </div>
 
@@ -644,6 +648,7 @@
         <button onclick={() => program(() => api.setPosition(0.5, 0.5))}>Centre</button>
         <button onclick={() => program(() => api.setPosition(0.5, null))}>Centre pan</button>
         <button onclick={() => program(() => api.setPosition(null, 0.5))}>Centre tilt</button>
+        <button onclick={() => (stageOpen = true)}>Stage</button>
       </div>
     </div>
   {:else if id === "beam"}

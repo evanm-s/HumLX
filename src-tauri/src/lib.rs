@@ -98,6 +98,7 @@ impl App {
             highlight_colour: state.highlight_colour,
             speed_bpm: state.speed_masters.bpms(),
             profiles,
+            stage: state.stage.clone(),
             ..Show::default()
         }
     }
@@ -135,6 +136,7 @@ fn apply_show(state: &mut State, show: Show) {
         .unwrap_or_else(|| humlx_core::layout::Layout::migrate(&state.cue_lists));
     state.osc_settings = show.osc;
     state.highlight_colour = show.highlight_colour;
+    state.stage = show.stage;
     let now = std::time::Instant::now();
     for (master, bpm) in state.speed_masters.0.iter_mut().zip(show.speed_bpm) {
         master.set_bpm(bpm, now);
@@ -210,6 +212,11 @@ pub fn run() {
             commands::record_preset,
             commands::apply_preset,
             commands::delete_preset,
+            commands::stage,
+            commands::set_stage_plan,
+            commands::calibrate_mark,
+            commands::forget_calibration,
+            commands::point_at,
             playback::playback,
             playback::new_cue_list,
             playback::rename_cue_list,
