@@ -9,6 +9,7 @@
   import { formKeys } from "../lib/keys";
   import { attempt, notify, show } from "../lib/show.svelte";
   import { updates } from "../lib/updates.svelte";
+  import { SCALES, uiScale } from "../lib/uiScale.svelte";
   import type { Node, RemoteStatus, Rgb } from "../lib/types";
 
   let draft = $state({ ...show.output, universe: show.output.universe as number | null, rateHz: show.output.rateHz as number | null });
@@ -233,6 +234,29 @@
           </tbody>
         </table>
       {/if}
+    </section>
+  {/if}
+
+  {#if inApp}
+    <section class="panel card">
+      <div class="row">
+        <h2>Screen scale</h2>
+        <span class="spacer"></span>
+        <div class="segmented">
+          <button aria-pressed={uiScale.choice === "auto"} onclick={() => uiScale.set("auto")}>
+            Auto ({Math.round(uiScale.auto * 100)}%)
+          </button>
+          {#each SCALES as scale (scale)}
+            <button aria-pressed={uiScale.choice === scale} onclick={() => uiScale.set(scale)}>
+              {Math.round(scale * 100)}%
+            </button>
+          {/each}
+        </div>
+      </div>
+      <p class="muted">
+        How big everything is drawn. Auto fits the layout to this screen: 100% on a 2560×1440 screen, 75% on
+        1920×1080. Remembered on this computer.
+      </p>
     </section>
   {/if}
 
