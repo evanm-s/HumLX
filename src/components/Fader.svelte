@@ -2,6 +2,8 @@
   // A vertical touch fader. Dragging moves the level relative to where the
   // finger started, so touching the fader never makes the level jump.
 
+  import { drag, type DragPoint } from "../lib/drag";
+
   interface Props {
     value: number;
     label: string;
@@ -32,15 +34,14 @@
   const shown = $derived(dragging ? local : value);
   const fill = $derived((shown / max) * 100);
 
-  function down(event: PointerEvent) {
-    track.setPointerCapture(event.pointerId);
+  function down(event: DragPoint) {
     dragging = true;
     startY = event.clientY;
     startValue = value;
     local = value;
   }
 
-  function move(event: PointerEvent) {
+  function move(event: DragPoint) {
     if (!dragging) return;
     const height = track.clientHeight;
     const scale = fine ? 0.1 : 1;
@@ -79,10 +80,7 @@
     aria-valuemin={0}
     aria-valuemax={max}
     aria-valuenow={shown}
-    onpointerdown={down}
-    onpointermove={move}
-    onpointerup={up}
-    onpointercancel={up}
+    use:drag={{ start: down, move, end: up }}
     onkeydown={key}
     style:--colour={colour}
     style:--level={fill / 100}
