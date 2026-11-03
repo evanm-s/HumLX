@@ -236,6 +236,8 @@ pub fn run() {
             playback::back,
             playback::go_to,
             playback::release_cue_list,
+            playback::tap_cue_list,
+            playback::set_cue_list_options,
             playback::release_all,
             playback::set_master,
             playback::save_effect,

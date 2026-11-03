@@ -199,6 +199,26 @@
         <button class="danger" onclick={deleteList}>{confirmDelete === "list" ? "Tap again to delete list" : "Delete list"}</button>
       </header>
 
+      <div class="row options">
+        <button
+          aria-pressed={list.releaseOnNextGo}
+          onclick={() => play(() => api.setCueListOptions(list.id, !list.releaseOnNextGo, list.solo))}
+          >Release on next go</button
+        >
+        <button aria-pressed={list.solo} onclick={() => play(() => api.setCueListOptions(list.id, list.releaseOnNextGo, !list.solo))}
+          >Solo</button
+        >
+        <span class="muted">
+          {#if list.solo}
+            GO fades out every other running list.
+          {:else if list.releaseOnNextGo}
+            GO fades out other running lists that release on next go, so looks replace each other.
+          {:else}
+            Layers on top: GO leaves other lists running, and other lists' GO leaves this one.
+          {/if}
+        </span>
+      </div>
+
       <CueTable {list} picked={cueIndex} onpick={pick}>
         {#snippet empty()}
           <p class="muted empty">No cues yet. Set a look in the Programmer, then tap <strong>Record cue</strong>.</p>
@@ -390,13 +410,24 @@
 
   .editor {
     display: grid;
-    grid-template-rows: auto minmax(0, 1fr) auto auto;
+    grid-template-rows: auto auto minmax(0, 1fr) auto auto;
     gap: 10px;
   }
 
   .editor header {
     flex-wrap: wrap;
     gap: 10px;
+  }
+
+  .options {
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .options button[aria-pressed="true"] {
+    background: var(--f-playback);
+    border-color: var(--f-playback);
+    color: var(--accent-text);
   }
 
   .list-num {

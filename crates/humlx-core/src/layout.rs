@@ -166,6 +166,7 @@ mod tests {
             id,
             name: format!("List {id}"),
             cues: vec![Cue::default(); cues],
+            ..Default::default()
         }
     }
 

@@ -125,6 +125,9 @@ export const api = {
   go: (list: number) => invoke<PlaybackView>("go", { list }),
   back: (list: number) => invoke<PlaybackView>("back", { list }),
   goTo: (list: number, index: number) => invoke<PlaybackView>("go_to", { list, index }),
+  tapCueList: (list: number) => invoke<PlaybackView>("tap_cue_list", { list }),
+  setCueListOptions: (id: number, releaseOnNextGo: boolean, solo: boolean) =>
+    invoke<PlaybackView>("set_cue_list_options", { id, releaseOnNextGo, solo }),
   releaseCueList: (list: number) => invoke<PlaybackView>("release_cue_list", { list }),
   releaseAll: () => invoke<PlaybackView>("release_all"),
   setMaster: (list: number, level: number) => invoke<PlaybackView>("set_master", { list, level }),

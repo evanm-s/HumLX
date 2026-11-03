@@ -226,6 +226,9 @@
         <tr><td><code>/humlx/cuelist/{example}/goto/3</code></td><td>Go to cue 3 (or send the number to <code>…/goto</code>)</td></tr>
         <tr><td><code>/humlx/cuelist/{example}/release</code></td><td>Release the cue list</td></tr>
         <tr><td><code>/humlx/cuelist/{example}/master</code> 0.5</td><td>Set the master, from 0 to 1</td></tr>
+        <tr><td><code>/humlx/selected/go</code></td><td>The same actions on the selected cue list</td></tr>
+        <tr><td><code>/humlx/slot/2/go</code></td><td>The same actions on the list in fader slot 2</td></tr>
+        <tr><td><code>/humlx/grid/1/12</code></td><td>Tap button 12 on grid page 1</td></tr>
         <tr><td><code>/humlx/releaseall</code></td><td>Release everything</td></tr>
         <tr><td><code>/humlx/blackout</code> 1 or 0</td><td>Blackout on or off</td></tr>
         <tr><td><code>/humlx/grandmaster</code> 0.5</td><td>Set the grand master, from 0 to 1</td></tr>

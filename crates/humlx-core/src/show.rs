@@ -94,6 +94,7 @@ impl Show {
                     effects: vec![effect],
                     ..Default::default()
                 }],
+                ..Default::default()
             });
         }
         let mut layout = show.layout.take().unwrap_or_else(|| Layout::migrate(&show.cue_lists));
@@ -162,6 +163,7 @@ mod tests {
                 values: programmer.values.clone(),
                 effects: Vec::new(),
             }],
+            ..Default::default()
         });
         show.cue_lists[0].cues[0].effects.push(crate::effect::Effect::new(
             1,

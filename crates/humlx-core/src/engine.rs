@@ -123,6 +123,54 @@ pub struct State {
 }
 
 impl State {
+    fn cue_list(&self, id: u32) -> Result<CueList> {
+        self.cue_lists
+            .iter()
+            .find(|l| l.id == id)
+            .cloned()
+            .ok_or(Error::UnknownCueList(id))
+    }
+
+    /// GO on a cue list, fading out the lists it replaces (see
+    /// [`Playbacks::release_others`]).
+    pub fn go(&mut self, list: u32, now: Instant) -> Result<()> {
+        let list = self.cue_list(list)?;
+        self.playbacks.go(&list, now)?;
+        self.playbacks.release_others(&list, &self.cue_lists, now);
+        Ok(())
+    }
+
+    /// Goes to cue `index` (from 0) of a cue list, fading out the lists it replaces.
+    pub fn go_to(&mut self, list: u32, index: usize, now: Instant) -> Result<()> {
+        let list = self.cue_list(list)?;
+        self.playbacks.go_to(&list, index, now)?;
+        self.playbacks.release_others(&list, &self.cue_lists, now);
+        Ok(())
+    }
+
+    /// Fades a running list out over the fade of the cue it's on.
+    pub fn fade_out(&mut self, list: u32, now: Instant) {
+        let fade = self
+            .playbacks
+            .get(list)
+            .and_then(|p| self.cue_lists.iter().find(|l| l.id == list)?.cues.get(p.current))
+            .map_or(0.0, |c| c.fade.max(0.0));
+        self.playbacks.fade_out(list, Duration::from_secs_f32(fade), now);
+    }
+
+    /// A tap of a grid button: selects its list, then fades a live one-cue
+    /// look out, or else GOes.
+    pub fn tap(&mut self, list: u32, now: Instant) -> Result<()> {
+        let looks = self.cue_list(list)?.cues.len() == 1;
+        self.layout.selected = Some(list);
+        if looks && self.playbacks.get(list).is_some_and(|p| !p.releasing) {
+            self.fade_out(list, now);
+            Ok(())
+        } else {
+            self.go(list, now)
+        }
+    }
+
     pub fn new(library: Library, patch: Patch, output: OutputSettings) -> Self {
         Self {
             library,
@@ -540,6 +588,7 @@ mod tests {
                     ..Default::default()
                 },
             ],
+            ..Default::default()
         };
         let start = Instant::now();
         let at = |ms: u64| start + Duration::from_millis(ms);

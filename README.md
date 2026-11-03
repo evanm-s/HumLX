@@ -25,7 +25,11 @@ up quickly.
   for quick looks, like Onyx's Playbacks. Tap a button to play its cue list
   and select it; tap a live one-cue look again to release it. Press
   **Record**, then tap an empty button to save the Programmer as a new look
-  there (or a filled one to add a cue to it). **Edit layout** swaps, assigns
+  there (or a filled one to add a cue to it). Lists have **Release on next
+  go** (on by default): GO fades out the other running lists that have it on,
+  over the new cue's fade, so looks replace each other. Turn it off for lists
+  meant to layer on top. **Solo** lists fade out everything else. Set both on
+  the Cue Lists screen. **Edit layout** swaps, assigns
   and clears buttons and adds, renames or removes pages.
 - **Playback faders**: 8 fader slots, each loaded with whichever cue list the
   show needs, with a master fader, GO, Back and Release. Tap a slot's name to
@@ -51,7 +55,8 @@ up quickly.
   every change.
 
 - **OSC**: run cue lists from QLab, Companion, TouchOSC and the like, with
-  addresses such as `/humlx/cuelist/1/go` (the full list is on the Settings
+  addresses such as `/humlx/cuelist/1/go`, `/humlx/selected/go`,
+  `/humlx/slot/2/go` and `/humlx/grid/1/12` (the full list is on the Settings
   screen). Off by default; turn it on and pick a port in Settings.
 - **Show files**: save the show to a file, open one, or start a new show.
   Imported fixture types travel inside the file.
