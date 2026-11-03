@@ -1367,7 +1367,7 @@ checksum = "df3b46402a9d5adb4c86a0cf463f42e19994e3ee891101b1841f30a545cb49a9"
 
 [[package]]
 name = "humlx"
-version = "0.33.0"
+version = "0.33.1"
 dependencies = [
  "axum",
  "getrandom 0.3.4",
@@ -1386,7 +1386,7 @@ dependencies = [
 
 [[package]]
 name = "humlx-core"
-version = "0.33.0"
+version = "0.33.1"
 dependencies = [
  "roxmltree",
  "serde",
