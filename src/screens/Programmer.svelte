@@ -28,17 +28,19 @@
   const current = $derived(show.current);
   const program = show.program.bind(show);
 
-  // Fixtures split by type (profile and mode), in order of first appearance
-  // in the patch, so each type starts on its own row like Onyx.
+  // Fixtures in ID order, split into runs of the same type (profile and
+  // mode). Each run starts on its own row like Onyx, so a type patched again
+  // later (say dimmers 17-18 after the movers) gets its own row in ID order.
   const fixtureTypes = $derived.by(() => {
-    const types = new Map<string, Fixture[]>();
-    for (const f of show.patch.fixtures) {
+    const runs: Fixture[][] = [];
+    let lastKey: string | undefined;
+    for (const f of [...show.patch.fixtures].sort((a, b) => a.id - b.id)) {
       const key = `${f.profile}\u0000${f.mode}`;
-      const list = types.get(key);
-      if (list) list.push(f);
-      else types.set(key, [f]);
+      if (key === lastKey) runs[runs.length - 1].push(f);
+      else runs.push([f]);
+      lastKey = key;
     }
-    return [...types.values()];
+    return runs;
   });
 
   // --- Layout --------------------------------------------------------------
