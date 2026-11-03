@@ -132,7 +132,14 @@
   const plan = $derived<Plan>(draft ?? stage);
 
   function copyPlan(s: Plan): Plan {
-    return { width: s.width, depth: s.depth, margin: s.margin, riser: s.riser, marks: s.marks.map((m) => ({ ...m })) };
+    return {
+      width: s.width,
+      depth: s.depth,
+      margin: s.margin,
+      riser: s.riser,
+      marks: s.marks.map((m) => ({ ...m })),
+      scenery: (s.scenery ?? []).map((p) => ({ ...p, points: p.points.map((pt) => [...pt] as [number, number]) })),
+    };
   }
 
   // The view takes in the studio margin and any mover hung outside it.
@@ -158,7 +165,12 @@
   // on the right, height going up.
   const side = $derived.by(() => {
     const low = -plan.riser - 0.3;
-    const high = Math.max(2.2, height + 0.5, ...drawn.map((d) => d.at[2] + 0.6));
+    const high = Math.max(
+      2.2,
+      height + 0.5,
+      ...drawn.map((d) => d.at[2] + 0.6),
+      ...(plan.scenery ?? []).map((p) => p.height + 0.4),
+    );
     return { low, high, box: `${view.front} ${-high} ${view.back - view.front} ${high - low}` };
   });
 
@@ -226,6 +238,8 @@
       }
     } else if (mode === "setup" && draft && pickedMark != null) {
       moveMark(pickedMark, at);
+    } else if (mode === "setup" && draft && pickedPiece != null) {
+      draft.scenery[pickedPiece]?.points.push([round5(at.x), round5(at.y)]);
     }
   }
 
@@ -365,6 +379,31 @@
   // --- Set up ---------------------------------------------------------------
 
   let pickedMark = $state<number | null>(null);
+  /** The scenery piece that taps on the plan add points to. */
+  let pickedPiece = $state<number | null>(null);
+
+  function pickMark(id: number) {
+    pickedMark = pickedMark === id ? null : id;
+    pickedPiece = null;
+  }
+
+  function pickPiece(index: number) {
+    pickedPiece = pickedPiece === index ? null : index;
+    pickedMark = null;
+  }
+
+  function addPiece() {
+    if (!draft) return;
+    const name = draft.scenery.length === 0 ? "LED wall" : `Scenery ${draft.scenery.length + 1}`;
+    draft.scenery.push({ name, points: [], height: 3 });
+    pickPiece(draft.scenery.length - 1);
+  }
+
+  function removePiece(index: number) {
+    if (!draft) return;
+    draft.scenery.splice(index, 1);
+    pickedPiece = null;
+  }
 
   const round5 = (v: number) => Math.round(v * 20) / 20;
 
@@ -391,10 +430,11 @@
 
   async function savePlan() {
     if (!draft) return;
-    const d = draft;
+    const d = $state.snapshot(draft);
     // Marks sit on whichever floor they are over.
     const marks: Mark[] = d.marks.map((m) => ({ ...m, name: m.name.trim() || `Mark ${m.id}`, z: floorAt(d, m.x, m.y) }));
-    const saved = await attempt(() => api.setStagePlan({ ...d, marks }));
+    const scenery = d.scenery.filter((p) => p.points.length >= 2).map((p) => ({ ...p, name: p.name.trim() || "Scenery" }));
+    const saved = await attempt(() => api.setStagePlan({ ...d, marks, scenery }));
     if (!saved) return;
     stage = saved;
     draft = copyPlan(saved);
@@ -462,6 +502,22 @@
         <text class="caption" x="0" y={unit * 3.2} font-size={unit * 2.2} text-anchor="middle">Front of stage</text>
         <text class="caption" x="0" y={-plan.depth - unit * 1.4} font-size={unit * 2.2} text-anchor="middle">Up stage</text>
 
+        {#each plan.scenery ?? [] as piece, i (i)}
+          {@const mid = piece.points[Math.floor((piece.points.length - 1) / 2)]}
+          <g class="scenery" class:picked={mode === "setup" && pickedPiece === i}>
+            <polyline
+              points={piece.points.map(([x, y]) => `${x},${-y}`).join(" ")}
+              stroke-width={unit * 0.9}
+            />
+            {#each piece.points as [x, y], j (j)}
+              <circle cx={x} cy={-y} r={unit * (mode === "setup" ? 0.8 : 0.45)} />
+            {/each}
+            {#if mid}
+              <text x={mid[0]} y={-mid[1] - unit * 1.6} font-size={unit * 1.9} text-anchor="middle">{piece.name}</text>
+            {/if}
+          </g>
+        {/each}
+
         {#each plan.marks as mark (mark.id)}
           {@const current = mode === "calibrate" && mark.id === currentMark}
           {@const read = mode === "calibrate" && readingFor(mark.id)}
@@ -525,6 +581,19 @@
         <rect class="studio" x={view.front} y={-side.high} width={view.back - view.front} height={side.high - side.low} />
         <line class="floor" x1={view.front} x2={view.back} y1={plan.riser} y2={plan.riser} />
         <rect class="stage" x="0" y="0" width={plan.depth} height={Math.max(plan.riser, 0.04)} />
+        {#each plan.scenery ?? [] as piece, i (i)}
+          {#if piece.points.length > 1}
+            {@const ys = piece.points.map((p) => p[1])}
+            {@const floor = floorAt(plan, piece.points[0][0], piece.points[0][1])}
+            <rect
+              class="scenery-side"
+              x={Math.min(...ys)}
+              y={-floor - piece.height}
+              width={Math.max(Math.max(...ys) - Math.min(...ys), 0.08)}
+              height={piece.height}
+            />
+          {/if}
+        {/each}
         {#if mode === "point" && height > 0}
           <line class="height-line" x1={view.front} x2={view.back} y1={-height} y2={-height} />
         {/if}
@@ -704,7 +773,7 @@
                 class="pick"
                 aria-pressed={pickedMark === mark.id}
                 aria-label="Pick {mark.name}"
-                onclick={() => (pickedMark = pickedMark === mark.id ? null : mark.id)}>{mark.id}</button
+                onclick={() => pickMark(mark.id)}>{mark.id}</button
               >
               <input type="text" aria-label="Mark name" bind:value={mark.name} />
               <div class="pair">
@@ -718,14 +787,47 @@
         <div class="row wrap">
           <button onclick={addMark}>Add mark</button>
           <button onclick={() => draft && (draft.marks = defaultMarks(draft.width, draft.depth))}>Corners and centre</button>
-          <span class="spacer"></span>
-          <button class="primary" onclick={savePlan}>Save</button>
         </div>
         {#if hasCalibration}
           <p class="muted small">
             Moving or removing marks works the calibrated movers out again from the readings left.
           </p>
         {/if}
+        <h3>Scenery</h3>
+        <p class="muted small">
+          Drawn on the plan for reference, such as the LED wall. Pick a piece and tap the plan to add its corners in
+          order, or type them.
+        </p>
+        {#each draft.scenery as piece, i (i)}
+          <div class="piece" class:picked={pickedPiece === i}>
+            <div class="piece-head">
+              <button
+                class="pick"
+                aria-pressed={pickedPiece === i}
+                aria-label="Pick {piece.name} to add points"
+                onclick={() => pickPiece(i)}>+</button
+              >
+              <input type="text" aria-label="Scenery name" bind:value={piece.name} />
+              <button class="ghost" aria-label="Remove {piece.name}" onclick={() => removePiece(i)}>✕</button>
+            </div>
+            <NumberField label="Height (m)" value={piece.height} onchange={(v) => v != null && (piece.height = v)} fractional increment={0.1} max={50} />
+            {#each piece.points as point, j (j)}
+              <div class="point">
+                <NumberField label="Point {j + 1} across" value={point[0]} onchange={(v) => v != null && (point[0] = v)} fractional increment={0.05} min={-500} max={500} />
+                <NumberField label="Up stage" value={point[1]} onchange={(v) => v != null && (point[1] = v)} fractional increment={0.05} min={-500} max={500} />
+                <button class="ghost" aria-label="Remove point {j + 1}" onclick={() => piece.points.splice(j, 1)}>✕</button>
+              </div>
+            {/each}
+            {#if piece.points.length < 2}
+              <p class="muted small">Needs at least two points; tap the plan to add them.</p>
+            {/if}
+          </div>
+        {/each}
+        <div class="row wrap">
+          <button onclick={addPiece}>Add scenery</button>
+          <span class="spacer"></span>
+          <button class="primary" onclick={savePlan}>Save</button>
+        </div>
       {/if}
     </aside>
   </div>
@@ -996,6 +1098,52 @@
   }
   .warn {
     color: var(--f-playback);
+  }
+
+  .scenery polyline {
+    fill: none;
+    stroke: color-mix(in srgb, #c56cff 70%, transparent);
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .scenery circle {
+    fill: #c56cff;
+  }
+  .scenery text {
+    fill: #c56cff;
+    font-family: var(--mono);
+  }
+  .scenery.picked polyline {
+    stroke: var(--warning);
+  }
+  .scenery-side {
+    fill: color-mix(in srgb, #c56cff 35%, transparent);
+    stroke: #c56cff;
+    stroke-width: 1;
+  }
+  .piece {
+    display: grid;
+    gap: 8px;
+    padding: 8px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+  }
+  .piece.picked {
+    border-color: var(--warning);
+  }
+  .piece-head {
+    display: grid;
+    grid-template-columns: var(--touch) 1fr var(--touch);
+    gap: 6px;
+  }
+  .piece-head .pick {
+    padding: 0;
+  }
+  .point {
+    display: grid;
+    grid-template-columns: 1fr 1fr var(--touch);
+    gap: 6px;
+    align-items: end;
   }
 
   .hang {

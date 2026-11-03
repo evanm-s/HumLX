@@ -51,6 +51,20 @@ pub struct Stage {
     /// Where fixtures hang, measured by hand. A mover with a known position
     /// only needs its heading worked out, which suits wide beams.
     pub positions: Vec<Placed>,
+    /// Things on the stage drawn for reference, such as an LED wall.
+    pub scenery: Vec<Scenery>,
+}
+
+/// A piece of scenery drawn on the plan as a line through its points, such
+/// as an LED wall. Only for reference: it doesn't change how anything aims.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Scenery {
+    pub name: String,
+    /// Points across and up stage, in metres.
+    pub points: Vec<[f32; 2]>,
+    /// How tall it stands above the floor, for the side view.
+    pub height: f32,
 }
 
 /// A fixture's measured position in metres; any part can be left unmeasured.
@@ -77,6 +91,7 @@ impl Default for Stage {
             marks: default_marks(width, depth),
             movers: Vec::new(),
             positions: Vec::new(),
+            scenery: Vec::new(),
         }
     }
 }
@@ -191,6 +206,8 @@ pub struct Plan {
     pub margin: f32,
     pub riser: f32,
     pub marks: Vec<Mark>,
+    #[serde(default)]
+    pub scenery: Vec<Scenery>,
 }
 
 impl Stage {
@@ -251,7 +268,17 @@ impl Stage {
             margin,
             riser,
             marks,
+            scenery,
         } = plan;
+        for piece in &scenery {
+            if piece.points.len() < 2 {
+                return Err(Error::InvalidStage(format!("{} needs at least two points", piece.name)));
+            }
+            let finite = piece.points.iter().flatten().all(|v| v.is_finite() && v.abs() <= 500.0);
+            if !finite || !(0.0..=50.0).contains(&piece.height) {
+                return Err(Error::InvalidStage(format!("{} is out of range", piece.name)));
+            }
+        }
         if !(width > 0.0 && depth > 0.0 && width <= 200.0 && depth <= 200.0) {
             return Err(Error::InvalidStage(
                 "the stage must be between 0 and 200 m each way".into(),
@@ -280,6 +307,7 @@ impl Stage {
         self.margin = margin;
         self.riser = riser;
         self.marks = marks;
+        self.scenery = scenery;
         if moved {
             let marks = self.marks.clone();
             let positions = self.positions.clone();
@@ -866,10 +894,31 @@ mod tests {
             margin: 2.0,
             riser: 0.4,
             marks,
+            scenery: vec![Scenery {
+                name: "LED wall".into(),
+                points: vec![[-3.8, 3.1], [-1.0, 5.6], [0.3, 5.6], [3.2, 3.1]],
+                height: 3.0,
+            }],
         };
         stage.set_plan(plan).unwrap();
         assert_eq!(stage.floor_at(0.0, 3.0), 0.0);
         assert_eq!(stage.floor_at(0.0, -1.0), -0.4);
+        assert_eq!(stage.scenery.len(), 1);
+        let mut bad = Plan {
+            width: 8.0,
+            depth: 6.0,
+            margin: 2.0,
+            riser: 0.4,
+            marks: stage.marks.clone(),
+            scenery: vec![Scenery {
+                name: "Flat".into(),
+                points: vec![[0.0, 0.0]],
+                height: 2.0,
+            }],
+        };
+        assert!(stage.set_plan(bad.clone()).is_err());
+        bad.scenery[0].points.push([1.0, 0.0]);
+        assert!(stage.set_plan(bad).is_ok());
         assert_eq!(stage.calibration(7).unwrap().readings.len(), 4);
         stage.forget(7, Some(1));
         assert!(stage.solution(7).is_none());
