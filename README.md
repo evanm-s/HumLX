@@ -43,8 +43,9 @@ up quickly.
 - **Patch** fixtures by type and mode, several at once, with automatic
   numbering and addressing, overlap checks and a live 512-channel address map.
 - **Fixture types**: generic dimmer, RGB and RGBW pars, a bi-colour LED panel,
-  moving head spot and wash profiles, and the Event Lighting LM6X15 are built
-  in. Real fixtures can be imported from QLC+ fixture definitions (`.qxf`, from its library or its
+  moving head spot and wash profiles, the Event Lighting LM6X15 and the
+  Philips Showline SL Wash 180 RGBW (from the manual, not yet checked on a
+  real fixture) are built in. Real fixtures can be imported from QLC+ fixture definitions (`.qxf`, from its library or its
   fixture editor) or from the
   [Open Fixture Library](https://open-fixture-library.org) (download a fixture
   as "Open Fixture Library JSON").
