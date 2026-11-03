@@ -8,7 +8,7 @@ use humlx_core::engine::{self, OutputSettings, OutputStatus};
 use humlx_core::fixture::{slug, Attribute, Family, Profile};
 use humlx_core::patch::{mode_of, FixtureChanges, FixtureOptions, FixtureUpdate, NewFixtures};
 use humlx_core::programmer::{next_id, Field, Group, Preset, Rgb, SelectMode, Values};
-use humlx_core::stage::{Plan, Stage};
+use humlx_core::stage::{Placed, Plan, Stage};
 use humlx_core::{ofl, qlc, Error, Result};
 use serde::Serialize;
 use tauri::State;
@@ -526,6 +526,15 @@ pub fn calibrate_mark(app: State<'_, App>, fixture: u32, mark: u32) -> Result<St
 #[tauri::command]
 pub fn set_fixture_position(app: State<'_, App>, fixture: u32, position: [Option<f32>; 3]) -> Result<Stage> {
     app.engine.state().stage.set_position(fixture, position)?;
+    app.save()?;
+    Ok(app.engine.state().stage.clone())
+}
+
+/// Places a fixture on the plan for the Stage page: where it hangs, where it
+/// points and how wide its beam is.
+#[tauri::command]
+pub fn set_placement(app: State<'_, App>, placed: Placed) -> Result<Stage> {
+    app.engine.state().stage.set_placement(placed)?;
     app.save()?;
     Ok(app.engine.state().stage.clone())
 }

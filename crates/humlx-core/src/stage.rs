@@ -53,6 +53,34 @@ pub struct Stage {
     pub positions: Vec<Placed>,
     /// Things on the stage drawn for reference, such as an LED wall.
     pub scenery: Vec<Scenery>,
+    /// Where measurements typed in and shown are taken from. Positions are
+    /// kept from the middle of the front edge whatever this is, so moving it
+    /// only changes the numbers shown.
+    pub reference: Reference,
+}
+
+/// The point positions are measured from, for whoever has the tape measure.
+#[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Reference {
+    pub from: ReferencePoint,
+    /// For `Custom`: the spot, from the middle of the front edge.
+    #[serde(default)]
+    pub x: f32,
+    #[serde(default)]
+    pub y: f32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ReferencePoint {
+    #[default]
+    FrontMiddle,
+    FrontLeft,
+    FrontRight,
+    BackLeft,
+    BackRight,
+    Custom,
 }
 
 /// Studio floor shown round the stage, in metres on each side. Shows saved
@@ -128,7 +156,7 @@ pub struct Scenery {
 }
 
 /// A fixture's measured position in metres; any part can be left unmeasured.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Placed {
     pub fixture: u32,
@@ -138,6 +166,39 @@ pub struct Placed {
     pub y: Option<f32>,
     #[serde(default)]
     pub z: Option<f32>,
+    /// Where a fixed light points: a spot on the floor, across and up stage.
+    /// `None` points it straight down. Movers aim from their calibration.
+    #[serde(default)]
+    pub aim: Option<[f32; 2]>,
+    /// Beam width in degrees, for drawing; `None` uses a default for its type.
+    #[serde(default)]
+    pub beam: Option<f32>,
+    /// More lights of the same type on this fixture's DMX address, such as
+    /// pars run in pairs. Each hangs and points on its own; all of them show
+    /// the fixture's output. Only for fixed lights.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub copies: Vec<Extra>,
+}
+
+/// Another light sharing a fixture's address: where it hangs and points.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Extra {
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+    #[serde(default)]
+    pub aim: Option<[f32; 2]>,
+}
+
+impl Placed {
+    fn known(&self) -> Known {
+        [self.x, self.y, self.z]
+    }
+
+    fn is_empty(&self) -> bool {
+        self.known().iter().all(Option::is_none) && self.aim.is_none() && self.beam.is_none() && self.copies.is_empty()
+    }
 }
 
 impl Default for Stage {
@@ -152,6 +213,7 @@ impl Default for Stage {
             movers: Vec::new(),
             positions: Vec::new(),
             scenery: Vec::new(),
+            reference: Reference::default(),
         }
     }
 }
@@ -268,6 +330,8 @@ pub struct Plan {
     pub marks: Vec<Mark>,
     #[serde(default)]
     pub scenery: Vec<Scenery>,
+    #[serde(default)]
+    pub reference: Reference,
 }
 
 impl Stage {
@@ -300,18 +364,65 @@ impl Stage {
         if !position.iter().flatten().all(|v| v.is_finite() && v.abs() <= 500.0) {
             return Err(Error::InvalidStage("that position is out of range".into()));
         }
-        self.positions.retain(|p| p.fixture != fixture);
-        if position.iter().any(Option::is_some) {
-            let [x, y, z] = position;
-            self.positions.push(Placed { fixture, x, y, z });
+        let [x, y, z] = position;
+        let mut placed = self.placement(fixture);
+        (placed.x, placed.y, placed.z) = (x, y, z);
+        self.store(placed);
+        self.resolve(fixture, position);
+        Ok(())
+    }
+
+    /// Where a fixture is placed, with nothing set when it isn't.
+    pub fn placement(&self, fixture: u32) -> Placed {
+        self.positions
+            .iter()
+            .find(|p| p.fixture == fixture)
+            .cloned()
+            .unwrap_or(Placed {
+                fixture,
+                ..Default::default()
+            })
+    }
+
+    /// Places a fixture on the plan: where it hangs, where it points and how
+    /// wide its beam is. A mover is worked out again to suit its position.
+    pub fn set_placement(&mut self, placed: Placed) -> Result<()> {
+        let finite = |v: &f32| v.is_finite() && v.abs() <= 500.0;
+        let copies_finite = placed
+            .copies
+            .iter()
+            .all(|c| [c.x, c.y, c.z].iter().all(finite) && c.aim.iter().flatten().all(finite));
+        if !placed.known().iter().flatten().all(finite) || !placed.aim.iter().flatten().all(finite) || !copies_finite {
+            return Err(Error::InvalidStage("that position is out of range".into()));
+        }
+        if placed.copies.len() > 16 {
+            return Err(Error::InvalidStage("that's more copies than one address needs".into()));
+        }
+        if placed.beam.is_some_and(|b| !(1.0..=120.0).contains(&b)) {
+            return Err(Error::InvalidStage("the beam must be 1 to 120 degrees wide".into()));
+        }
+        let fixture = placed.fixture;
+        let position = placed.known();
+        self.store(placed);
+        self.resolve(fixture, position);
+        Ok(())
+    }
+
+    fn store(&mut self, placed: Placed) {
+        self.positions.retain(|p| p.fixture != placed.fixture);
+        if !placed.is_empty() {
+            self.positions.push(placed);
             self.positions.sort_by_key(|p| p.fixture);
         }
+    }
+
+    /// Works a mover's calibration out again for a newly measured position.
+    fn resolve(&mut self, fixture: u32, position: Known) {
         let marks = self.marks.clone();
         if let Some(calibration) = self.movers.iter_mut().find(|c| c.fixture == fixture) {
             let ranges = calibration.ranges();
             calibration.solution = solve(&marks, &calibration.readings, ranges, position);
         }
-        Ok(())
     }
 
     pub fn solution(&self, fixture: u32) -> Option<&Solution> {
@@ -329,7 +440,11 @@ impl Stage {
             riser,
             marks,
             scenery,
+            reference,
         } = plan;
+        if !(reference.x.is_finite() && reference.y.is_finite()) {
+            return Err(Error::InvalidStage("the reference point has no position".into()));
+        }
         for piece in &scenery {
             if piece.points.len() < 2 {
                 return Err(Error::InvalidStage(format!("{} needs at least two points", piece.name)));
@@ -368,6 +483,7 @@ impl Stage {
         self.riser = riser;
         self.marks = marks;
         self.scenery = scenery;
+        self.reference = reference;
         if moved {
             let marks = self.marks.clone();
             let positions = self.positions.clone();
@@ -812,9 +928,57 @@ mod tests {
     use super::*;
 
     #[test]
+    fn placement_keeps_aim_and_beam_when_the_position_changes() {
+        let mut stage = Stage::default();
+        let placed = Placed {
+            fixture: 3,
+            x: Some(1.0),
+            y: Some(2.0),
+            z: Some(4.5),
+            aim: Some([0.0, 3.0]),
+            beam: Some(25.0),
+            copies: vec![Extra {
+                x: 2.0,
+                y: 2.0,
+                z: 4.5,
+                aim: None,
+            }],
+        };
+        stage.set_placement(placed.clone()).unwrap();
+        stage.set_position(3, [Some(1.5), Some(2.0), Some(4.5)]).unwrap();
+        let after = stage.placement(3);
+        assert_eq!(after.x, Some(1.5));
+        assert_eq!(after.aim, Some([0.0, 3.0]));
+        assert_eq!(after.beam, Some(25.0));
+        assert_eq!(after.copies.len(), 1);
+        assert!(stage
+            .set_placement(Placed {
+                beam: Some(500.0),
+                ..placed.clone()
+            })
+            .is_err());
+        let mut bad = placed.clone();
+        bad.copies[0].x = f32::NAN;
+        assert!(stage.set_placement(bad).is_err());
+        let cleared = Placed {
+            fixture: 3,
+            ..Default::default()
+        };
+        stage.set_placement(cleared).unwrap();
+        assert!(stage.positions.is_empty());
+        // Shows saved before placements had an aim still load.
+        let old: Placed = serde_json::from_str(r#"{"fixture":2,"z":4.5}"#).unwrap();
+        assert_eq!(old.aim, None);
+        assert!(old.copies.is_empty());
+    }
+
+    #[test]
     fn margin_reads_one_number_or_each_side() {
         let old: Stage = serde_json::from_str(r#"{"width":9.2,"depth":6.6,"margin":3}"#).unwrap();
         assert_eq!(old.margin, Margins::even(3.0));
+        assert_eq!(old.reference.from, ReferencePoint::FrontMiddle);
+        let custom: Reference = serde_json::from_str(r#"{"from":"custom","x":-4.6,"y":-1}"#).unwrap();
+        assert_eq!((custom.from, custom.x), (ReferencePoint::Custom, -4.6));
         let new: Stage = serde_json::from_str(r#"{"margin":{"left":4.6,"right":0,"front":9.2,"back":0}}"#).unwrap();
         assert_eq!(new.margin.left, 4.6);
         assert_eq!(new.margin.back, 0.0);
@@ -970,11 +1134,17 @@ mod tests {
                 points: vec![[-3.8, 3.1], [-1.0, 5.6], [0.3, 5.6], [3.2, 3.1]],
                 height: 3.0,
             }],
+            reference: Reference {
+                from: ReferencePoint::FrontLeft,
+                x: 0.0,
+                y: 0.0,
+            },
         };
         stage.set_plan(plan).unwrap();
         assert_eq!(stage.floor_at(0.0, 3.0), 0.0);
         assert_eq!(stage.floor_at(0.0, -1.0), -0.4);
         assert_eq!(stage.scenery.len(), 1);
+        assert_eq!(stage.reference.from, ReferencePoint::FrontLeft);
         let mut bad = Plan {
             width: 8.0,
             depth: 6.0,
@@ -986,6 +1156,7 @@ mod tests {
                 points: vec![[0.0, 0.0]],
                 height: 2.0,
             }],
+            reference: Reference::default(),
         };
         assert!(stage.set_plan(bad.clone()).is_err());
         bad.scenery[0].points.push([1.0, 0.0]);

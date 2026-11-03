@@ -49,6 +49,20 @@ export interface Placed {
   x?: number | null;
   y?: number | null;
   z?: number | null;
+  /** Where a fixed light points: a spot on the floor; none points straight down. */
+  aim?: [number, number] | null;
+  /** Beam width in degrees, for drawing; none uses a default for its type. */
+  beam?: number | null;
+  /** More lights on the same address, such as pars run in pairs. Fixed lights only. */
+  copies?: Extra[];
+}
+
+/** Another light sharing a fixture's address: where it hangs and points. */
+export interface Extra {
+  x: number;
+  y: number;
+  z: number;
+  aim?: [number, number] | null;
 }
 
 /** Scenery drawn on the plan for reference, such as an LED wall: a line through its points. */
@@ -59,6 +73,8 @@ export interface Scenery {
   /** How tall it stands, for the side view. */
   height: number;
 }
+
+export type Vec3 = [number, number, number];
 
 export interface Margins {
   left: number;
@@ -79,6 +95,70 @@ export interface Stage {
   /** Positions measured by hand; a mover with one only needs its heading worked out. */
   positions: Placed[];
   scenery: Scenery[];
+  /** Where measurements typed in and shown are taken from. */
+  reference: Reference;
+}
+
+export type ReferencePoint = "front-middle" | "front-left" | "front-right" | "back-left" | "back-right" | "custom";
+
+/** The point positions are measured from. Positions are kept from the middle of the front edge whatever it is. */
+export interface Reference {
+  from: ReferencePoint;
+  /** For "custom": the spot, from the middle of the front edge. */
+  x: number;
+  y: number;
+}
+
+export const REFERENCE_POINTS: [ReferencePoint, string][] = [
+  ["front-middle", "Front, middle"],
+  ["front-left", "Front left corner"],
+  ["front-right", "Front right corner"],
+  ["back-left", "Back left corner"],
+  ["back-right", "Back right corner"],
+  ["custom", "A spot I pick"],
+];
+
+/** Where the reference point is, from the middle of the front edge. */
+export function referenceAt(plan: Plan): [number, number] {
+  const r = plan.reference ?? { from: "front-middle", x: 0, y: 0 };
+  const half = plan.width / 2;
+  switch (r.from) {
+    case "front-left":
+      return [-half, 0];
+    case "front-right":
+      return [half, 0];
+    case "back-left":
+      return [-half, plan.depth];
+    case "back-right":
+      return [half, plan.depth];
+    case "custom":
+      return [r.x, r.y];
+    default:
+      return [0, 0];
+  }
+}
+
+const tidy = (v: number) => Math.round(v * 1000) / 1000;
+
+/** A spot as it is measured from the reference point. */
+export function measured(plan: Plan, x: number, y: number): [number, number] {
+  const [rx, ry] = referenceAt(plan);
+  return [tidy(x - rx), tidy(y - ry)];
+}
+
+/** A measurement from the reference point back to where it is on the plan. */
+export function fromMeasured(plan: Plan, x: number, y: number): [number, number] {
+  const [rx, ry] = referenceAt(plan);
+  return [tidy(x + rx), tidy(y + ry)];
+}
+
+/** One part of a measurement: 0 across, 1 up stage. Null stays null. */
+export function measuredPart(plan: Plan, value: number | null | undefined, axis: 0 | 1): number | null {
+  return value == null ? null : tidy(value - referenceAt(plan)[axis]);
+}
+
+export function fromMeasuredPart(plan: Plan, value: number | null, axis: 0 | 1): number | null {
+  return value == null ? null : tidy(value + referenceAt(plan)[axis]);
 }
 
 export type Plan = Omit<Stage, "movers" | "positions">;
@@ -108,7 +188,7 @@ export function defaultMarks(width: number, depth: number): Mark[] {
 }
 
 export function defaultStage(): Stage {
-  return { width: 8, depth: 6, margin: { left: 2, right: 2, front: 2, back: 2 }, riser: 0, marks: defaultMarks(8, 6), movers: [], positions: [], scenery: [] };
+  return { width: 8, depth: 6, margin: { left: 2, right: 2, front: 2, back: 2 }, riser: 0, marks: defaultMarks(8, 6), movers: [], positions: [], scenery: [], reference: { from: "front-middle", x: 0, y: 0 } };
 }
 
 export function onStage(stage: Plan, x: number, y: number) {
@@ -163,8 +243,20 @@ export function meets(
   tilt: number,
   height = 0,
 ): [number, number, number] | null {
-  const d = beam(s, pan, tilt);
-  const [px, py, pz] = s.position;
+  return hit(stage, s.position, beam(s, pan, tilt), height);
+}
+
+/**
+ * Where a ray from `from` going along `d` comes down to `height` above the
+ * floor under it (the stage floor first, then the studio floor), or null.
+ */
+export function hit(
+  stage: Plan,
+  from: readonly [number, number, number] | number[],
+  d: readonly [number, number, number] | number[],
+  height = 0,
+): [number, number, number] | null {
+  const [px, py, pz] = from;
   if (Math.abs(d[2]) < 1e-9) return null;
   for (const floor of [0, -stage.riser]) {
     const z = floor + height;
@@ -214,4 +306,43 @@ export function aim(s: Solution, target: [number, number, number], current: [num
       if (!best || travel < best[0]) best = [travel, p, t];
     }
   return best ? [best[1], best[2]] : current;
+}
+
+const normalise = (v: number[]): Vec3 => {
+  const len = Math.hypot(...v) || 1;
+  return v.map((x) => x / len) as Vec3;
+};
+const cross = (a: number[], b: number[]): Vec3 => [
+  a[1] * b[2] - a[2] * b[1],
+  a[2] * b[0] - a[0] * b[2],
+  a[0] * b[1] - a[1] * b[0],
+];
+
+/**
+ * The patch of floor a beam lights: where rays round the edge of its cone come
+ * down, as a polygon. Rays that never come down stop `reach` metres out, so a
+ * beam pointing at the horizon draws as a long streak. Null for a beam pointing up.
+ */
+export function pool(stage: Plan, from: Vec3, axis: Vec3, degrees: number, reach = 30): Vec3[] | null {
+  const d = normalise(axis);
+  if (d[2] > 0.05) return null;
+  const half = ((Math.min(Math.max(degrees, 1), 120) / 2) * Math.PI) / 180;
+  const side = normalise(cross(d, Math.abs(d[2]) > 0.9 ? [1, 0, 0] : [0, 0, 1]));
+  const up = cross(d, side);
+  const points: Vec3[] = [];
+  const steps = 32;
+  for (let i = 0; i < steps; i++) {
+    const a = (i / steps) * Math.PI * 2;
+    const [c, s] = [Math.cos(a) * Math.sin(half), Math.sin(a) * Math.sin(half)];
+    const ray = [0, 1, 2].map((j) => d[j] * Math.cos(half) + side[j] * c + up[j] * s);
+    const at = hit(stage, from, ray);
+    const far = at && Math.hypot(at[0] - from[0], at[1] - from[1], at[2] - from[2]) <= reach;
+    points.push(far ? at : (from.map((p, j) => p + ray[j] * reach) as Vec3));
+  }
+  return points;
+}
+
+/** The direction from one point to another. */
+export function towards(from: Vec3, to: Vec3): Vec3 {
+  return normalise(to.map((v, i) => v - from[i]));
 }
