@@ -16,8 +16,14 @@ up quickly.
   screen, then pick a cue list or name a new one. Cues track, so each
   one only stores what changed. Give a cue a name and fade time, and update or
   delete it later. **GO** fades to the next cue, **Back** steps back.
-- **Playback faders**: each cue list gets a strip with a master fader, GO, Back
-  and Release. Intensity from several lists combines highest-takes-precedence;
+- **Cue Lists screen**: every cue list in the show, with search, sorting and
+  filters (in slots, on the grid, unplaced). Pick one to build and edit its
+  cues, rename, duplicate or delete it, or load it into a fader slot. The list
+  you pick is the *selected* list, which Space (GO), Shift+Space (Back), the
+  NX-K's Next, Last and Cue n Enter, and Record act on.
+- **Playback faders**: 8 fader slots, each loaded with whichever cue list the
+  show needs, with a master fader, GO, Back and Release. Tap a slot's name to
+  select its list; the Playback screen shows the selected list's cues. Intensity from several lists combines highest-takes-precedence;
   the programmer always sits on top.
 - **Effects**: dimmer chases (sine, square or saw), rainbow colour and position
   circles on any selection, with rate, size and spread across the fixtures.
@@ -57,7 +63,7 @@ connected.
 | `1 Thru 4 - 2 @ 5 Enter` | Selects fixtures 1, 3 and 4 at 50% (`@ 5` is 50%, `@ 05` is 5%) |
 | `Group 2 + 3 @ Full` | Selects groups 2 and 3 at full (Full finishes the command) |
 | `@ 75 Enter` | Sets the selection to 75% |
-| `Cue 4 Enter` | Goes to cue 4 of the cue list chosen on the Playback screen |
+| `Cue 4 Enter` | Goes to cue 4 of the selected cue list |
 | Next / Last | GO / Back on that cue list |
 | Record | Opens Record cue |
 | Highlight | Highlight on or off |

@@ -15,6 +15,7 @@ use crate::dmx::Universe;
 use crate::effect::{EffectSize, SpeedMasters};
 use crate::error::{Error, Result};
 use crate::fixture::{Attribute, Library, Mode};
+use crate::layout::Layout;
 use crate::osc::{OscSettings, OscStatus};
 use crate::patch::{mode_of, Patch};
 use crate::playback::{CueList, Playbacks, RunningEffects};
@@ -104,6 +105,8 @@ pub struct State {
     pub groups: Vec<Group>,
     pub presets: Vec<Preset>,
     pub cue_lists: Vec<CueList>,
+    /// Where cue lists sit on the Playback screen, and which is selected.
+    pub layout: Layout,
     pub playbacks: Playbacks,
     /// When each programmer effect started, by its number.
     pub running_effects: RunningEffects,

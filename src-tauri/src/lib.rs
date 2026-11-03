@@ -93,6 +93,7 @@ impl App {
             groups: state.groups.clone(),
             presets: state.presets.clone(),
             cue_lists: state.cue_lists.clone(),
+            layout: Some(state.layout.clone()),
             osc: state.osc_settings.clone(),
             highlight_colour: state.highlight_colour,
             speed_bpm: state.speed_masters.bpms(),
@@ -129,6 +130,9 @@ fn apply_show(state: &mut State, show: Show) {
     state.groups = show.groups;
     state.presets = show.presets;
     state.cue_lists = show.cue_lists;
+    state.layout = show
+        .layout
+        .unwrap_or_else(|| humlx_core::layout::Layout::migrate(&state.cue_lists));
     state.osc_settings = show.osc;
     state.highlight_colour = show.highlight_colour;
     let now = std::time::Instant::now();
@@ -208,6 +212,9 @@ pub fn run() {
             playback::new_cue_list,
             playback::rename_cue_list,
             playback::delete_cue_list,
+            playback::duplicate_cue_list,
+            playback::select_cue_list,
+            playback::set_slot,
             playback::record_cue,
             shows::osc_settings,
             shows::set_osc,

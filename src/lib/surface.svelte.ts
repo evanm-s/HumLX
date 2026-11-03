@@ -43,8 +43,10 @@ class Surface {
   line = $state<Token[]>([]);
   /** Encoders move in small steps while on. */
   fine = $state(false);
-  /** The cue list Next and Last run, as chosen on the Playback screen. */
-  cueList = $state<number | null>(null);
+  /** The cue list Next, Last and Cue n Enter run: the selected one, else the first. */
+  get cueList(): number | null {
+    return show.playback.layout.selected ?? show.playback.cueLists[0]?.id ?? null;
+  }
   /** Set by Record or Delete until a preset is stored or deleted, or Clear. */
   mode = $state<PresetMode | null>(null);
   /** In delete mode, the preset tapped and waiting for Enter. */
@@ -179,7 +181,7 @@ class Surface {
         return;
       case "next":
       case "last": {
-        const list = this.cueList ?? show.playback.cueLists[0]?.id;
+        const list = this.cueList;
         if (list == null) return notify("There are no cue lists to run yet", "warning");
         show.play(() => (key === "next" ? api.go(list) : api.back(list)));
         return;
@@ -225,7 +227,7 @@ class Surface {
     }
 
     if (command.kind === "cue") {
-      const list = show.playback.cueLists.find((l) => l.id === (this.cueList ?? show.playback.cueLists[0]?.id));
+      const list = show.playback.cueLists.find((l) => l.id === this.cueList);
       if (!list) return notify("There are no cue lists to run yet", "warning");
       if (command.cue < 1 || command.cue > list.cues.length) return notify(`${list.name} has no cue ${command.cue}`, "warning");
       show.play(() => api.goTo(list.id, command.cue - 1));

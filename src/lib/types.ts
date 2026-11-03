@@ -292,6 +292,35 @@ export interface PlaybackView {
   /** Tempo of speed masters A and B. */
   speedBpm: [number, number];
   masters: [number, number][];
+  layout: Layout;
+}
+
+/** Grid size and number of fader slots on the Playback screen. */
+export const GRID_COLUMNS = 8;
+export const GRID_ROWS = 6;
+export const SLOTS = 8;
+
+export interface GridPage {
+  name: string;
+  /** The cue list on each button, row by row, or null. */
+  buttons: (number | null)[];
+}
+
+/** Where cue lists sit on the Playback screen, and which is selected. */
+export interface Layout {
+  pages: GridPage[];
+  /** The cue list in each fader slot, or null. */
+  slots: (number | null)[];
+  /** The list that GO, Back, the NX-K's Next and Last and Record act on. */
+  selected: number | null;
+}
+
+export function emptyLayout(): Layout {
+  return {
+    pages: [{ name: "", buttons: Array(GRID_COLUMNS * GRID_ROWS).fill(null) }],
+    slots: Array(SLOTS).fill(null),
+    selected: null,
+  };
 }
 
 export interface PlaybackStatus {

@@ -1,6 +1,7 @@
 // App-wide state shared by every screen.
 
 import { api } from "./api";
+import { emptyLayout } from "./types";
 import type {
   Fixture,
   Live,
@@ -29,7 +30,13 @@ class ShowState {
     beats: [0, 0],
     osc: { listening: false, error: null, received: 0, last: null },
   });
-  playback = $state<PlaybackView>({ cueLists: [], effectSize: 1, speedBpm: [120, 120], masters: [] });
+  playback = $state<PlaybackView>({
+    cueLists: [],
+    effectSize: 1,
+    speedBpm: [120, 120],
+    masters: [],
+    layout: emptyLayout(),
+  });
   programmer = $state<ProgrammerView>({ selection: [], values: {}, effects: [], groups: [], presets: [] });
   loaded = $state(false);
   /** Bumped when a different show is loaded, so screens start afresh. */

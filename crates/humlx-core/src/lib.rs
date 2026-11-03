@@ -7,6 +7,7 @@ pub mod effect;
 pub mod engine;
 pub mod error;
 pub mod fixture;
+pub mod layout;
 pub mod nxk;
 pub mod ofl;
 pub mod osc;

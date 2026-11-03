@@ -23,7 +23,9 @@ import type {
   Shape,
   Values,
   OscSettings,
+  Layout,
 } from "./types";
+import { emptyLayout } from "./types";
 
 const files = import.meta.glob<Omit<Profile, "id">>("../../crates/humlx-core/fixtures/*.json", {
   eager: true,
@@ -64,12 +66,19 @@ const beats = (): [number, number] =>
   [0, 1].map((i) => ((Date.now() - speedOrigin[i]) / 60000) * speedBpm[i]) as [number, number];
 const running = new Map<number, number>(); // cue list -> current cue
 const masters = new Map<number, number>();
+const layout: Layout = emptyLayout();
+const forget = (id: number) => {
+  for (const page of layout.pages) page.buttons = page.buttons.map((b) => (b === id ? null : b));
+  layout.slots = layout.slots.map((s) => (s === id ? null : s));
+  if (layout.selected === id) layout.selected = null;
+};
 
 const playback = (): PlaybackView => ({
   cueLists: structuredClone(cueLists),
   effectSize,
   speedBpm: [...speedBpm] as [number, number],
   masters: cueLists.map((l) => [l.id, masters.get(l.id) ?? 1]),
+  layout: structuredClone(layout),
 });
 
 /** Playbacks (tracked, no fades) with the programmer on top. */
@@ -401,12 +410,29 @@ const commands: Record<string, (args: Args) => unknown> = {
   },
   delete_preset: ({ id }) => ((presets = presets.filter((p) => p.id !== id)), programmer()),
   playback,
-  new_cue_list: ({ name }) => (addCueList(name), playback()),
+  new_cue_list: ({ name }) => ((layout.selected = addCueList(name)), playback()),
+  duplicate_cue_list: ({ id }) => {
+    const copy = structuredClone(cueLists.find((l) => l.id === id)!);
+    copy.id = nextId(cueLists.map((l) => l.id));
+    copy.name += " copy";
+    cueLists.push(copy);
+    layout.selected = copy.id;
+    return playback();
+  },
+  select_cue_list: ({ list }) => ((layout.selected = list), playback()),
+  set_slot: ({ slot, list }) => ((layout.slots[slot] = list), playback()),
   rename_cue_list: ({ id, name }) => ((cueLists.find((l) => l.id === id)!.name = name), playback()),
-  delete_cue_list: ({ id }) => ((cueLists = cueLists.filter((l) => l.id !== id)), running.delete(id), playback()),
+  delete_cue_list: ({ id }) => (
+    (cueLists = cueLists.filter((l) => l.id !== id)), forget(id), running.delete(id), playback()
+  ),
   record_cue: ({ target, name, fade, after }) => {
     if (!Object.keys(values).length && !effects.length) throw "There is nothing in the programmer to record";
     const list = "list" in target ? target.list : addCueList(target.new);
+    if (!("list" in target)) {
+      const free = layout.slots.indexOf(null);
+      if (free >= 0) layout.slots[free] = list;
+    }
+    layout.selected = list;
     const l = cueLists.find((x) => x.id === list)!;
     const index = after == null ? l.cues.length : Math.min(after + 1, l.cues.length);
     l.cues.splice(index, 0, { name: name.trim() || `Cue ${index + 1}`, fade, mode: "hold", follow: 0, values: structuredClone(values), effects: structuredClone(effects) });
