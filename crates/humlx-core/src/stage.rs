@@ -39,8 +39,8 @@ pub struct Stage {
     /// Size of the acting area drawn on the plan, in metres.
     pub width: f32,
     pub depth: f32,
-    /// Studio floor shown round the stage on the plan, in metres each side.
-    pub margin: f32,
+    /// Studio floor shown round the stage on the plan, in metres on each side.
+    pub margin: Margins,
     /// How far the stage floor sits above the studio floor. Heights are
     /// measured from the stage floor, so the studio floor is at minus this.
     pub riser: f32,
@@ -53,6 +53,66 @@ pub struct Stage {
     pub positions: Vec<Placed>,
     /// Things on the stage drawn for reference, such as an LED wall.
     pub scenery: Vec<Scenery>,
+}
+
+/// Studio floor shown round the stage, in metres on each side. Shows saved
+/// before each side had its own read a single number for all four.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Margins {
+    pub left: f32,
+    pub right: f32,
+    pub front: f32,
+    pub back: f32,
+}
+
+impl Margins {
+    pub fn even(m: f32) -> Self {
+        Self {
+            left: m,
+            right: m,
+            front: m,
+            back: m,
+        }
+    }
+
+    fn sides(&self) -> [f32; 4] {
+        [self.left, self.right, self.front, self.back]
+    }
+}
+
+impl Default for Margins {
+    fn default() -> Self {
+        Self::even(2.0)
+    }
+}
+
+impl<'de> Deserialize<'de> for Margins {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> std::result::Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct Sides {
+            left: f32,
+            right: f32,
+            front: f32,
+            back: f32,
+        }
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum Either {
+            Even(f32),
+            Sides(Sides),
+        }
+        Ok(match Either::deserialize(d)? {
+            Either::Even(m) => Self::even(m),
+            Either::Sides(s) => Self {
+                left: s.left,
+                right: s.right,
+                front: s.front,
+                back: s.back,
+            },
+        })
+    }
 }
 
 /// A piece of scenery drawn on the plan as a line through its points, such
@@ -86,7 +146,7 @@ impl Default for Stage {
         Self {
             width,
             depth,
-            margin: 2.0,
+            margin: Margins::default(),
             riser: 0.0,
             marks: default_marks(width, depth),
             movers: Vec::new(),
@@ -203,7 +263,7 @@ pub struct Aim {
 pub struct Plan {
     pub width: f32,
     pub depth: f32,
-    pub margin: f32,
+    pub margin: Margins,
     pub riser: f32,
     pub marks: Vec<Mark>,
     #[serde(default)]
@@ -284,7 +344,7 @@ impl Stage {
                 "the stage must be between 0 and 200 m each way".into(),
             ));
         }
-        if !((0.0..=50.0).contains(&margin) && (0.0..=10.0).contains(&riser)) {
+        if !(margin.sides().iter().all(|m| (0.0..=50.0).contains(m)) && (0.0..=10.0).contains(&riser)) {
             return Err(Error::InvalidStage(
                 "the studio margin must be 0 to 50 m and the stage height 0 to 10 m".into(),
             ));
@@ -751,6 +811,17 @@ impl Solution {
 mod tests {
     use super::*;
 
+    #[test]
+    fn margin_reads_one_number_or_each_side() {
+        let old: Stage = serde_json::from_str(r#"{"width":9.2,"depth":6.6,"margin":3}"#).unwrap();
+        assert_eq!(old.margin, Margins::even(3.0));
+        let new: Stage = serde_json::from_str(r#"{"margin":{"left":4.6,"right":0,"front":9.2,"back":0}}"#).unwrap();
+        assert_eq!(new.margin.left, 4.6);
+        assert_eq!(new.margin.back, 0.0);
+        let again: Stage = serde_json::from_str(&serde_json::to_string(&new).unwrap()).unwrap();
+        assert_eq!(again, new);
+    }
+
     /// A made-up mover, used to fake readings at each mark.
     fn fake(position: V3, rotation: M3, ranges: (f64, f64)) -> Solution {
         let f = |v: f64| v as f32;
@@ -891,7 +962,7 @@ mod tests {
         let plan = Plan {
             width: 8.0,
             depth: 6.0,
-            margin: 2.0,
+            margin: Margins::even(2.0),
             riser: 0.4,
             marks,
             scenery: vec![Scenery {
@@ -907,7 +978,7 @@ mod tests {
         let mut bad = Plan {
             width: 8.0,
             depth: 6.0,
-            margin: 2.0,
+            margin: Margins::even(2.0),
             riser: 0.4,
             marks: stage.marks.clone(),
             scenery: vec![Scenery {
