@@ -16,5 +16,6 @@ pub mod playback;
 pub mod programmer;
 pub mod qlc;
 pub mod show;
+pub mod stage;
 
 pub use error::{Error, Result};

@@ -8,6 +8,7 @@ use humlx_core::engine::{self, OutputSettings, OutputStatus};
 use humlx_core::fixture::{slug, Attribute, Family, Profile};
 use humlx_core::patch::{mode_of, FixtureChanges, FixtureOptions, FixtureUpdate, NewFixtures};
 use humlx_core::programmer::{next_id, Field, Group, Preset, Rgb, SelectMode, Values};
+use humlx_core::stage::{Plan, Stage};
 use humlx_core::{ofl, qlc, Error, Result};
 use serde::Serialize;
 use tauri::State;
@@ -478,5 +479,74 @@ pub fn delete_preset(app: State<'_, App>, id: u32) -> Result<ProgrammerView> {
     change_pools(&app, |state| {
         state.presets.retain(|p| p.id != id);
         Ok(())
+    })
+}
+
+// --- Stage plan ----------------------------------------------------------
+
+#[tauri::command]
+pub fn stage(app: State<'_, App>) -> Stage {
+    app.engine.state().stage.clone()
+}
+
+/// Sets the stage size and its marks, keeping mover calibration.
+#[tauri::command]
+pub fn set_stage_plan(app: State<'_, App>, plan: Plan) -> Result<Stage> {
+    app.engine.state().stage.set_plan(plan)?;
+    app.save()?;
+    Ok(app.engine.state().stage.clone())
+}
+
+/// Records that `fixture`, where the programmer has it now, is on `mark`.
+#[tauri::command]
+pub fn calibrate_mark(app: State<'_, App>, fixture: u32, mark: u32) -> Result<Stage> {
+    {
+        let mut state = app.engine.state();
+        let state = &mut *state;
+        let patched = state.patch.get(fixture).ok_or(Error::UnknownFixture(fixture))?;
+        let options = patched.options;
+        let values = state.programmer.values.get(&fixture);
+        let (Some(pan), Some(tilt)) = (values.and_then(|v| v.pan), values.and_then(|v| v.tilt)) else {
+            return Err(Error::InvalidStage(
+                "move the mover onto the mark with the pad first".into(),
+            ));
+        };
+        // Calibration is kept as the fixture sees it, so changing its
+        // orientation in the patch later doesn't spoil it.
+        let (pan, tilt) = options.orient(pan, tilt);
+        let ranges = (f32::from(options.pan_range), f32::from(options.tilt_range));
+        state.stage.record(fixture, mark, pan, tilt, ranges)?;
+    }
+    app.save()?;
+    Ok(app.engine.state().stage.clone())
+}
+
+/// Forgets one of a mover's readings, or all of them when `mark` is `None`.
+#[tauri::command]
+pub fn forget_calibration(app: State<'_, App>, fixture: u32, mark: Option<u32>) -> Result<Stage> {
+    app.engine.state().stage.forget(fixture, mark);
+    app.save()?;
+    Ok(app.engine.state().stage.clone())
+}
+
+/// Points every selected, calibrated mover at a spot on the plan, `height`
+/// above the floor there (the stage floor on the stage, the studio floor round it).
+#[tauri::command]
+pub fn point_at(app: State<'_, App>, x: f32, y: f32, height: f32) -> ProgrammerView {
+    change_programmer(&app, |state| {
+        let z = state.stage.floor_at(x, y) + height;
+        let selection = state.programmer.selection.clone();
+        for id in selection {
+            let (Some(patched), Some(solution)) = (state.patch.get(id), state.stage.solution(id)) else {
+                continue;
+            };
+            let options = patched.options;
+            let values = state.programmer.values.entry(id).or_default();
+            let current = options.orient(values.pan.unwrap_or(0.5), values.tilt.unwrap_or(0.5));
+            let aim = solution.aim([x, y, z], current);
+            let (pan, tilt) = options.unorient(aim.pan, aim.tilt);
+            values.pan = Some(pan);
+            values.tilt = Some(tilt);
+        }
     })
 }

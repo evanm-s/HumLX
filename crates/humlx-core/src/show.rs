@@ -12,6 +12,7 @@ use crate::osc::OscSettings;
 use crate::patch::Patch;
 use crate::playback::{CueList, Effect};
 use crate::programmer::{Group, Preset, Rgb};
+use crate::stage::Stage;
 
 const FORMAT_VERSION: u32 = 1;
 
@@ -49,6 +50,9 @@ pub struct Show {
     /// opens on another computer.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub profiles: Vec<Profile>,
+    /// The stage plan and mover calibration for pointing from the plan.
+    #[serde(default)]
+    pub stage: Stage,
 }
 
 impl Default for Show {
@@ -66,6 +70,7 @@ impl Default for Show {
             highlight_colour: Rgb::WHITE,
             speed_bpm: default_bpm(),
             profiles: Vec::new(),
+            stage: Stage::default(),
         }
     }
 }
