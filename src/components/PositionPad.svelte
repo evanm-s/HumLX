@@ -11,6 +11,8 @@
     onchange: (pan: number, tilt: number) => void;
   }
 
+  import { drag, type DragPoint } from "../lib/drag";
+
   let { pan, tilt, fine, path, onchange }: Props = $props();
 
   let pad: HTMLDivElement;
@@ -19,12 +21,11 @@
   const x = $derived(pan ?? 0.5);
   const y = $derived(tilt ?? 0.5);
 
-  function down(event: PointerEvent) {
-    pad.setPointerCapture(event.pointerId);
+  function down(event: DragPoint) {
     start = { x: event.clientX, y: event.clientY, pan: x, tilt: y };
   }
 
-  function move(event: PointerEvent) {
+  function move(event: DragPoint) {
     if (!start) return;
     const scale = fine ? 0.1 : 1;
     const clamp = (v: number) => Math.max(0, Math.min(1, v));
@@ -42,10 +43,7 @@
   bind:this={pad}
   role="application"
   aria-label="Pan and tilt"
-  onpointerdown={down}
-  onpointermove={move}
-  onpointerup={() => (start = null)}
-  onpointercancel={() => (start = null)}
+  use:drag={{ start: down, move, end: () => (start = null) }}
 >
   <div class="axis h"></div>
   <div class="axis v"></div>

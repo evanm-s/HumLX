@@ -5,6 +5,7 @@
 
   import type { Snippet } from "svelte";
   import { fits, freeSpot, type Grid, type Layout, type Rect } from "../lib/layout";
+  import { drag as dragAction, type DragPoint } from "../lib/drag";
 
   interface Props {
     /** tone: the colour of the window's title band; white when not given. */
@@ -27,7 +28,6 @@
   interface Drag {
     id: string;
     mode: "move" | "resize";
-    pointer: number;
     startX: number;
     startY: number;
     origin: Rect;
@@ -44,18 +44,16 @@
     };
   }
 
-  function start(event: PointerEvent, id: string, mode: Drag["mode"]) {
-    if (!editing || event.button > 0) return;
+  function start(event: DragPoint, target: EventTarget | null, id: string, mode: Drag["mode"]) {
+    if (!editing) return false;
     // Buttons in the title bar (such as Hide) keep working while editing.
-    if (mode === "move" && (event.target as HTMLElement).closest("button")) return;
-    event.preventDefault();
-    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+    if (mode === "move" && (target as HTMLElement | null)?.closest("button")) return false;
     const { x, y, w, h } = layout[id];
-    drag = { id, mode, pointer: event.pointerId, startX: event.clientX, startY: event.clientY, origin: { x, y, w, h }, rect: { x, y, w, h } };
+    drag = { id, mode, startX: event.clientX, startY: event.clientY, origin: { x, y, w, h }, rect: { x, y, w, h } };
   }
 
-  function move(event: PointerEvent) {
-    if (!drag || event.pointerId !== drag.pointer) return;
+  function move(event: DragPoint) {
+    if (!drag) return;
     const size = cell();
     const dx = Math.round((event.clientX - drag.startX) / size.w);
     const dy = Math.round((event.clientY - drag.startY) / size.h);
@@ -76,9 +74,9 @@
           };
   }
 
-  function end(event: PointerEvent) {
-    if (!drag || event.pointerId !== drag.pointer) return;
-    if (ok) onchange({ ...layout, [drag.id]: { ...drag.rect } });
+  function end(cancelled: boolean) {
+    if (!drag) return;
+    if (ok && !cancelled) onchange({ ...layout, [drag.id]: { ...drag.rect } });
     drag = null;
   }
 
@@ -124,10 +122,7 @@
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <header
           class="bar"
-          onpointerdown={(e) => start(e, win.id, "move")}
-          onpointermove={move}
-          onpointerup={end}
-          onpointercancel={end}
+          use:dragAction={{ start: (e, t) => start(e, t, win.id, "move"), move, end }}
         >
           <h2>{win.title}</h2>
           <span class="spacer"></span>
@@ -143,10 +138,7 @@
           <div
             class="resize"
             aria-hidden="true"
-            onpointerdown={(e) => start(e, win.id, "resize")}
-            onpointermove={move}
-            onpointerup={end}
-            onpointercancel={end}
+            use:dragAction={{ start: (e, t) => start(e, t, win.id, "resize"), move, end }}
           ></div>
         {/if}
       </section>

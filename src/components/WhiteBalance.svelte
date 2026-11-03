@@ -7,6 +7,8 @@
     onchange: (value: number) => void;
   }
 
+  import { drag, type DragPoint } from "../lib/drag";
+
   let { value, onchange }: Props = $props();
 
   const STOPS = [
@@ -18,9 +20,8 @@
   ];
 
   let strip: HTMLDivElement;
-  let dragging = false;
 
-  function pick(event: PointerEvent) {
+  function pick(event: DragPoint) {
     const rect = strip.getBoundingClientRect();
     onchange(Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)));
   }
@@ -45,14 +46,7 @@
     aria-valuemin={0}
     aria-valuemax={100}
     aria-valuenow={value == null ? undefined : Math.round(value * 100)}
-    onpointerdown={(e) => {
-      strip.setPointerCapture(e.pointerId);
-      dragging = true;
-      pick(e);
-    }}
-    onpointermove={(e) => dragging && pick(e)}
-    onpointerup={() => (dragging = false)}
-    onpointercancel={() => (dragging = false)}
+    use:drag={{ start: pick, move: pick }}
     onkeydown={key}
   >
     {#if value != null}<div class="marker" style:left="{value * 100}%"></div>{/if}
