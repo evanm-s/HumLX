@@ -19,7 +19,7 @@
   import { attributeColour, attributeName, capabilityAt, fixtureColour, rgbCss, SWATCHES } from "../lib/format";
   import { nearestWheelSlot } from "../lib/wheel";
   import { loadLayout, saveLayout, type Grid, type Layout } from "../lib/layout";
-  import { endSelectWindow, restartSelectWindow, tapMode } from "../lib/selection";
+  import { endSelectWindow, restartSelectWindow, tapSelectMode } from "../lib/selection";
   import { attempt, show } from "../lib/show.svelte";
   import { RECORD_EVENT, surface } from "../lib/surface.svelte";
   import { sheetPicks } from "../lib/sheet.svelte";
@@ -96,11 +96,14 @@
 
   function tapGroup(id: number) {
     if (editingGroups) program(() => api.deleteGroup(id));
-    else program(() => api.selectGroup(id, tapMode("add")));
+    else {
+      const fixtures = show.programmer.groups.find((g) => g.id === id)?.fixtures ?? [];
+      program(() => api.selectGroup(id, tapSelectMode(fixtures, selection)));
+    }
   }
 
   function tapFixture(id: number) {
-    program(() => api.select([id], tapMode("toggle")));
+    program(() => api.select([id], tapSelectMode([id], selection)));
   }
 
   function selectAll() {
