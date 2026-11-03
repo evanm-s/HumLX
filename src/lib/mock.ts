@@ -4,6 +4,7 @@
 
 import { recipe, SHAPES } from "../components/programmer/effects";
 import type {
+  RemoteStatus,
   Attribute,
   CueList,
   Effect,
@@ -397,8 +398,15 @@ const commands: Record<string, (args: Args) => unknown> = {
     speedBpm: [...speedBpm] as [number, number],
     beats: beats(),
     osc: { listening: osc.enabled, error: null, received: 0, last: null },
+    remotes: 0,
   }),
   osc_settings: () => osc,
+  remote_status: () => remoteView(),
+  set_remote: ({ on }) => ((remoteMock.enabled = on as boolean), remoteView()),
+  remote_pairing_code: () => ((remoteMock.code = "482916"), remoteView()),
+  forget_remote_device: ({ id }) => (
+    (remoteMock.devices = remoteMock.devices.filter((d) => d.id !== id)), remoteView()
+  ),
   surface_status: () => ({ connected: false, problem: null }),
   set_surface_leds: () => undefined,
   set_osc: ({ settings }) => (osc = settings),
@@ -703,4 +711,25 @@ export async function mockInvoke<T>(command: string, args: Args = {}): Promise<T
   const handler = commands[command];
   if (!handler) throw `Unknown command ${command}`;
   return (await handler(args)) as T;
+}
+
+// Remote control, so the Settings section can be previewed.
+const remoteMock = {
+  enabled: false,
+  code: null as string | null,
+  devices: [{ id: 1, name: "Evan's laptop", pairedAt: Date.now() / 1000 - 86400 * 3, connected: true }],
+};
+
+function remoteView(): RemoteStatus {
+  const on = remoteMock.enabled;
+  return {
+    enabled: on,
+    running: on,
+    port: 8130,
+    addresses: on ? ["http://192.168.1.20:8130"] : [],
+    error: null,
+    code: on ? remoteMock.code : null,
+    codeSeconds: 120,
+    devices: remoteMock.devices,
+  };
 }

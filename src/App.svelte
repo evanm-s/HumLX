@@ -3,7 +3,10 @@
   import Fader from "./components/Fader.svelte";
   import Toasts from "./components/Toasts.svelte";
   import UpdateButton from "./components/UpdateButton.svelte";
-  import { api, inApp } from "./lib/api";
+  import { api, inApp, remote } from "./lib/api";
+  import { listen } from "@tauri-apps/api/event";
+  import { link } from "./lib/remote.svelte";
+  import PairRemote from "./components/PairRemote.svelte";
   import { attempt, show } from "./lib/show.svelte";
   import { lineText, surface } from "./lib/surface.svelte";
   import { updates } from "./lib/updates.svelte";
@@ -36,12 +39,29 @@
   type ScreenId = (typeof screens)[number]["id"];
   let screen = $state<ScreenId>("programmer");
 
+  async function start() {
+    await show.load();
+    // A new show has nothing to program yet, so start on the patch.
+    if (show.patch.fixtures.length === 0) screen = "patch";
+  }
+
+  // A remote loads the show once linked, and catches up on anything it
+  // missed whenever the link comes back.
+  $effect(() => {
+    if (!remote || link.state !== "open") return;
+    if (link.opened === 1) attempt(start);
+    else show.changed(["patch", "programmer", "playback", "stage"]);
+  });
+
   onMount(() => {
-    attempt(async () => {
-      await show.load();
-      // A new show has nothing to program yet, so start on the patch.
-      if (show.patch.fixtures.length === 0) screen = "patch";
-    });
+    let stopChanges = () => {};
+    if (remote) {
+      link.onchange = (parts) => show.changed(parts);
+      link.start();
+    } else {
+      attempt(start);
+      if (inApp) listen<string[]>("remote-change", (e) => show.changed(e.payload)).then((stop) => (stopChanges = stop));
+    }
     updates.start();
     const stopSurface = surface.start();
     const stopLive = show.startLive();
@@ -53,6 +73,7 @@
     window.addEventListener(SCREEN_EVENT, go);
     return () => {
       window.removeEventListener(SCREEN_EVENT, go);
+      stopChanges();
       stopLive();
       stopSurface.then((stop) => stop());
     };
@@ -82,9 +103,23 @@
 
 <svelte:window onkeydown={keys} />
 
+{#if remote && link.state === "unpaired"}
+  <PairRemote />
+{:else}
 <div class="shell">
   <nav class="rail" aria-label="Screens">
-    <div class="brand">HumLX<span class="gels" aria-hidden="true"></span></div>
+    <div class="brand">
+      HumLX
+      {#if remote}
+        <span class="remote-tag" title="This screen controls the Studio PC over the network">Remote</span>
+      {:else if show.live.remotes > 0}
+        <button class="remote-tag" onclick={() => (screen = "output")} title="Devices controlling this computer">
+          {show.live.remotes} remote{show.live.remotes === 1 ? "" : "s"}
+        </button>
+      {:else}
+        <span class="gels" aria-hidden="true"></span>
+      {/if}
+    </div>
     {#each screens as s (s.id)}
       <button class="nav" aria-current={screen === s.id ? "page" : undefined} onclick={() => (screen = s.id)}>
         <span class="icon" aria-hidden="true">{s.icon}</span>
@@ -117,7 +152,11 @@
   </nav>
 
   <main>
-    {#if !inApp}<div class="preview">Preview mode in a browser. Run the desktop app to control lights.</div>{/if}
+    {#if remote && link.state === "lost"}
+      <div class="preview">Lost the connection to the Studio PC. Reconnecting… The lights keep running.</div>
+    {:else if !inApp && !remote}
+      <div class="preview">Preview mode in a browser. Run the desktop app to control lights.</div>
+    {/if}
     {#if surface.status.connected || surface.status.problem}
       <div class="surface" class:bad={surface.status.problem}>
         <span class="tag">NX-K</span>
@@ -142,6 +181,7 @@
     </div>
   </main>
 </div>
+{/if}
 
 <Toasts />
 
@@ -335,6 +375,19 @@
     color: var(--muted);
   }
 
+  /* Takes the place of the gels under the name, so the rail keeps its height. */
+  .remote-tag {
+    min-height: 0;
+    padding: 1px 8px;
+    border: none;
+    border-radius: var(--radius);
+    background: color-mix(in srgb, var(--f-position) 22%, var(--panel));
+    color: var(--f-position);
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
   .preview {
     padding: 8px 14px;
     border-radius: var(--radius);

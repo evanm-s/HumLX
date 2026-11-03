@@ -4,7 +4,7 @@
   // calibrated movers aim there. Calibrate: point one mover at each floor mark
   // so HumLX can work out where it hangs. Set up: the stage's size and marks.
 
-  import { onDestroy, onMount } from "svelte";
+  import { onDestroy, onMount, untrack } from "svelte";
   import NumberField from "./NumberField.svelte";
   import PositionPad from "./PositionPad.svelte";
   import { api } from "../lib/api";
@@ -71,6 +71,15 @@
       // Only a convenience.
     }
   }
+
+  // Another screen changed the plan or calibration.
+  $effect(() => {
+    if (show.stageRevision)
+      untrack(async () => {
+        const loaded = await attempt(() => api.stage());
+        if (loaded) stage = loaded;
+      });
+  });
 
   onMount(async () => {
     const loaded = await attempt(() => api.stage());
