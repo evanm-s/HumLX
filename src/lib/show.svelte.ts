@@ -29,6 +29,7 @@ class ShowState {
     speedBpm: [120, 120],
     beats: [0, 0],
     osc: { listening: false, error: null, received: 0, last: null },
+    remotes: 0,
   });
   playback = $state<PlaybackView>({
     cueLists: [],
@@ -41,6 +42,39 @@ class ShowState {
   loaded = $state(false);
   /** Bumped when a different show is loaded, so screens start afresh. */
   revision = $state(0);
+  /** Bumped when another screen changed the stage plan or calibration. */
+  stageRevision = $state(0);
+
+  private changedParts = new Set<string>();
+  private changeTimer: ReturnType<typeof setTimeout> | undefined;
+
+  /**
+   * Another screen (a remote, or the Studio PC) changed these parts of the
+   * show. Reloads them, gathering a burst of changes such as a drag into one.
+   */
+  changed(parts: string[]) {
+    for (const part of parts) this.changedParts.add(part);
+    if (this.changeTimer) return;
+    this.changeTimer = setTimeout(() => {
+      this.changeTimer = undefined;
+      const changed = this.changedParts;
+      this.changedParts = new Set();
+      this.reload(changed).catch(() => {});
+    }, 120);
+  }
+
+  private async reload(parts: Set<string>) {
+    if (parts.has("show")) return this.load();
+    if (parts.has("patch")) {
+      const overview = await api.overview();
+      this.profiles = overview.profiles;
+      this.patch = overview.patch;
+      this.output = overview.output;
+    }
+    if (parts.has("programmer")) this.programmer = await api.programmer();
+    if (parts.has("playback")) this.playback = await api.playback();
+    if (parts.has("stage")) this.stageRevision++;
+  }
 
   async load() {
     const overview = await api.overview();

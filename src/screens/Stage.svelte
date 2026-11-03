@@ -4,7 +4,7 @@
   // lights. Movers aim from their calibration; fixed lights are placed by hand
   // with where they point. Tap a light to select it.
 
-  import { onMount } from "svelte";
+  import { onMount, untrack } from "svelte";
   import NumberField from "../components/NumberField.svelte";
   import StageWindow from "../components/StageWindow.svelte";
   import { api } from "../lib/api";
@@ -37,6 +37,11 @@
   }
 
   onMount(load);
+
+  // Another screen changed the plan or calibration.
+  $effect(() => {
+    if (show.stageRevision) untrack(load);
+  });
 
   type Tab = "look" | "place";
   let tab = $state<Tab>("look");

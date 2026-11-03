@@ -3,12 +3,13 @@
   import ColourPicker from "../components/ColourPicker.svelte";
   import Dialog from "../components/Dialog.svelte";
   import NumberField from "../components/NumberField.svelte";
-  import { api, inApp } from "../lib/api";
+  import { onMount } from "svelte";
+  import { api, inApp, remote } from "../lib/api";
   import { isIPv4, portAddressParts, rgbCss, SWATCHES } from "../lib/format";
   import { formKeys } from "../lib/keys";
   import { attempt, notify, show } from "../lib/show.svelte";
   import { updates } from "../lib/updates.svelte";
-  import type { Node, Rgb } from "../lib/types";
+  import type { Node, RemoteStatus, Rgb } from "../lib/types";
 
   let draft = $state({ ...show.output, universe: show.output.universe as number | null, rateHz: show.output.rateHz as number | null });
   let nodes = $state<Node[] | null>(null);
@@ -124,6 +125,43 @@
   const sameColour = (a: Rgb | undefined, b: Rgb) =>
     !!a && Math.abs(a.r - b.r) < 0.01 && Math.abs(a.g - b.g) < 0.01 && Math.abs(a.b - b.b) < 0.01;
 
+  // --- Remote control (on the Studio PC only) -------------------------------
+
+  let remoteStatus = $state<RemoteStatus | null>(null);
+
+  async function refreshRemote() {
+    if (remote) return;
+    try {
+      remoteStatus = await api.remoteStatus();
+    } catch {
+      // Shown next time.
+    }
+  }
+
+  onMount(() => {
+    refreshRemote();
+    const timer = setInterval(refreshRemote, 1000);
+    return () => clearInterval(timer);
+  });
+
+  async function setRemote(on: boolean) {
+    const next = await attempt(() => api.setRemote(on));
+    if (next) remoteStatus = next;
+  }
+
+  async function pairingCode() {
+    const next = await attempt(() => api.remotePairingCode());
+    if (next) remoteStatus = next;
+  }
+
+  async function forgetDevice(id: number) {
+    const next = await attempt(() => api.forgetRemoteDevice(id));
+    if (next) remoteStatus = next;
+  }
+
+  const pairedOn = (seconds: number) =>
+    new Date(seconds * 1000).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+
   const status = $derived(show.live.osc);
   const example = $derived(show.playback.cueLists[0]?.id ?? 1);
 </script>
@@ -133,7 +171,72 @@
     <h1>Settings</h1>
   </header>
 
-  <section class="panel card">
+  {#if remote}
+    <p class="remote-note">
+      This screen controls the Studio PC over the network. Show files, Art-Net output, OSC and updates can only be
+      changed on the Studio PC.
+    </p>
+  {/if}
+
+  {#if !remote && remoteStatus}
+    <section class="panel card">
+      <div class="row">
+        <h2>Remote control</h2>
+        <span class="spacer"></span>
+        <div class="segmented">
+          <button aria-pressed={remoteStatus.enabled} onclick={() => setRemote(true)}>On</button>
+          <button aria-pressed={!remoteStatus.enabled} onclick={() => setRemote(false)}>Off</button>
+        </div>
+      </div>
+      <p class="muted">
+        Run this show from a laptop on the same network, for example to point and calibrate movers while walking the
+        stage. The laptop opens HumLX in its web browser; only this computer sends Art-Net.
+      </p>
+      {#if remoteStatus.error}
+        <p class="bad">{remoteStatus.error}</p>
+      {:else if remoteStatus.running}
+        <p>
+          Open {remoteStatus.addresses.length > 1 ? "one of these" : "this"} in a browser on the laptop:
+          {#each remoteStatus.addresses as address (address)}
+            <br /><code class="address">{address}</code>
+          {:else}
+            <br /><span class="bad">This computer isn't on a network.</span>
+          {/each}
+        </p>
+        <div class="row">
+          {#if remoteStatus.code}
+            <span>Type this code on the new device:</span>
+            <strong class="pair-code">{remoteStatus.code}</strong>
+            <span class="muted">{remoteStatus.codeSeconds}s left</span>
+          {:else}
+            <span class="muted">Each new device needs a code from here once.</span>
+          {/if}
+          <span class="spacer"></span>
+          <button class="primary" onclick={pairingCode}>{remoteStatus.code ? "New code" : "Pair a device"}</button>
+        </div>
+      {/if}
+      {#if remoteStatus.devices.length > 0}
+        <table class="addresses">
+          <thead><tr><th>Paired device</th><th>Status</th><th></th></tr></thead>
+          <tbody>
+            {#each remoteStatus.devices as device (device.id)}
+              <tr>
+                <td>{device.name}</td>
+                <td>
+                  {#if device.connected}<span class="good">Connected</span>{:else}<span class="muted"
+                      >Paired {pairedOn(device.pairedAt)}</span
+                    >{/if}
+                </td>
+                <td class="end"><button onclick={() => forgetDevice(device.id)}>Remove</button></td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      {/if}
+    </section>
+  {/if}
+
+  <section class="panel card" inert={remote} class:locked={remote}>
     <div class="row">
       <h2>Show file</h2>
       <span class="spacer"></span>
@@ -149,7 +252,7 @@
     </p>
   </section>
 
-  <section class="panel card" use:formKeys>
+  <section class="panel card" use:formKeys inert={remote} class:locked={remote}>
     <div class="row">
       <h2>Art-Net output</h2>
       <span class="spacer"></span>
@@ -185,7 +288,7 @@
     </div>
   </section>
 
-  <section class="panel card osc" use:formKeys>
+  <section class="panel card osc" use:formKeys inert={remote} class:locked={remote}>
     <div class="row">
       <h2>OSC</h2>
       <span class="spacer"></span>
@@ -270,7 +373,7 @@
     {/if}
   </section>
 
-  <section class="panel card">
+  <section class="panel card" inert={remote} class:locked={remote}>
     <div class="row">
       <h2>Find nodes</h2>
       <span class="spacer"></span>
@@ -291,7 +394,7 @@
     {/if}
   </section>
 
-  <section class="panel card">
+  <section class="panel card" inert={remote} class:locked={remote}>
     <div class="row">
       <h2>Updates</h2>
       <span class="spacer"></span>
@@ -408,6 +511,28 @@
     color: var(--accent);
   }
 
+  .locked {
+    opacity: 0.45;
+  }
+  .remote-note {
+    margin: 0;
+    padding: 8px 14px;
+    border-radius: var(--radius);
+    background: color-mix(in srgb, var(--f-position) 15%, var(--panel));
+    color: var(--f-position);
+  }
+  .address {
+    font-size: 1.1rem;
+    user-select: all;
+  }
+  .pair-code {
+    font-family: var(--mono);
+    font-size: 1.8rem;
+    letter-spacing: 0.2em;
+  }
+  .end {
+    text-align: right;
+  }
   .card {
     padding: 16px;
     display: grid;

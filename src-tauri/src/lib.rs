@@ -3,6 +3,7 @@
 
 mod commands;
 mod playback;
+mod remote;
 mod shows;
 mod surface;
 
@@ -24,6 +25,8 @@ pub struct App {
     osc: Mutex<Option<Listener>>,
     /// The show file last saved or opened, if any.
     show_file: Mutex<Option<PathBuf>>,
+    /// Remote control from browsers on the local network.
+    remote: remote::Remote,
 }
 
 struct Paths {
@@ -71,6 +74,7 @@ impl App {
             warnings: Mutex::new(warnings),
             osc: Mutex::new(None),
             show_file: Mutex::new(None),
+            remote: remote::Remote::load(data_dir.join("remote.json")),
         };
         app.restart_osc();
         Ok(app)
@@ -167,6 +171,28 @@ fn load_profiles(dir: &Path) -> Vec<(String, humlx_core::Result<Profile>)> {
         .collect()
 }
 
+/// Wraps the command handler so that after a command changes the show, every
+/// other screen (the Studio PC's and each remote's) hears what changed.
+fn with_change_notes<R: tauri::Runtime>(
+    handler: impl Fn(tauri::ipc::Invoke<R>) -> bool + Send + Sync + 'static,
+) -> impl Fn(tauri::ipc::Invoke<R>) -> bool + Send + Sync + 'static {
+    move |invoke| {
+        let cmd = invoke.message.command().to_string();
+        let from = remote::connection_of(invoke.message.headers());
+        let webview = invoke.message.webview();
+        // Every command here is synchronous, so it has finished on return.
+        let handled = handler(invoke);
+        let parts = remote::changes(&cmd);
+        if !parts.is_empty() {
+            let handle = webview.app_handle();
+            if let Some(app) = handle.try_state::<App>() {
+                app.remote.changed(handle, from, parts);
+            }
+        }
+        handled
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -177,9 +203,10 @@ pub fn run() {
             let data_dir = app.path().app_data_dir()?;
             app.manage(App::load(&data_dir)?);
             app.manage(surface::start(app.handle().clone()));
+            app.state::<App>().remote.resume(app.handle());
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![
+        .invoke_handler(with_change_notes(tauri::generate_handler![
             commands::overview,
             commands::add_fixtures,
             commands::update_fixture,
@@ -256,7 +283,11 @@ pub fn run() {
             playback::set_effect_size,
             playback::tap_speed,
             playback::set_speed_bpm,
-        ])
+            remote::remote_status,
+            remote::set_remote,
+            remote::remote_pairing_code,
+            remote::forget_remote_device,
+        ]))
         .run(tauri::generate_context!())
         .expect("error while running HumLX");
 }

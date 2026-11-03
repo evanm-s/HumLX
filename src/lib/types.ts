@@ -140,6 +140,8 @@ export interface Live {
   /** Beats counted by speed masters A and B. */
   beats: [number, number];
   osc: OscStatus;
+  /** Remotes connected to the Studio PC now. */
+  remotes: number;
 }
 
 export interface OscSettings {
@@ -381,3 +383,24 @@ export interface SurfaceStatus {
 
 /** How an NX-K key LED is lit. */
 export type Led = "off" | "on" | "blink";
+
+export interface RemoteDevice {
+  id: number;
+  name: string;
+  /** Seconds since 1970 when it paired. */
+  pairedAt: number;
+  connected: boolean;
+}
+
+export interface RemoteStatus {
+  enabled: boolean;
+  running: boolean;
+  port: number;
+  /** Addresses to open in a browser, such as http://192.168.1.20:8130. */
+  addresses: string[];
+  error: string | null;
+  /** The pairing code while one is showing. */
+  code: string | null;
+  codeSeconds: number;
+  devices: RemoteDevice[];
+}

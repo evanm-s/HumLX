@@ -26,15 +26,21 @@ import type {
   Led,
 } from "./types";
 import type { Known, Placed, Plan, Stage } from "./stage";
+import { link } from "./remote.svelte";
+import type { RemoteStatus } from "./types";
 
 /** True when running inside the desktop app rather than a plain browser. */
 export const inApp = "__TAURI_INTERNALS__" in window;
+
+/** True in a browser on another computer, driving the Studio PC that served the page. */
+export const remote = !inApp && document.querySelector('meta[name="humlx-remote"]') != null;
 
 type Invoke = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
 
 // In a plain browser (`npm run dev`) there is no Rust side, so a small
 // in-memory stand-in is used to preview the UI.
-let invokeImpl: Invoke | undefined = inApp ? tauriInvoke : undefined;
+// A remote sends commands to the Studio PC over the network.
+let invokeImpl: Invoke | undefined = inApp ? tauriInvoke : remote ? (c, a) => link.invoke(c, a) : undefined;
 
 async function invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
   if (!invokeImpl) {
@@ -157,4 +163,9 @@ export const api = {
   setEffectSize: (level: number) => invoke<PlaybackView>("set_effect_size", { level }),
   tapSpeed: (master: number) => invoke<PlaybackView>("tap_speed", { master }),
   setSpeedBpm: (master: number, bpm: number) => invoke<PlaybackView>("set_speed_bpm", { master, bpm }),
+
+  remoteStatus: () => invoke<RemoteStatus>("remote_status"),
+  setRemote: (on: boolean) => invoke<RemoteStatus>("set_remote", { on }),
+  remotePairingCode: () => invoke<RemoteStatus>("remote_pairing_code"),
+  forgetRemoteDevice: (id: number) => invoke<RemoteStatus>("forget_remote_device", { id }),
 };

@@ -60,6 +60,14 @@ up quickly.
   addresses such as `/humlx/cuelist/1/go`, `/humlx/selected/go`,
   `/humlx/slot/2/go` and `/humlx/grid/1/12` (the full list is on the Settings
   screen). Off by default; turn it on and pick a port in Settings.
+- **Remote control**: turn it on in Settings and open the address it shows in a
+  browser on another computer on the same network, to run the show from there
+  (for example to point and calibrate movers while walking the stage). Each
+  device pairs once with a 6-digit code from the Studio PC. Only the Studio PC
+  sends Art-Net; show files, Art-Net, OSC and updates stay Studio-PC-only. The
+  server listens on port 8130 (change `port` in `remote.json` in the app's data
+  folder); Windows asks once to let it through the firewall. It works in an
+  installed or `tauri build` app, not `tauri dev`.
 - **Show files**: save the show to a file, open one, or start a new show.
   Imported fixture types travel inside the file.
 - **Updates**: the app checks GitHub Releases and offers to update itself.

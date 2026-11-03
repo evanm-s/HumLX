@@ -73,6 +73,8 @@ pub struct Live {
     /// Beats counted by speed masters A and B, for their beat lights.
     beats: [f32; 2],
     osc: humlx_core::osc::OscStatus,
+    /// Remotes connected to this computer now.
+    remotes: usize,
 }
 
 fn patch_view(app: &App) -> PatchView {
@@ -239,6 +241,7 @@ pub fn live(app: State<'_, App>) -> Live {
         speed_bpm: state.speed_masters.bpms(),
         beats: state.speed_masters.beats(std::time::Instant::now()).0,
         osc: state.osc.clone(),
+        remotes: app.remote.connected(),
     }
 }
 
