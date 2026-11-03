@@ -60,11 +60,18 @@ export interface Scenery {
   height: number;
 }
 
+export interface Margins {
+  left: number;
+  right: number;
+  front: number;
+  back: number;
+}
+
 export interface Stage {
   width: number;
   depth: number;
-  /** Studio floor shown round the stage, in metres each side. */
-  margin: number;
+  /** Studio floor shown round the stage, in metres on each side. */
+  margin: Margins;
   /** Height of the stage floor above the studio floor. */
   riser: number;
   marks: Mark[];
@@ -101,7 +108,7 @@ export function defaultMarks(width: number, depth: number): Mark[] {
 }
 
 export function defaultStage(): Stage {
-  return { width: 8, depth: 6, margin: 2, riser: 0, marks: defaultMarks(8, 6), movers: [], positions: [], scenery: [] };
+  return { width: 8, depth: 6, margin: { left: 2, right: 2, front: 2, back: 2 }, riser: 0, marks: defaultMarks(8, 6), movers: [], positions: [], scenery: [] };
 }
 
 export function onStage(stage: Plan, x: number, y: number) {

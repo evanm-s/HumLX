@@ -135,19 +135,26 @@
     return {
       width: s.width,
       depth: s.depth,
-      margin: s.margin,
+      margin: { ...s.margin },
       riser: s.riser,
       marks: s.marks.map((m) => ({ ...m })),
       scenery: (s.scenery ?? []).map((p) => ({ ...p, points: p.points.map((pt) => [...pt] as [number, number]) })),
     };
   }
 
+  const margins = [
+    ["left", "Left (m)"],
+    ["right", "Right (m)"],
+    ["front", "In front (m)"],
+    ["back", "Behind (m)"],
+  ] as const;
+
   // The view takes in the studio margin and any mover hung outside it.
   const view = $derived.by(() => {
-    let left = -plan.width / 2 - plan.margin;
-    let right = plan.width / 2 + plan.margin;
-    let front = -plan.margin;
-    let back = plan.depth + plan.margin;
+    let left = -plan.width / 2 - plan.margin.left;
+    let right = plan.width / 2 + plan.margin.right;
+    let front = -plan.margin.front;
+    let back = plan.depth + plan.margin.back;
     for (const d of drawn) {
       left = Math.min(left, d.at[0] - 0.6);
       right = Math.max(right, d.at[0] + 0.6);
@@ -758,8 +765,14 @@
         <div class="sizes">
           <NumberField label="Stage width (m)" value={draft.width} onchange={(v) => draft && v != null && (draft.width = v)} fractional increment={0.5} min={0.5} max={200} />
           <NumberField label="Stage depth (m)" value={draft.depth} onchange={(v) => draft && v != null && (draft.depth = v)} fractional increment={0.5} min={0.5} max={200} />
-          <NumberField label="Studio floor round it (m)" value={draft.margin} onchange={(v) => draft && v != null && (draft.margin = v)} fractional increment={0.5} max={50} />
           <NumberField label="Stage height above studio floor (m)" value={draft.riser} onchange={(v) => draft && v != null && (draft.riser = v)} fractional increment={0.05} max={10} />
+        </div>
+        <h3>Studio floor round the stage</h3>
+        <p class="muted small">How much floor to show on each side, in metres; left and right as seen from the desk.</p>
+        <div class="sizes">
+          {#each margins as [side, label] (side)}
+            <NumberField {label} value={draft.margin[side]} onchange={(v) => draft && v != null && (draft.margin[side] = v)} fractional increment={0.5} max={50} />
+          {/each}
         </div>
         <h3>Marks</h3>
         <p class="muted small">
