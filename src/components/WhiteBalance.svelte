@@ -21,9 +21,17 @@
 
   let strip: HTMLDivElement;
 
-  function pick(event: DragPoint) {
-    const rect = strip.getBoundingClientRect();
-    onchange(Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)));
+  // Dragging moves the balance relative to the finger, so a touch never makes
+  // it jump. With no balance set yet it starts at neutral.
+  let start: { x: number; value: number } | null = null;
+
+  function down(event: DragPoint) {
+    start = { x: event.clientX, value: value ?? 0.5 };
+  }
+
+  function move(event: DragPoint) {
+    if (!start) return;
+    onchange(Math.max(0, Math.min(1, start.value + (event.clientX - start.x) / strip.clientWidth)));
   }
 
   function key(event: KeyboardEvent) {
@@ -46,7 +54,7 @@
     aria-valuemin={0}
     aria-valuemax={100}
     aria-valuenow={value == null ? undefined : Math.round(value * 100)}
-    use:drag={{ start: pick, move: pick }}
+    use:drag={{ start: down, move, end: () => (start = null) }}
     onkeydown={key}
   >
     {#if value != null}<div class="marker" style:left="{value * 100}%"></div>{/if}
