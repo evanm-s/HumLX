@@ -190,15 +190,27 @@
       {@const l = show.playback.cueLists.find((x) => x.id === id)}
       {#if l}
         {@const running = status(l.id)}
-        <div class="strip slot" class:running={running != null} class:selected={l.id === list?.id}>
+        {@const on = running != null && !running.releasing}
+        <div
+          class="strip slot"
+          class:live={on}
+          class:fading={on && running?.fading}
+          class:releasing={running?.releasing}
+          class:selected={l.id === list?.id}
+        >
           <div class="slot-head">
             <button class="strip-name ghost" title="Select this cue list" onclick={() => selectList(l.id)}>
               <span class="slot-num">{slot + 1}</span>{l.name}
             </button>
             <button class="ghost unload" aria-label={`Take ${l.name} out of slot ${slot + 1}`} onclick={() => play(() => api.setSlot(slot, null))}>✕</button>
           </div>
-          <div class="strip-cue muted">
-            {running ? `${running.current + 1} · ${l.cues[running.current]?.name ?? ""}` : "Not running"}
+          <div class="strip-cue" class:muted={!running}>
+            {#if running}
+              <span class="live-tag">{running.releasing ? "Releasing" : "Live"}</span>
+              {running.current + 1} · {l.cues[running.current]?.name ?? ""}
+            {:else}
+              Not running
+            {/if}
           </div>
           <div class="strip-body">
             <Fader
@@ -298,9 +310,37 @@
     flex: 1 0 210px;
   }
 
+  /* Live: the head turns solid playback orange (like a live grid button) and
+     the whole strip gets an orange edge and tint. Selected stays a white
+     outline drawn outside that edge, so the two never hide each other. */
+  div.strip.slot {
+    border-top: none;
+    padding-top: 0;
+    box-shadow: inset 0 0 0 2px transparent;
+  }
+
+  .strip.slot.live,
+  .strip.slot.releasing {
+    box-shadow: inset 0 0 0 2px var(--f-playback);
+  }
+
+  .strip.slot.live {
+    background: color-mix(in srgb, var(--f-playback) 14%, var(--panel-raised));
+  }
+
+  .strip.slot.fading .slot-head {
+    animation: fade 0.6s ease-in-out infinite alternate;
+  }
+
+  @keyframes fade {
+    to {
+      opacity: 0.55;
+    }
+  }
+
   .strip.slot.selected {
-    outline: 2px solid var(--accent);
-    outline-offset: -2px;
+    outline: 3px solid var(--accent);
+    outline-offset: 3px;
   }
 
   .slot-head {
@@ -308,6 +348,42 @@
     align-items: center;
     gap: 4px;
     min-width: 0;
+    margin: 0 -14px;
+    padding: 6px 8px;
+    border-radius: var(--radius) var(--radius) 0 0;
+    background: var(--line);
+  }
+
+  .live .slot-head {
+    background: var(--f-playback);
+    color: var(--accent-text);
+  }
+
+  .live .slot-num {
+    opacity: 0.75;
+  }
+
+  .releasing .slot-head {
+    color: var(--f-playback);
+  }
+
+  .live-tag {
+    display: inline-block;
+    margin-right: 6px;
+    padding: 1px 6px;
+    border-radius: var(--radius);
+    background: var(--f-playback);
+    color: var(--accent-text);
+    font-weight: 700;
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .releasing .live-tag {
+    background: transparent;
+    color: var(--f-playback);
+    box-shadow: inset 0 0 0 1px var(--f-playback);
   }
 
   .slot-head .strip-name {
