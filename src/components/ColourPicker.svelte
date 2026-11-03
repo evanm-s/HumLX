@@ -25,15 +25,27 @@
       : null,
   );
 
-  function pick(event: DragPoint) {
-    const rect = disc.getBoundingClientRect();
-    const radius = rect.width / 2;
-    const dx = event.clientX - rect.left - radius;
-    const dy = event.clientY - rect.top - radius;
+  // Dragging moves the marker from where it was, relative to the finger, so a
+  // touch never makes the colour jump. With no colour yet it starts at white.
+  let start: { x: number; y: number; mx: number; my: number } | null = null;
+
+  function down(event: DragPoint) {
+    start = { x: event.clientX, y: event.clientY, mx: marker?.x ?? 0, my: marker?.y ?? 0 };
+  }
+
+  function move(event: DragPoint) {
+    if (!start) return;
+    const radius = disc.clientWidth / 2;
+    let x = start.mx + (event.clientX - start.x) / radius;
+    let y = start.my + (event.clientY - start.y) / radius;
+    const distance = Math.hypot(x, y);
+    if (distance > 1) {
+      x /= distance;
+      y /= distance;
+    }
     // 0° at the top, clockwise, matching the conic gradient.
-    const hue = ((Math.atan2(dx, -dy) * 180) / Math.PI + 360) % 360;
-    const saturation = Math.min(1, Math.hypot(dx, dy) / radius);
-    onchange(hsvToRgb(hue, saturation));
+    const hue = ((Math.atan2(x, -y) * 180) / Math.PI + 360) % 360;
+    onchange(hsvToRgb(hue, Math.min(1, distance)));
   }
 </script>
 
@@ -44,7 +56,7 @@
   tabindex="0"
   aria-label="Colour"
   aria-valuenow={hsv ? Math.round(hsv.h) : undefined}
-  use:drag={{ start: pick, move: pick }}
+  use:drag={{ start: down, move, end: () => (start = null) }}
 >
   {#if marker && colour}
     <div
