@@ -17,6 +17,7 @@
   import ProgrammerSheet from "../components/programmer/ProgrammerSheet.svelte";
   import { api } from "../lib/api";
   import { attributeColour, attributeName, capabilityAt, fixtureColour, rgbCss, SWATCHES } from "../lib/format";
+  import { nearestWheelSlot } from "../lib/wheel";
   import { loadLayout, saveLayout, type Grid, type Layout } from "../lib/layout";
   import { endSelectWindow, restartSelectWindow, tapMode } from "../lib/selection";
   import { attempt, show } from "../lib/show.svelte";
@@ -265,8 +266,9 @@
   const hasIntensity = $derived(colourHas("intensity") || MIXERS.some(colourHas));
   const hasColour = $derived([...EMITTERS, "color_temperature", "color_wheel"].some((a) => colourHas(a as Attribute)));
   const hasPosition = $derived(colourHas("pan") || colourHas("tilt"));
+  // Colour wheels get a fader too, so wheel-only fixtures are not left out.
   const colourFaderList = $derived(
-    [...EMITTERS, "color_temperature" as Attribute]
+    [...EMITTERS, "color_wheel" as Attribute, "color_temperature" as Attribute]
       .filter(colourHas)
       .map((attribute) => ({ attribute, channel: colourChannels.get(attribute)! })),
   );
@@ -277,7 +279,15 @@
     const colour = current.colour;
     const fixture = show.fixture(selection[0] ?? null);
     if (!colour || !fixture) return undefined;
-    const own = new Set(show.channels(fixture).map((c) => c.attribute));
+    const channels = show.channels(fixture).filter((c) => !c.fineOf);
+    const own = new Set(channels.map((c) => c.attribute));
+    if (attribute === "color_wheel") {
+      // The engine only turns the wheel when the fixture cannot mix the colour.
+      if (["red", "green", "blue", "cyan", "magenta", "yellow"].some((a) => own.has(a as Attribute))) return undefined;
+      const wheel = channels.find((c) => c.attribute === "color_wheel");
+      const slot = wheel && nearestWheelSlot(wheel, colour);
+      return slot == null ? undefined : slot / 255;
+    }
     const scale = own.has("intensity") ? 1 : (current.intensity ?? 0);
     const [r, g, b] = [colour.r * scale, colour.g * scale, colour.b * scale];
     if (own.has("red") || own.has("green") || own.has("blue")) {
@@ -408,6 +418,12 @@
       {editingGroups ? "Done" : "Edit"}
     </button>
   {:else if families[id]}
+    <!-- The view toggle goes first so FX and Clear stay put when it hides. -->
+    {#if id === "colour" && !effectsShown.colour && hasColour}
+      <button class="small" onclick={() => setColourFaders(!colourFaders)}>
+        {colourFaders ? "Picker" : "Faders"}
+      </button>
+    {/if}
     {#if EFFECT_WINDOWS[id]}
       {@const running = runningOfFamily(id)}
       <button
@@ -418,11 +434,6 @@
         onclick={() => (effectsShown[id] = !effectsShown[id])}
       >
         FX{running > 0 ? ` ${running}` : ""}
-      </button>
-    {/if}
-    {#if id === "colour" && !effectsShown.colour && hasColour}
-      <button class="small" onclick={() => setColourFaders(!colourFaders)}>
-        {colourFaders ? "Picker" : "Faders"}
       </button>
     {/if}
     <button
