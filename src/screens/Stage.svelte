@@ -18,6 +18,7 @@
     hit,
     pool,
     towards,
+    type Extra,
     type Placed,
     type Stage,
     type Vec3,
@@ -43,6 +44,10 @@
 
   interface Light {
     fixture: Fixture;
+    /** 0 for the fixture itself, then its copies on the same address. */
+    copy: number;
+    key: string;
+    label: string;
     channels: Channel[];
     mover: boolean;
     calibrated: boolean;
@@ -63,37 +68,58 @@
   const placementOf = (id: number): Placed =>
     stage.positions.find((p) => p.fixture === id) ?? { fixture: id };
 
+  /** Where one light hangs and points: the fixture itself, or one of its copies. */
+  interface Body {
+    x?: number | null;
+    y?: number | null;
+    z?: number | null;
+    aim?: [number, number] | null;
+  }
+
+  function bodyOf(placed: Placed, copy: number): Body {
+    return copy === 0 ? placed : (placed.copies?.[copy - 1] ?? {});
+  }
+
+  const letter = (copy: number) => String.fromCharCode(97 + copy);
+
   const lights = $derived.by((): Light[] => {
     const selection = new Set(show.programmer.selection);
-    return show.patch.fixtures.map((fixture) => {
+    return show.patch.fixtures.flatMap((fixture) => {
       const channels = show.channels(fixture);
       const mover = channels.some((c) => c.attribute === "pan");
       const placed = placementOf(fixture.id);
       const solution = mover ? (stage.movers.find((m) => m.fixture === fixture.id)?.solution ?? null) : null;
       const look = lookOf(fixture, channels, show.live.universe);
-      const known = placed.x != null && placed.y != null && placed.z != null;
-      const at: Vec3 | null = solution ? [...solution.position] : known ? [placed.x!, placed.y!, placed.z!] : null;
-      let axis: Vec3 | null = null;
-      if (solution && look.position) axis = beam(solution, look.position[0], look.position[1]);
-      else if (!mover && at)
-        axis = placed.aim ? towards(at, [placed.aim[0], placed.aim[1], floorAt(stage, ...placed.aim)]) : [0, 0, -1];
       const degrees = placed.beam ?? defaultBeam(channels);
-      const centre = at && axis ? hit(stage, at, axis) : null;
-      const lit = look.intensity > 0.01;
-      return {
-        fixture,
-        channels,
-        mover,
-        calibrated: !!solution,
-        placed,
-        at,
-        axis,
-        degrees,
-        look,
-        patch: at && axis && lit ? pool(stage, at, axis, degrees, reachOf(at, centre)) : null,
-        centre,
-        selected: selection.has(fixture.id),
-      };
+      const copies = mover ? 0 : (placed.copies?.length ?? 0);
+      return Array.from({ length: copies + 1 }, (_, copy): Light => {
+        const body = bodyOf(placed, copy);
+        const known = body.x != null && body.y != null && body.z != null;
+        const at: Vec3 | null = solution ? [...solution.position] : known ? [body.x!, body.y!, body.z!] : null;
+        let axis: Vec3 | null = null;
+        if (solution && look.position) axis = beam(solution, look.position[0], look.position[1]);
+        else if (!mover && at)
+          axis = body.aim ? towards(at, [body.aim[0], body.aim[1], floorAt(stage, ...body.aim)]) : [0, 0, -1];
+        const centre = at && axis ? hit(stage, at, axis) : null;
+        const lit = look.intensity > 0.01;
+        return {
+          fixture,
+          copy,
+          key: `${fixture.id}-${copy}`,
+          label: copies > 0 ? `${fixture.id}${letter(copy)}` : String(fixture.id),
+          channels,
+          mover,
+          calibrated: !!solution,
+          placed,
+          at,
+          axis,
+          degrees,
+          look,
+          patch: at && axis && lit ? pool(stage, at, axis, degrees, reachOf(at, centre)) : null,
+          centre,
+          selected: selection.has(fixture.id),
+        };
+      });
     });
   });
 
@@ -198,8 +224,8 @@
       if (light) tapLight(light.fixture.id);
       return false;
     }
-    if (light && light.fixture.id !== picked) {
-      pick(light.fixture.id);
+    if (light && (light.fixture.id !== picked || light.copy !== pickedCopy)) {
+      pick(light.fixture.id, light.copy);
       return false;
     }
     if (picked == null) return false;
@@ -219,7 +245,7 @@
       const done = dragging;
       save(picked);
       // A fixed light placed for the first time goes on to where it points.
-      if (done === "position" && !pickedLight?.mover && !placementOf(picked).aim) tapSets = "aim";
+      if (done === "position" && !pickedLight?.mover && !bodyOf(placementOf(picked), pickedCopy).aim) tapSets = "aim";
     }
     dragging = null;
   }
@@ -265,16 +291,21 @@
   // --- Place ----------------------------------------------------------------
 
   let picked = $state<number | null>(null);
+  /** Which light on the picked fixture's address: 0 for the fixture, then its copies. */
+  let pickedCopy = $state(0);
   let tapSets = $state<"position" | "aim">("position");
   /** Height given to a light placed for the first time: the last one used. */
   let lastHeight = 4.5;
 
-  const pickedLight = $derived(lights.find((l) => l.fixture.id === picked));
+  const pickedLight = $derived(lights.find((l) => l.fixture.id === picked && l.copy === pickedCopy));
+  const pickedBodies = $derived(picked == null ? [] : lights.filter((l) => l.fixture.id === picked));
 
-  function pick(id: number) {
+  function pick(id: number, copy = 0) {
     picked = id;
-    const light = lights.find((l) => l.fixture.id === id);
-    tapSets = !light?.mover && light?.at && !light.placed.aim ? "aim" : "position";
+    pickedCopy = copy;
+    const light = lights.find((l) => l.fixture.id === id && l.copy === copy);
+    const body = light && bodyOf(light.placed, copy);
+    tapSets = !light?.mover && light?.at && !body?.aim ? "aim" : "position";
   }
 
   const round5 = (v: number) => Math.round(v * 20) / 20;
@@ -286,16 +317,29 @@
     stage.positions = [...others, next].sort((a, b) => a.fixture - b.fixture);
   }
 
+  /** Changes where the picked light hangs or points, whether it's the fixture or a copy. */
+  function editBody(change: Body) {
+    if (picked == null) return;
+    if (pickedCopy === 0) return edit(picked, change);
+    const copies = [...(placementOf(picked).copies ?? [])];
+    const old = copies[pickedCopy - 1];
+    if (!old) return;
+    const next = { ...old, ...change };
+    copies[pickedCopy - 1] = { x: next.x ?? old.x, y: next.y ?? old.y, z: next.z ?? old.z, aim: next.aim };
+    edit(picked, { copies });
+  }
+
   function placeAt(at: { x: number; y: number }) {
     if (picked == null) return;
     const spot: [number, number] = [round5(at.x), round5(at.y)];
-    if (tapSets === "aim") edit(picked, { aim: spot });
-    else edit(picked, { x: spot[0], y: spot[1], z: placementOf(picked).z ?? lastHeight });
+    if (tapSets === "aim") editBody({ aim: spot });
+    else editBody({ x: spot[0], y: spot[1], z: bodyOf(placementOf(picked), pickedCopy).z ?? lastHeight });
   }
 
   async function save(id: number) {
     const placed = $state.snapshot(placementOf(id));
-    if (placed.z != null) lastHeight = placed.z;
+    const body = bodyOf(placed, pickedCopy);
+    if (body.z != null) lastHeight = body.z;
     const saved = await attempt(() => api.setPlacement(placed));
     if (saved) stage = saved;
     else load();
@@ -307,22 +351,54 @@
     save(picked);
   }
 
+  function setBody(change: Body) {
+    if (picked == null) return;
+    editBody(change);
+    save(picked);
+  }
+
   function setAimPart(i: 0 | 1, v: number | null) {
     if (picked == null || pickedLight?.at == null) return;
-    const aim = [...(placementOf(picked).aim ?? [pickedLight.at[0], pickedLight.at[1]])] as [number, number];
+    const aim = [...(bodyOf(placementOf(picked), pickedCopy).aim ?? [pickedLight.at[0], pickedLight.at[1]])] as [
+      number,
+      number,
+    ];
     if (v != null) aim[i] = v;
-    setField({ aim });
+    setBody({ aim });
+  }
+
+  /** Another light on the same address, hung a metre to the right of the last one to start with. */
+  function addCopy() {
+    if (picked == null) return;
+    const placed = placementOf(picked);
+    const last = bodyOf(placed, placed.copies?.length ?? 0);
+    const copy: Extra = {
+      x: round5((last.x ?? 0) + 1),
+      y: last.y ?? 0,
+      z: last.z ?? lastHeight,
+      aim: last.aim ? [last.aim[0] + 1, last.aim[1]] : null,
+    };
+    const copies = [...(placed.copies ?? []), copy];
+    setField({ copies });
+    pick(picked, copies.length);
+    tapSets = "position";
   }
 
   function removeFromPlan() {
     if (picked == null) return;
-    setField({ x: null, y: null, z: null, aim: null, beam: null });
+    if (pickedCopy > 0) {
+      const copies = (placementOf(picked).copies ?? []).filter((_, i) => i !== pickedCopy - 1);
+      pickedCopy = 0;
+      return setField({ copies });
+    }
+    setField({ x: null, y: null, z: null, aim: null, beam: null, copies: [] });
   }
 
   function status(l: Light) {
     if (l.mover) return l.calibrated ? "Calibrated" : l.at ? "Not calibrated" : "Not placed";
     if (!l.at) return l.placed.x != null ? "Needs a height" : "Not placed";
-    return l.placed.aim ? "Placed and aimed" : "Placed, pointing down";
+    const more = l.placed.copies?.length ? ` · ${l.placed.copies.length + 1} lights` : "";
+    return (l.placed.aim ? "Placed and aimed" : "Placed, pointing down") + more;
   }
 
   function closeWindow() {
@@ -358,17 +434,17 @@
       <text class="caption" x="0" y={unit * 3.2} font-size={unit * 2.2} text-anchor="middle">Front of stage</text>
 
       <g class="pools" filter="url(#soft)">
-        {#each onPlan as l (l.fixture.id)}
+        {#each onPlan as l (l.key)}
           {#if l.patch}
             {@const g = spread(l)}
             {@const colour = cssColour(l.look.colour)}
             {@const strength = 0.2 + 0.65 * l.look.intensity}
-            <radialGradient id="pool-{l.fixture.id}" gradientUnits="userSpaceOnUse" cx={g.cx} cy={g.cy} r={g.r}>
+            <radialGradient id="pool-{l.key}" gradientUnits="userSpaceOnUse" cx={g.cx} cy={g.cy} r={g.r}>
               <stop offset="0" stop-color={colour} stop-opacity={strength} />
               <stop offset="0.6" stop-color={colour} stop-opacity={strength * 0.7} />
               <stop offset="1" stop-color={colour} stop-opacity={strength * 0.15} />
             </radialGradient>
-            <polygon points={polygon(l.patch)} fill="url(#pool-{l.fixture.id})" />
+            <polygon points={polygon(l.patch)} fill="url(#pool-{l.key})" />
           {/if}
         {/each}
       </g>
@@ -377,7 +453,7 @@
         <polyline class="scenery" points={piece.points.map(([x, y]) => `${x},${-y}`).join(" ")} stroke-width={unit * 0.9} />
       {/each}
 
-      {#each onPlan as l (l.fixture.id)}
+      {#each onPlan as l (l.key)}
         {#if l.centre && (l.patch || l.selected)}
           <line
             class="axis"
@@ -393,7 +469,7 @@
       {/each}
 
       {#if tab === "place" && pickedLight?.at && !pickedLight.mover}
-        {@const aim = pickedLight.placed.aim ?? [pickedLight.at[0], pickedLight.at[1]]}
+        {@const aim = bodyOf(pickedLight.placed, pickedCopy).aim ?? [pickedLight.at[0], pickedLight.at[1]]}
         <g class="aim-mark" transform="translate({aim[0]} {-aim[1]})">
           <circle r={unit * 2} stroke-width={unit * 0.35} />
           <line x1={-unit * 3} x2={unit * 3} stroke-width={unit * 0.2} />
@@ -401,12 +477,12 @@
         </g>
       {/if}
 
-      {#each onPlan as l (l.fixture.id)}
+      {#each onPlan as l (l.key)}
         {@const fill = cssColour(l.look.colour, glow(l))}
         <g
           class="light"
           class:selected={l.selected}
-          class:picked={tab === "place" && picked === l.fixture.id}
+          class:picked={tab === "place" && picked === l.fixture.id && pickedCopy === l.copy}
           transform="translate({l.at![0]} {-l.at![1]})"
         >
           {#if l.mover}
@@ -414,7 +490,7 @@
           {:else}
             <rect x={-unit * 1.8} y={-unit * 1.8} width={unit * 3.6} height={unit * 3.6} rx={unit * 0.5} {fill} stroke-width={unit * 0.4} />
           {/if}
-          <text y={unit * 0.7} font-size={unit * 1.8} text-anchor="middle" class:dark={l.look.intensity > 0.45}>{l.fixture.id}</text>
+          <text y={unit * 0.7} font-size={unit * 1.8} text-anchor="middle" class:dark={l.look.intensity > 0.45}>{l.label}</text>
         </g>
       {/each}
 
@@ -437,12 +513,12 @@
             <rect class="scenery-side" x={Math.min(...ys)} y={-floor - piece.height} width={Math.max(Math.max(...ys) - Math.min(...ys), 0.08)} height={piece.height} />
           {/if}
         {/each}
-        {#each onPlan as l (l.fixture.id)}
+        {#each onPlan as l (l.key)}
           {#if l.patch}
             <polygon class="cone" points={sideCone(l)} fill={cssColour(l.look.colour)} fill-opacity={0.08 + 0.3 * l.look.intensity} />
           {/if}
         {/each}
-        {#each onPlan as l (l.fixture.id)}
+        {#each onPlan as l (l.key)}
           <circle class="dot" class:selected={l.selected} cx={l.at![1]} cy={-l.at![2]} r="0.16" fill={cssColour(l.look.colour, glow(l))} />
         {/each}
       </svg>
@@ -489,7 +565,7 @@
         from their calibration.
       </p>
       <div class="lights">
-        {#each lights as l (l.fixture.id)}
+        {#each lights.filter((l) => l.copy === 0) as l (l.fixture.id)}
           <button aria-pressed={picked === l.fixture.id} onclick={() => pick(l.fixture.id)}>
             <span class="chip" style:background={cssColour(l.look.colour, glow(l))}></span>
             <span class="name"><strong>{l.fixture.id}</strong> {l.fixture.name}</span>
@@ -500,8 +576,24 @@
 
       {#if pickedLight}
         {@const p = pickedLight.placed}
+        {@const b = bodyOf(p, pickedCopy)}
         <section class="placing">
-          <h3>{pickedLight.fixture.id} {pickedLight.fixture.name}</h3>
+          <h3>{pickedLight.label} {pickedLight.fixture.name}</h3>
+          {#if !pickedLight.mover && pickedLight.at}
+            <div class="row wrap copies" role="group" aria-label="Lights on this address">
+              <span class="muted small">
+                {pickedBodies.length > 1
+                  ? `${pickedBodies.length} lights share this address, all showing its output`
+                  : "Another light on the same address, such as a pair of pars?"}
+              </span>
+              {#if pickedBodies.length > 1}
+                {#each pickedBodies as l (l.key)}
+                  <button aria-pressed={pickedCopy === l.copy} onclick={() => pick(l.fixture.id, l.copy)}>{l.label}</button>
+                {/each}
+              {/if}
+              <button onclick={addCopy}>Add another on this address</button>
+            </div>
+          {/if}
           {#if !pickedLight.mover}
             <div class="row wrap tap-sets" role="group" aria-label="Tapping the plan sets">
               <span class="muted small">Tapping the plan sets</span>
@@ -510,9 +602,9 @@
             </div>
           {/if}
           <div class="fields">
-            <NumberField label="Across (m)" value={p.x ?? null} onchange={(v) => setField({ x: v })} fractional increment={0.05} min={-500} max={500} />
-            <NumberField label="Up stage (m)" value={p.y ?? null} onchange={(v) => setField({ y: v })} fractional increment={0.05} min={-500} max={500} />
-            <NumberField label="Height (m)" value={p.z ?? null} onchange={(v) => setField({ z: v })} fractional increment={0.05} min={-50} max={50} />
+            <NumberField label="Across (m)" value={b.x ?? null} onchange={(v) => setBody({ x: v })} fractional increment={0.05} min={-500} max={500} />
+            <NumberField label="Up stage (m)" value={b.y ?? null} onchange={(v) => setBody({ y: v })} fractional increment={0.05} min={-500} max={500} />
+            <NumberField label="Height (m)" value={b.z ?? null} onchange={(v) => setBody({ z: v })} fractional increment={0.05} min={-50} max={50} />
           </div>
           {#if pickedLight.mover}
             <p class="muted small">
@@ -525,15 +617,15 @@
             <button onclick={() => (windowFor = { fixture: picked! })}>Calibrate</button>
           {:else}
             <div class="fields two">
-              <NumberField label="Points at, across (m)" value={p.aim?.[0] ?? null} onchange={(v) => setAimPart(0, v)} fractional increment={0.1} min={-500} max={500} />
-              <NumberField label="Points at, up stage (m)" value={p.aim?.[1] ?? null} onchange={(v) => setAimPart(1, v)} fractional increment={0.1} min={-500} max={500} />
+              <NumberField label="Points at, across (m)" value={b.aim?.[0] ?? null} onchange={(v) => setAimPart(0, v)} fractional increment={0.1} min={-500} max={500} />
+              <NumberField label="Points at, up stage (m)" value={b.aim?.[1] ?? null} onchange={(v) => setAimPart(1, v)} fractional increment={0.1} min={-500} max={500} />
             </div>
             <div class="row wrap">
-              <button disabled={!p.aim} onclick={() => setField({ aim: null })}>Straight down</button>
+              <button disabled={!b.aim} onclick={() => setBody({ aim: null })}>Straight down</button>
             </div>
           {/if}
           <NumberField
-            label="Beam width (°)"
+            label={pickedBodies.length > 1 ? "Beam width, all of them (°)" : "Beam width (°)"}
             value={p.beam ?? null}
             placeholder={String(defaultBeam(pickedLight.channels))}
             onchange={(v) => setField({ beam: v })}
@@ -541,8 +633,12 @@
             min={1}
             max={120}
           />
-          {#if p.x != null || p.y != null || p.z != null || p.aim || p.beam != null}
-            <button class="danger" onclick={removeFromPlan}>Take off the plan</button>
+          {#if pickedCopy > 0}
+            <button class="danger" onclick={removeFromPlan}>Remove {pickedLight.label}</button>
+          {:else if p.x != null || p.y != null || p.z != null || p.aim || p.beam != null}
+            <button class="danger" onclick={removeFromPlan}>
+              {pickedBodies.length > 1 ? "Take them all off the plan" : "Take off the plan"}
+            </button>
           {/if}
         </section>
       {/if}
@@ -772,7 +868,8 @@
   .fields > :global(*) {
     min-width: 0;
   }
-  .tap-sets span {
+  .tap-sets span,
+  .copies span {
     flex-basis: 100%;
   }
 </style>

@@ -53,6 +53,16 @@ export interface Placed {
   aim?: [number, number] | null;
   /** Beam width in degrees, for drawing; none uses a default for its type. */
   beam?: number | null;
+  /** More lights on the same address, such as pars run in pairs. Fixed lights only. */
+  copies?: Extra[];
+}
+
+/** Another light sharing a fixture's address: where it hangs and points. */
+export interface Extra {
+  x: number;
+  y: number;
+  z: number;
+  aim?: [number, number] | null;
 }
 
 /** Scenery drawn on the plan for reference, such as an LED wall: a line through its points. */

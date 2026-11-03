@@ -128,7 +128,7 @@ pub struct Scenery {
 }
 
 /// A fixture's measured position in metres; any part can be left unmeasured.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Placed {
     pub fixture: u32,
@@ -145,6 +145,22 @@ pub struct Placed {
     /// Beam width in degrees, for drawing; `None` uses a default for its type.
     #[serde(default)]
     pub beam: Option<f32>,
+    /// More lights of the same type on this fixture's DMX address, such as
+    /// pars run in pairs. Each hangs and points on its own; all of them show
+    /// the fixture's output. Only for fixed lights.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub copies: Vec<Extra>,
+}
+
+/// Another light sharing a fixture's address: where it hangs and points.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Extra {
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+    #[serde(default)]
+    pub aim: Option<[f32; 2]>,
 }
 
 impl Placed {
@@ -153,7 +169,7 @@ impl Placed {
     }
 
     fn is_empty(&self) -> bool {
-        self.known().iter().all(Option::is_none) && self.aim.is_none() && self.beam.is_none()
+        self.known().iter().all(Option::is_none) && self.aim.is_none() && self.beam.is_none() && self.copies.is_empty()
     }
 }
 
@@ -330,14 +346,10 @@ impl Stage {
         self.positions
             .iter()
             .find(|p| p.fixture == fixture)
-            .copied()
+            .cloned()
             .unwrap_or(Placed {
                 fixture,
-                x: None,
-                y: None,
-                z: None,
-                aim: None,
-                beam: None,
+                ..Default::default()
             })
     }
 
@@ -345,8 +357,15 @@ impl Stage {
     /// wide its beam is. A mover is worked out again to suit its position.
     pub fn set_placement(&mut self, placed: Placed) -> Result<()> {
         let finite = |v: &f32| v.is_finite() && v.abs() <= 500.0;
-        if !placed.known().iter().flatten().all(finite) || !placed.aim.iter().flatten().all(finite) {
+        let copies_finite = placed
+            .copies
+            .iter()
+            .all(|c| [c.x, c.y, c.z].iter().all(finite) && c.aim.iter().flatten().all(finite));
+        if !placed.known().iter().flatten().all(finite) || !placed.aim.iter().flatten().all(finite) || !copies_finite {
             return Err(Error::InvalidStage("that position is out of range".into()));
+        }
+        if placed.copies.len() > 16 {
+            return Err(Error::InvalidStage("that's more copies than one address needs".into()));
         }
         if placed.beam.is_some_and(|b| !(1.0..=120.0).contains(&b)) {
             return Err(Error::InvalidStage("the beam must be 1 to 120 degrees wide".into()));
@@ -882,32 +901,39 @@ mod tests {
             z: Some(4.5),
             aim: Some([0.0, 3.0]),
             beam: Some(25.0),
+            copies: vec![Extra {
+                x: 2.0,
+                y: 2.0,
+                z: 4.5,
+                aim: None,
+            }],
         };
-        stage.set_placement(placed).unwrap();
+        stage.set_placement(placed.clone()).unwrap();
         stage.set_position(3, [Some(1.5), Some(2.0), Some(4.5)]).unwrap();
         let after = stage.placement(3);
         assert_eq!(after.x, Some(1.5));
         assert_eq!(after.aim, Some([0.0, 3.0]));
         assert_eq!(after.beam, Some(25.0));
+        assert_eq!(after.copies.len(), 1);
         assert!(stage
             .set_placement(Placed {
                 beam: Some(500.0),
-                ..placed
+                ..placed.clone()
             })
             .is_err());
+        let mut bad = placed.clone();
+        bad.copies[0].x = f32::NAN;
+        assert!(stage.set_placement(bad).is_err());
         let cleared = Placed {
-            x: None,
-            y: None,
-            z: None,
-            aim: None,
-            beam: None,
-            ..placed
+            fixture: 3,
+            ..Default::default()
         };
         stage.set_placement(cleared).unwrap();
         assert!(stage.positions.is_empty());
         // Shows saved before placements had an aim still load.
         let old: Placed = serde_json::from_str(r#"{"fixture":2,"z":4.5}"#).unwrap();
         assert_eq!(old.aim, None);
+        assert!(old.copies.is_empty());
     }
 
     #[test]
