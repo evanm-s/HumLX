@@ -17,8 +17,10 @@
     floorAt,
     beamEnd,
     meets,
-    MIN_READINGS,
+    knownOf,
+    minReadings,
     onStage,
+    type Known,
     type Mark,
     type Plan,
     type Stage,
@@ -27,13 +29,16 @@
 
   interface Props {
     onclose: () => void;
+    /** Opens on Calibrate for this fixture, as the Patch page does. */
+    fixture?: number;
   }
 
-  let { onclose }: Props = $props();
+  let { onclose, fixture: startFixture }: Props = $props();
 
   type Mode = "point" | "calibrate" | "setup";
   const MODE_KEY = "humlx.stage.mode";
-  let mode = $state<Mode>(readMode());
+  // svelte-ignore state_referenced_locally
+  let mode = $state<Mode>(startFixture != null ? "calibrate" : readMode());
   let stage = $state<Stage>(defaultStage());
 
   function readMode(): Mode {
@@ -254,6 +259,8 @@
   const calValues = $derived(calibrating == null ? {} : (show.programmer.values[calibrating] ?? {}));
 
   function startCalibrating() {
+    if (startFixture != null && calibrating == null && movers.some((m) => m.id === startFixture))
+      return chooseMover(startFixture);
     const first = show.programmer.selection.find((id) => movers.some((m) => m.id === id)) ?? movers[0]?.id;
     if (first != null) chooseMover(first);
   }
@@ -268,6 +275,46 @@
       await attempt(() => api.setHighlight(true));
     }
     currentMark = stage.marks.find((m) => !readingFor(m.id))?.id ?? stage.marks[0]?.id ?? null;
+    resetHang();
+  }
+
+  // Where the mover hangs, when it has been measured. Then only which way it
+  // faces is worked out, which suits wide washes that are hard to centre.
+  const known = $derived<Known>(calibrating == null ? [null, null, null] : knownOf(stage, calibrating));
+  const measured = $derived(known.filter((k) => k != null).length);
+  const needed = $derived(minReadings(known));
+  /** The hang position fields; blank ones are left to the calibration. */
+  let hang = $state<Known>([null, null, null]);
+
+  function resetHang() {
+    if (calibrating != null) hang = [...knownOf(stage, calibrating)];
+  }
+
+  async function saveHang(position: Known) {
+    if (calibrating == null) return;
+    const fixture = calibrating;
+    const saved = await attempt(() => api.setFixturePosition(fixture, position));
+    if (saved) {
+      stage = saved;
+      resetHang();
+    }
+  }
+
+  /** Gives every mover this height, such as the lighting grid's, keeping the rest of what's measured. */
+  async function heightForAll(z: number) {
+    for (const f of movers) {
+      const [x, y] = knownOf(stage, f.id);
+      const saved = await attempt(() => api.setFixturePosition(f.id, [x, y, z]));
+      if (saved) stage = saved;
+    }
+    resetHang();
+  }
+
+  /** Fills the blank fields from where the calibration worked the mover out to be. */
+  function fillFromFit() {
+    const solved = calibrating == null ? undefined : solutionOf(calibrating)?.position;
+    if (!solved) return;
+    hang = hang.map((v, i) => v ?? Math.round(solved[i] * 100) / 100) as Known;
   }
 
   function stopHighlight() {
@@ -312,7 +359,7 @@
     const c = calibrationOf(id);
     if (c?.solution) return "Calibrated";
     const n = c?.readings.length ?? 0;
-    return n === 0 ? "Not calibrated" : `${n} of ${MIN_READINGS} marks`;
+    return n === 0 ? "Not calibrated" : `${n} of ${minReadings(knownOf(stage, id))} marks`;
   }
 
   // --- Set up ---------------------------------------------------------------
@@ -602,11 +649,37 @@
                 worst mark is {Math.round(worst * 100)} cm off.
                 {#if worst > 0.15}Redo the marks in orange.{/if}
               {:else}
-                Needs {MIN_READINGS} marks to work this mover out; {stage.marks.length > MIN_READINGS
-                  ? "more makes it more accurate and shows up a bad reading"
-                  : "add a fifth mark on Set up to check it"}.
+                Needs {needed} marks to work this mover out; more makes it more accurate and shows up a bad
+                reading.
               {/if}
             </p>
+            <section class="hang">
+              <h3>Hang position</h3>
+              <p class="muted small">
+                Anything measured here is held while the rest is worked out from the marks, which helps a lot
+                with wide beams. Leave a field blank if you don't know it.
+                {#if measured === 3}With all three, {needed} marks are enough.{:else if measured > 0}With some of it,
+                  {needed} marks are enough.{/if}
+              </p>
+              <div class="hang-fields">
+                <NumberField label="Across (m)" value={hang[0]} onchange={(v) => (hang[0] = v)} fractional increment={0.05} min={-500} max={500} />
+                <NumberField label="Up stage (m)" value={hang[1]} onchange={(v) => (hang[1] = v)} fractional increment={0.05} min={-500} max={500} />
+                <NumberField label="Height above stage (m)" value={hang[2]} onchange={(v) => (hang[2] = v)} fractional increment={0.05} min={-50} max={50} />
+              </div>
+              <div class="row wrap">
+                <button onclick={() => saveHang([...hang])}>Save</button>
+                {#if hang[2] != null && movers.length > 1}
+                  {@const z = hang[2]}
+                  <button onclick={() => heightForAll(z)}>Use height for all movers</button>
+                {/if}
+                {#if calibration?.solution && hang.some((v) => v == null)}
+                  <button class="ghost" onclick={fillFromFit}>Fill in from calibration</button>
+                {/if}
+                {#if measured > 0}
+                  <button class="ghost" onclick={() => saveHang([null, null, null])}>Clear</button>
+                {/if}
+              </div>
+            </section>
             {#if calibration && calibration.readings.length > 0}
               <button class="danger" onclick={() => forget(null)}>Reset this mover</button>
             {/if}
@@ -923,6 +996,21 @@
   }
   .warn {
     color: var(--f-playback);
+  }
+
+  .hang {
+    display: grid;
+    gap: 8px;
+    border-top: 1px solid var(--line);
+    padding-top: 10px;
+  }
+  .hang p {
+    margin: 0;
+  }
+  .hang-fields {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
   }
 
   .sizes {

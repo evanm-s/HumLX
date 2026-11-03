@@ -27,7 +27,7 @@ import type {
   Layout,
 } from "./types";
 import { DEFAULT_OPTIONS, emptyLayout } from "./types";
-import { aim, defaultStage, floorAt, MIN_READINGS, orient, unorient, type Solution, type Stage } from "./stage";
+import { aim, defaultStage, floorAt, knownOf, minReadings, orient, unorient, type Known, type Solution, type Stage } from "./stage";
 
 const files = import.meta.glob<Omit<Profile, "id">>("../../crates/humlx-core/fixtures/*.json", {
   eager: true,
@@ -81,12 +81,22 @@ const masters = new Map<number, number>();
 const layout: Layout = emptyLayout();
 let stage: Stage = defaultStage();
 
+function refit(fixture: number) {
+  const c = stage.movers.find((m) => m.fixture === fixture);
+  if (!c) return;
+  c.solution =
+    c.readings.length >= minReadings(knownOf(stage, fixture))
+      ? { ...pretendSolution(fixture), errors: c.readings.map((r) => ({ mark: r.mark, metres: 0.03 })) }
+      : null;
+}
+
 /** The preview can't fit movers, so it pretends each hangs over the front of the stage. */
 function pretendSolution(fixture: number): Solution {
+  const [kx, ky, kz] = knownOf(stage, fixture);
   const c = Math.cos((fixture * Math.PI) / 3);
   const s = Math.sin((fixture * Math.PI) / 3);
   return {
-    position: [((fixture % 4) - 1.5) * 2, -1, 4.5],
+    position: [kx ?? ((fixture % 4) - 1.5) * 2, ky ?? -1, kz ?? 4.5],
     // Hung, axis down, turned round by fixture number.
     rotation: [
       [c, s, 0],
@@ -482,7 +492,7 @@ const commands: Record<string, (args: Args) => unknown> = {
   },
   stage: () => structuredClone(stage),
   set_stage_plan: ({ plan }) => {
-    stage = { ...stage, ...structuredClone(plan as Omit<Stage, "movers">) };
+    stage = { ...stage, ...structuredClone(plan as Omit<Stage, "movers" | "positions">) };
     return structuredClone(stage);
   },
   calibrate_mark: ({ fixture, mark }) => {
@@ -494,10 +504,14 @@ const commands: Record<string, (args: Args) => unknown> = {
     if (!c) stage.movers.push((c = { fixture: fixture as number, readings: [] }));
     c.readings = [...c.readings.filter((r) => r.mark !== mark), { mark: mark as number, pan, tilt }];
     c.readings.sort((a, b) => a.mark - b.mark);
-    c.solution =
-      c.readings.length >= MIN_READINGS
-        ? { ...pretendSolution(c.fixture), errors: c.readings.map((r) => ({ mark: r.mark, metres: 0.03 })) }
-        : null;
+    refit(c.fixture);
+    return structuredClone(stage);
+  },
+  set_fixture_position: ({ fixture, position }) => {
+    stage.positions = stage.positions.filter((p) => p.fixture !== fixture);
+    const [x, y, z] = position as Known;
+    if (x != null || y != null || z != null) stage.positions.push({ fixture: fixture as number, x, y, z });
+    refit(fixture as number);
     return structuredClone(stage);
   },
   forget_calibration: ({ fixture, mark }) => {
@@ -506,7 +520,7 @@ const commands: Record<string, (args: Args) => unknown> = {
       const c = stage.movers.find((m) => m.fixture === fixture);
       if (c) {
         c.readings = c.readings.filter((r) => r.mark !== mark);
-        if (c.readings.length < MIN_READINGS) c.solution = null;
+        refit(c.fixture);
       }
     }
     return structuredClone(stage);

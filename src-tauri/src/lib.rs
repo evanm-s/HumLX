@@ -216,6 +216,7 @@ pub fn run() {
             commands::set_stage_plan,
             commands::calibrate_mark,
             commands::forget_calibration,
+            commands::set_fixture_position,
             commands::point_at,
             playback::playback,
             playback::new_cue_list,

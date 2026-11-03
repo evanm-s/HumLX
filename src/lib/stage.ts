@@ -40,6 +40,17 @@ export interface Calibration {
   solution?: Solution | null;
 }
 
+/** What has been measured of a fixture's position: across, up stage, height; null when not measured. */
+export type Known = [number | null, number | null, number | null];
+
+/** A fixture's measured position in metres; any part can be left unmeasured. */
+export interface Placed {
+  fixture: number;
+  x?: number | null;
+  y?: number | null;
+  z?: number | null;
+}
+
 export interface Stage {
   width: number;
   depth: number;
@@ -49,12 +60,22 @@ export interface Stage {
   riser: number;
   marks: Mark[];
   movers: Calibration[];
+  /** Positions measured by hand; a mover with one only needs its heading worked out. */
+  positions: Placed[];
 }
 
-export type Plan = Omit<Stage, "movers">;
+export type Plan = Omit<Stage, "movers" | "positions">;
 
-/** Readings needed before a mover can be worked out. */
-export const MIN_READINGS = 4;
+/** Readings needed to work a mover out: 4, 3 with part of its position measured, 2 with all of it. */
+export function minReadings(known: Known) {
+  const n = known.filter((k) => k != null).length;
+  return n === 0 ? 4 : n === 3 ? 2 : 3;
+}
+
+export function knownOf(stage: Stage, fixture: number): Known {
+  const p = stage.positions.find((p) => p.fixture === fixture);
+  return [p?.x ?? null, p?.y ?? null, p?.z ?? null];
+}
 
 export function defaultMarks(width: number, depth: number): Mark[] {
   const [l, r] = [-width / 2, width / 2];
@@ -70,7 +91,7 @@ export function defaultMarks(width: number, depth: number): Mark[] {
 }
 
 export function defaultStage(): Stage {
-  return { width: 8, depth: 6, margin: 2, riser: 0, marks: defaultMarks(8, 6), movers: [] };
+  return { width: 8, depth: 6, margin: 2, riser: 0, marks: defaultMarks(8, 6), movers: [], positions: [] };
 }
 
 export function onStage(stage: Plan, x: number, y: number) {

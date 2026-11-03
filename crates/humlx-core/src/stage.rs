@@ -19,6 +19,20 @@ use crate::error::{Error, Result};
 /// Readings needed before a mover can be worked out.
 pub const MIN_READINGS: usize = 4;
 
+/// What has been measured of a fixture's position: across, up stage and
+/// height, each in metres or `None` when not measured.
+pub type Known = [Option<f32>; 3];
+
+/// Readings needed to work a mover out: four with nothing measured, three
+/// with part of its position (such as the grid height), two with all of it.
+pub fn min_readings(known: &Known) -> usize {
+    match known.iter().filter(|k| k.is_some()).count() {
+        0 => MIN_READINGS,
+        3 => 2,
+        _ => 3,
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Stage {
@@ -34,6 +48,22 @@ pub struct Stage {
     pub marks: Vec<Mark>,
     /// Calibration of each mover, by fixture number.
     pub movers: Vec<Calibration>,
+    /// Where fixtures hang, measured by hand. A mover with a known position
+    /// only needs its heading worked out, which suits wide beams.
+    pub positions: Vec<Placed>,
+}
+
+/// A fixture's measured position in metres; any part can be left unmeasured.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Placed {
+    pub fixture: u32,
+    #[serde(default)]
+    pub x: Option<f32>,
+    #[serde(default)]
+    pub y: Option<f32>,
+    #[serde(default)]
+    pub z: Option<f32>,
 }
 
 impl Default for Stage {
@@ -46,6 +76,7 @@ impl Default for Stage {
             riser: 0.0,
             marks: default_marks(width, depth),
             movers: Vec::new(),
+            positions: Vec::new(),
         }
     }
 }
@@ -178,6 +209,34 @@ impl Stage {
         self.movers.iter().find(|c| c.fixture == fixture)
     }
 
+    /// What has been measured of a fixture's position.
+    pub fn position(&self, fixture: u32) -> Known {
+        self.positions
+            .iter()
+            .find(|p| p.fixture == fixture)
+            .map_or([None; 3], |p| [p.x, p.y, p.z])
+    }
+
+    /// Sets a fixture's measured position (any part `None` to leave it to the
+    /// calibration), and works its calibration out again to suit.
+    pub fn set_position(&mut self, fixture: u32, position: Known) -> Result<()> {
+        if !position.iter().flatten().all(|v| v.is_finite() && v.abs() <= 500.0) {
+            return Err(Error::InvalidStage("that position is out of range".into()));
+        }
+        self.positions.retain(|p| p.fixture != fixture);
+        if position.iter().any(Option::is_some) {
+            let [x, y, z] = position;
+            self.positions.push(Placed { fixture, x, y, z });
+            self.positions.sort_by_key(|p| p.fixture);
+        }
+        let marks = self.marks.clone();
+        if let Some(calibration) = self.movers.iter_mut().find(|c| c.fixture == fixture) {
+            let ranges = calibration.ranges();
+            calibration.solution = solve(&marks, &calibration.readings, ranges, position);
+        }
+        Ok(())
+    }
+
     pub fn solution(&self, fixture: u32) -> Option<&Solution> {
         self.calibration(fixture).and_then(|c| c.solution.as_ref())
     }
@@ -223,10 +282,15 @@ impl Stage {
         self.marks = marks;
         if moved {
             let marks = self.marks.clone();
+            let positions = self.positions.clone();
             for calibration in &mut self.movers {
                 calibration.readings.retain(|r| marks.iter().any(|m| m.id == r.mark));
                 let ranges = calibration.ranges();
-                calibration.solution = solve(&marks, &calibration.readings, ranges);
+                let known = positions
+                    .iter()
+                    .find(|p| p.fixture == calibration.fixture)
+                    .map_or([None; 3], |p| [p.x, p.y, p.z]);
+                calibration.solution = solve(&marks, &calibration.readings, ranges, known);
             }
         }
         Ok(())
@@ -249,11 +313,12 @@ impl Stage {
                 self.movers.len() - 1
             }
         };
+        let known = self.position(fixture);
         let calibration = &mut self.movers[index];
         calibration.readings.retain(|r| r.mark != mark);
         calibration.readings.push(Reading { mark, pan, tilt });
         calibration.readings.sort_by_key(|r| r.mark);
-        calibration.solution = solve(&self.marks, &calibration.readings, Some(ranges));
+        calibration.solution = solve(&self.marks, &calibration.readings, Some(ranges), known);
         Ok(&self.movers[index])
     }
 
@@ -263,10 +328,11 @@ impl Stage {
             None => self.movers.retain(|c| c.fixture != fixture),
             Some(mark) => {
                 let marks = self.marks.clone();
+                let known = self.position(fixture);
                 if let Some(calibration) = self.movers.iter_mut().find(|c| c.fixture == fixture) {
                     calibration.readings.retain(|r| r.mark != mark);
                     let ranges = calibration.ranges();
-                    calibration.solution = solve(&marks, &calibration.readings, ranges);
+                    calibration.solution = solve(&marks, &calibration.readings, ranges, known);
                 }
             }
         }
@@ -344,6 +410,8 @@ fn local_direction(pan: f64, tilt: f64) -> V3 {
 struct Model {
     base: M3,
     base_ranges: (f64, f64),
+    /// Measured parts of its position, which the fit holds the mover to.
+    known: [Option<f64>; 3],
 }
 
 /// Parameters: position (3), rotation tweak (3), log scale of pan and tilt range (2).
@@ -374,6 +442,7 @@ impl Model {
         }
         out.push(q[6] * 0.05);
         out.push(q[7] * 0.05);
+        out.extend((0..3).map(|i| self.known[i].map_or(0.0, |k| (q[i] - k) * 100.0)));
     }
 }
 
@@ -472,8 +541,13 @@ fn fit(model: &Model, points: &[(V3, f64, f64)], mut q: Params) -> (Params, f64)
 
 /// Works out where a mover hangs from its readings. `ranges` are the expected
 /// pan and tilt travel in degrees; `None` keeps whatever an earlier fit found
-/// (or the usual 540 by 270).
-pub fn solve(marks: &[Mark], readings: &[Reading], ranges: Option<(f32, f32)>) -> Option<Solution> {
+/// (or the usual 540 by 270). Whatever is `known` of its position is held,
+/// so fewer and less exact readings are needed; with all of it, only which
+/// way it faces is worked out.
+pub fn solve(marks: &[Mark], readings: &[Reading], ranges: Option<(f32, f32)>, known: Known) -> Option<Solution> {
+    let needed = min_readings(&known);
+    let known = known.map(|k| k.map(f64::from));
+    let fully_known = known.iter().all(Option::is_some);
     let points: Vec<(V3, f64, f64)> = readings
         .iter()
         .filter_map(|r| {
@@ -481,7 +555,7 @@ pub fn solve(marks: &[Mark], readings: &[Reading], ranges: Option<(f32, f32)>) -
             Some((mark.point(), f64::from(r.pan), f64::from(r.tilt)))
         })
         .collect();
-    if points.len() < MIN_READINGS {
+    if points.len() < needed {
         return None;
     }
     let (pan_range, tilt_range) = ranges.unwrap_or((540.0, 270.0));
@@ -509,23 +583,31 @@ pub fn solve(marks: &[Mark], readings: &[Reading], ranges: Option<(f32, f32)>) -
             let model = Model {
                 base: matmul(&yaw, &base),
                 base_ranges,
+                known,
             };
-            for dx in [-1.0, 0.0, 1.0] {
-                for dy in [-1.5, 0.0, 1.5] {
-                    let start = [
-                        middle[0] + dx * reach,
-                        middle[1] + dy * reach,
-                        height,
-                        0.0,
-                        0.0,
-                        0.0,
-                        0.0,
-                        0.0,
-                    ];
-                    let (q, c) = fit(&model, &points, start);
-                    if best.as_ref().is_none_or(|(_, _, b)| c < *b) {
-                        best = Some((model, q, c));
-                    }
+            // A known position needs only the one start for each heading.
+            let offsets: &[(f64, f64)] = if fully_known {
+                &[(0.0, 0.0)]
+            } else {
+                &[
+                    (-1.0, -1.5),
+                    (-1.0, 0.0),
+                    (-1.0, 1.5),
+                    (0.0, -1.5),
+                    (0.0, 0.0),
+                    (0.0, 1.5),
+                    (1.0, -1.5),
+                    (1.0, 0.0),
+                    (1.0, 1.5),
+                ]
+            };
+            for &(dx, dy) in offsets {
+                let guess = [middle[0] + dx * reach, middle[1] + dy * reach, height];
+                let [x, y, z] = [0, 1, 2].map(|i| known[i].unwrap_or(guess[i]));
+                let start = [x, y, z, 0.0, 0.0, 0.0, 0.0, 0.0];
+                let (q, c) = fit(&model, &points, start);
+                if best.as_ref().is_none_or(|(_, _, b)| c < *b) {
+                    best = Some((model, q, c));
                 }
             }
         }
@@ -682,7 +764,7 @@ mod tests {
     fn finds_a_hung_mover_from_five_marks() {
         let marks = default_marks(6.0, 4.0);
         let truth = fake([1.5, -2.0, 4.5], hung(37.0), (540.0, 270.0));
-        let solution = solve(&marks, &readings(&truth, &marks), Some((540.0, 270.0))).unwrap();
+        let solution = solve(&marks, &readings(&truth, &marks), Some((540.0, 270.0)), [None; 3]).unwrap();
         assert_close(solution.position, truth.position, 0.01);
         assert!(solution.errors.iter().all(|e| e.metres < 0.01), "{:?}", solution.errors);
         // And it aims where the real mover would.
@@ -700,7 +782,7 @@ mod tests {
         let tilted = matmul(&hung(-120.0), &rotation([0.25, -0.1, 0.0]));
         let truth = fake([-3.0, 6.0, 5.0], tilted, (630.0, 250.0));
         // Told to expect 540 by 270: the fit should still find the real ranges.
-        let solution = solve(&marks, &readings(&truth, &marks), Some((540.0, 270.0))).unwrap();
+        let solution = solve(&marks, &readings(&truth, &marks), Some((540.0, 270.0)), [None; 3]).unwrap();
         assert_close(solution.position, truth.position, 0.05);
         assert!(solution.errors.iter().all(|e| e.metres < 0.03), "{:?}", solution.errors);
         let aim = solution.aim([1.0, 1.0, 0.0], (0.5, 0.5));
@@ -721,7 +803,7 @@ mod tests {
             matmul(&standing, &rotation([-0.9, 0.0, 0.0])),
             (540.0, 270.0),
         );
-        let solution = solve(&marks, &readings(&truth, &marks), Some((540.0, 270.0))).unwrap();
+        let solution = solve(&marks, &readings(&truth, &marks), Some((540.0, 270.0)), [None; 3]).unwrap();
         assert_close(solution.position, truth.position, 0.05);
     }
 
@@ -731,7 +813,7 @@ mod tests {
         let truth = fake([1.0, -1.0, 4.0], hung(10.0), (540.0, 270.0));
         let mut readings = readings(&truth, &marks);
         readings[4].pan += 0.03; // centre mark, about 16 degrees out
-        let solution = solve(&marks, &readings, Some((540.0, 270.0))).unwrap();
+        let solution = solve(&marks, &readings, Some((540.0, 270.0)), [None; 3]).unwrap();
         let worst = solution
             .errors
             .iter()
@@ -745,8 +827,8 @@ mod tests {
         let marks = default_marks(6.0, 4.0);
         let truth = fake([1.0, -1.0, 4.0], hung(10.0), (540.0, 270.0));
         let readings = readings(&truth, &marks);
-        assert!(solve(&marks, &readings[..3], None).is_none());
-        assert!(solve(&marks, &readings[..4], None).is_some());
+        assert!(solve(&marks, &readings[..3], None, [None; 3]).is_none());
+        assert!(solve(&marks, &readings[..4], None, [None; 3]).is_some());
     }
 
     #[test]
@@ -793,5 +875,67 @@ mod tests {
         assert!(stage.solution(7).is_none());
         stage.forget(7, None);
         assert!(stage.calibration(7).is_none());
+    }
+
+    #[test]
+    fn a_known_position_needs_only_two_rough_readings() {
+        let marks = default_marks(8.0, 6.0);
+        let truth = fake([2.0, -1.5, 4.0], hung(-50.0), (540.0, 270.0));
+        let mut readings = readings(&truth, &marks);
+        // A wide wash: the pool centred by eye, a degree or so out.
+        for (i, r) in readings.iter_mut().enumerate() {
+            r.pan += if i % 2 == 0 { 0.002 } else { -0.002 };
+            r.tilt += if i % 3 == 0 { 0.003 } else { -0.002 };
+        }
+        let known = [Some(2.0), Some(-1.5), Some(4.0)];
+        assert!(solve(&marks, &readings[..1], None, known).is_none());
+        let solution = solve(&marks, &readings[..2], Some((540.0, 270.0)), known).unwrap();
+        assert_close(solution.position, truth.position, 0.01);
+        let solution = solve(&marks, &readings, Some((540.0, 270.0)), known).unwrap();
+        let aim = solution.aim([0.0, 3.0, 0.0], (0.5, 0.5));
+        let landing = truth.landing(aim.pan, aim.tilt, 0.0).unwrap();
+        assert!(
+            (landing[0]).abs() < 0.15 && (landing[1] - 3.0).abs() < 0.15,
+            "{landing:?}"
+        );
+    }
+
+    #[test]
+    fn setting_a_position_refits() {
+        let mut stage = Stage::default();
+        let truth = fake([1.0, -1.0, 4.0], hung(10.0), (540.0, 270.0));
+        for r in readings(&truth, &stage.marks).into_iter().take(2) {
+            stage.record(3, r.mark, r.pan, r.tilt, (540.0, 270.0)).unwrap();
+        }
+        assert!(stage.solution(3).is_none());
+        stage.set_position(3, [Some(1.0), Some(-1.0), Some(4.0)]).unwrap();
+        assert!(stage.solution(3).is_some());
+        assert_eq!(stage.position(3), [Some(1.0), Some(-1.0), Some(4.0)]);
+        stage.set_position(3, [None; 3]).unwrap();
+        assert!(stage.solution(3).is_none());
+        assert!(stage.positions.is_empty());
+        assert!(stage.set_position(3, [Some(f32::NAN), None, None]).is_err());
+    }
+
+    #[test]
+    fn a_known_height_helps_with_rough_readings() {
+        let marks = default_marks(8.0, 6.0);
+        let truth = fake([-2.5, -1.0, 4.5], hung(25.0), (540.0, 270.0));
+        let mut readings = readings(&truth, &marks);
+        for (i, r) in readings.iter_mut().enumerate() {
+            r.pan += if i % 2 == 0 { 0.002 } else { -0.002 };
+            r.tilt += if i % 3 == 0 { 0.003 } else { -0.002 };
+        }
+        let height = [None, None, Some(4.5)];
+        assert!(solve(&marks, &readings[..2], None, height).is_none());
+        let solution = solve(&marks, &readings, Some((540.0, 270.0)), height).unwrap();
+        assert!((solution.position[2] - 4.5).abs() < 0.01);
+        // Aiming is what matters: it should land close to where it is sent.
+        for spot in [[0.0, 3.0, 0.0], [2.0, 1.0, 0.0], [-3.0, 5.0, 1.6]] {
+            let aim = solution.aim(spot, (0.5, 0.5));
+            let landing = truth.landing(aim.pan, aim.tilt, spot[2]).unwrap();
+            let miss = ((landing[0] - spot[0]).powi(2) + (landing[1] - spot[1]).powi(2)).sqrt();
+            assert!(miss < 0.2, "{spot:?} missed by {miss}");
+        }
     }
 }
