@@ -740,7 +740,7 @@
     align-items: center;
     gap: 6px;
     padding: 0 10px;
-    min-height: 40px;
+    min-height: 60px;
     text-align: left;
   }
 
