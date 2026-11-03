@@ -1,10 +1,11 @@
 <script lang="ts">
   // Every value in the programmer, a row per fixture and a column per
-  // attribute, like a spreadsheet. Tap a row to select that fixture.
+  // attribute, like a spreadsheet. Tap a fixture number to pick its row, or a
+  // value to pick just that value, then Delete takes them out of the
+  // programmer. Tapping a column heading picks the whole column.
 
-  import { api } from "../../lib/api";
   import { attributeName, fixtureColour, rgbCss } from "../../lib/format";
-  import { tapMode } from "../../lib/selection";
+  import { hasValue, sheetPicks, type Column } from "../../lib/sheet.svelte";
   import { show } from "../../lib/show.svelte";
   import type { Attribute, Rgb, Values } from "../../lib/types";
 
@@ -13,12 +14,24 @@
       .map(([id, values]) => ({ id: Number(id), values, fixture: show.fixture(Number(id)) }))
       .sort((a, b) => a.id - b.id),
   );
+  const ids = $derived(rows.map((r) => r.id));
 
-  const has = (key: keyof Values) => rows.some((r) => r.values[key] != null);
   const other = $derived.by(() => {
     const found = new Set<Attribute>();
     for (const r of rows) for (const a of Object.keys(r.values.other ?? {})) found.add(a as Attribute);
     return [...found].sort();
+  });
+
+  const columns = $derived.by(() => {
+    const has = (column: Column) => rows.some((r) => hasValue(r.values, column));
+    const all: { column: Column; label: string; band: string }[] = [
+      { column: "intensity", label: "Intensity %", band: "f-i" },
+      { column: "colour", label: "Colour", band: "f-c" },
+      { column: "pan", label: "Pan %", band: "f-p" },
+      { column: "tilt", label: "Tilt %", band: "f-p" },
+      ...other.map((a) => ({ column: `o:${a}` as Column, label: attributeName(a), band: "f-b" })),
+    ];
+    return all.filter((c) => has(c.column));
   });
   const selected = $derived(new Set(show.programmer.selection));
 
@@ -35,9 +48,14 @@
       .join("")
       .toUpperCase();
 
-  function tap(id: number, event: MouseEvent) {
-    const mode = event.shiftKey || event.ctrlKey || event.metaKey ? "toggle" : tapMode("toggle");
-    show.program(() => api.select([id], mode));
+  function text(values: Values, column: Column): string {
+    if (column === "intensity" || column === "pan" || column === "tilt") return pct(values[column]);
+    if (column.startsWith("o:")) return dmx(values.other?.[column.slice(2) as Attribute]);
+    return "";
+  }
+
+  function tapCell(id: number, column: Column, values: Values) {
+    if (hasValue(values, column)) sheetPicks.toggleCell(id, column);
   }
 </script>
 
@@ -55,34 +73,35 @@
   <table>
     <thead>
       <tr>
-        <th class="fixture">Fixture</th>
-        {#if has("intensity")}<th class="f-i">Intensity %</th>{/if}
-        {#if has("colour")}<th class="f-c">Colour</th>{/if}
-        {#if has("pan")}<th class="f-p">Pan %</th>{/if}
-        {#if has("tilt")}<th class="f-p">Tilt %</th>{/if}
-        {#each other as a (a)}<th class="f-b">{attributeName(a)}</th>{/each}
+        <th class="fixture" onclick={() => sheetPicks.toggleAllRows(ids)}>Fixture</th>
+        {#each columns as c (c.column)}
+          <th class={c.band} onclick={() => sheetPicks.toggleColumn(ids, c.column)}>{c.label}</th>
+        {/each}
       </tr>
     </thead>
     <tbody>
       {#each rows as r (r.id)}
-        <tr class:selected={selected.has(r.id)} onclick={(e) => tap(r.id, e)}>
-          <td class="fixture">
+        <tr class:selected={selected.has(r.id)} class:picked={sheetPicks.rowPicked(r.id)}>
+          <td class="fixture" onclick={() => sheetPicks.toggleRow(r.id)}>
             <span class="num" style:color={fixtureColour(r.id)}>{r.id}</span>
             {r.fixture?.name ?? "Unpatched"}
           </td>
-          {#if has("intensity")}<td>{pct(r.values.intensity)}</td>{/if}
-          {#if has("colour")}
-            <td>
-              {#if r.values.colour}
-                <span class="colour"
-                  ><span class="chip" style:background={rgbCss(r.values.colour)}></span>{hex(r.values.colour)}</span
-                >
+          {#each columns as c (c.column)}
+            <td
+              class:picked={hasValue(r.values, c.column) && sheetPicks.cellPicked(r.id, c.column)}
+              onclick={() => tapCell(r.id, c.column, r.values)}
+            >
+              {#if c.column === "colour"}
+                {#if r.values.colour}
+                  <span class="colour"
+                    ><span class="chip" style:background={rgbCss(r.values.colour)}></span>{hex(r.values.colour)}</span
+                  >
+                {/if}
+              {:else}
+                {text(r.values, c.column)}
               {/if}
             </td>
-          {/if}
-          {#if has("pan")}<td>{pct(r.values.pan)}</td>{/if}
-          {#if has("tilt")}<td>{pct(r.values.tilt)}</td>{/if}
-          {#each other as a (a)}<td>{dmx(r.values.other?.[a])}</td>{/each}
+          {/each}
         </tr>
       {/each}
     </tbody>
@@ -147,12 +166,25 @@
     text-align: left;
   }
 
-  tbody tr {
+  th,
+  tbody td {
     cursor: pointer;
+    user-select: none;
   }
 
   tbody tr.selected {
-    background: color-mix(in srgb, var(--accent) 16%, transparent);
+    background: color-mix(in srgb, var(--accent) 10%, transparent);
+  }
+
+  /* Picked for deleting. */
+  td.picked {
+    background: color-mix(in srgb, var(--danger) 22%, transparent);
+    box-shadow: inset 0 0 0 2px var(--danger);
+  }
+
+  tr.picked td.fixture {
+    background: color-mix(in srgb, var(--danger) 22%, transparent);
+    box-shadow: inset 0 0 0 2px var(--danger);
   }
 
   td {

@@ -197,6 +197,9 @@ export interface ProgrammerView {
   presets: Preset[];
 }
 
+/** One value in a fixture's programmer values, as a column of the programmer sheet. */
+export type ProgrammerField = "intensity" | "colour" | "pan" | "tilt" | { other: Attribute };
+
 export type SelectMode = "set" | "toggle" | "add";
 
 /** Hold waits for GO; follow goes to the next cue by itself. */

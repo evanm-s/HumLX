@@ -203,6 +203,7 @@ pub fn run() {
             commands::set_position,
             commands::set_attribute,
             commands::clear_programmer,
+            commands::remove_from_programmer,
             commands::load_live,
             commands::save_group,
             commands::delete_group,
