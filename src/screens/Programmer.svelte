@@ -314,9 +314,9 @@
     else if (key === "r") surface.press("record");
     else if (key === "delete") surface.press("delete");
     else if (key === "enter" && surface.mode) surface.confirm();
-    else if (key === "escape" && surface.mode) surface.setMode(null);
     else return;
     e.preventDefault();
+    surface.disarmClear();
   }
 
   // Record (on the control surface, or R) arms record mode so a preset slot
@@ -383,7 +383,14 @@
       >
         ● Record cue
       </button>
-      <button class="danger" onclick={() => program(() => api.clearProgrammer(null))}>Clear all</button>
+      <button
+        class="danger"
+        class:armed={surface.clearClears}
+        title="Clear deselects, and Clear again clears the programmer (Esc)"
+        onclick={() => surface.press("clear")}
+      >
+        {surface.clearClears ? "Clear all" : show.programmer.selection.length > 0 ? "Deselect" : "Clear"}
+      </button>
     {/if}
   </header>
 
@@ -416,7 +423,14 @@
         {colourFaders ? "Picker" : "Faders"}
       </button>
     {/if}
-    <button class="small" onclick={() => program(() => api.clearProgrammer(families[id]))}>Clear</button>
+    <button
+      class="small"
+      title={show.programmer.selection.length > 0 ? `Clear ${id} from the selected fixtures` : `Clear ${id} from every fixture`}
+      onclick={() =>
+        program(() =>
+          api.clearProgrammer(families[id], show.programmer.selection.length > 0 ? [...show.programmer.selection] : null),
+        )}>Clear</button
+    >
   {/if}
 {/snippet}
 
@@ -635,6 +649,13 @@
 {/if}
 
 <style>
+  /* The next Clear clears the programmer. */
+  button.danger.armed {
+    background: var(--danger);
+    color: var(--bg);
+    font-weight: 600;
+  }
+
   .programmer {
     height: 100%;
     display: grid;
