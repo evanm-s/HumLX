@@ -417,7 +417,6 @@
           {confirmBulkRemove ? `Tap again to remove ${selection.length}` : `Remove ${selection.length}`}
         </button>
         <span class="spacer"></span>
-        <button onclick={clearSelection}>Done</button>
         <button class="primary" disabled={!bulkDirty} onclick={saveBulk}>Save changes</button>
       </div>
     {:else if selected}
@@ -457,7 +456,6 @@
       <div class="row actions">
         <button class="danger" onclick={remove}>{confirmRemove ? "Tap again to remove" : "Remove"}</button>
         <span class="spacer"></span>
-        <button onclick={clearSelection}>Done</button>
         <button class="primary" disabled={!dirty} onclick={save}>Save changes</button>
       </div>
     {:else}
