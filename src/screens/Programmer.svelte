@@ -254,6 +254,15 @@
   const canBalance = $derived(
     colourHas("color_temperature") || (colourHas("warm_white") && colourHas("cool_white") && !colourHas("red")),
   );
+  // Which windows have anything to control for the selection. Like Beam, a
+  // window whose attributes none of the selected fixtures have says so
+  // instead of offering controls that would do nothing; a mixed selection
+  // gets the controls if any fixture can use them.
+  const MIXERS: Attribute[] = ["red", "green", "blue", "white", "warm_white", "cool_white", "cyan", "magenta", "yellow"];
+  // Fixtures without a dimmer take their intensity from their colour mix.
+  const hasIntensity = $derived(colourHas("intensity") || MIXERS.some(colourHas));
+  const hasColour = $derived([...EMITTERS, "color_temperature", "color_wheel"].some((a) => colourHas(a as Attribute)));
+  const hasPosition = $derived(colourHas("pan") || colourHas("tilt"));
   const colourFaderList = $derived(
     [...EMITTERS, "color_temperature" as Attribute]
       .filter(colourHas)
@@ -402,7 +411,7 @@
         FX{running > 0 ? ` ${running}` : ""}
       </button>
     {/if}
-    {#if id === "colour" && !effectsShown.colour}
+    {#if id === "colour" && !effectsShown.colour && hasColour}
       <button class="small" onclick={() => setColourFaders(!colourFaders)}>
         {colourFaders ? "Picker" : "Faders"}
       </button>
@@ -469,6 +478,12 @@
     <EffectList family={EFFECT_WINDOWS[id]} />
   {:else if selection.length === 0}
     {@render noSelection()}
+  {:else if id === "intensity" && !hasIntensity}
+    <p class="muted">The selected fixtures have no intensity control.</p>
+  {:else if id === "colour" && !hasColour}
+    <p class="muted">The selected fixtures have no colour controls.</p>
+  {:else if id === "position" && !hasPosition}
+    <p class="muted">The selected fixtures have no position controls.</p>
   {:else if id === "intensity"}
     <div class="intensity">
       <Fader
