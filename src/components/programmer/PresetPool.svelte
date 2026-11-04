@@ -73,7 +73,7 @@
 </script>
 
 <div class="pool">
-  {#if recording}<p class="hint rec">Tap a slot to store the {family} of the selection.</p>
+  {#if recording}<p class="hint rec">Tap a slot to store the selection's {family}.</p>
   {:else if deleting && presets.length > 0}
     {@const doomed = presets.find((p) => p.id === surface.pendingDelete)}
     <p class="hint del">

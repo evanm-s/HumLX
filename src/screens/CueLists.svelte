@@ -179,7 +179,7 @@
         <p class="muted empty">
           {show.playback.cueLists.length
             ? "No cue lists match."
-            : "No cue lists yet. Tap + New, or set a look in the Programmer and Record it."}
+            : "No cue lists yet. Tap + New, or Record a look."}
         </p>
       {/each}
     </div>
@@ -217,18 +217,18 @@
         >
         <span class="muted">
           {#if list.solo}
-            GO fades out every other running list.
+            GO fades out all other lists.
           {:else if list.releaseOnNextGo}
-            GO fades out other running lists that release on next go, so looks replace each other.
+            GO fades out other lists set to release on next go.
           {:else}
-            Layers on top: GO leaves other lists running, and other lists' GO leaves this one.
+            Layers on top; other lists' GO leaves it running.
           {/if}
         </span>
       </div>
 
       <CueTable {list} picked={cueIndex} onpick={pick}>
         {#snippet empty()}
-          <p class="muted empty">No cues yet. Set a look in the Programmer, then tap <strong>Record cue</strong>.</p>
+          <p class="muted empty">No cues yet. Set a look, then tap <strong>Record cue</strong>.</p>
         {/snippet}
       </CueTable>
 
@@ -237,7 +237,7 @@
           ● Record cue{cueIndex != null && cueIndex < list.cues.length - 1 ? ` after ${cueIndex + 1}` : ""}
         </button>
         <button
-          title="Merge the programmer into the picked cue, or the cue running now (U)"
+          title="Merge programmer into the picked or running cue (U)"
           disabled={(cueIndex == null && !live) || programmed === 0}
           onclick={() => updateCue.open({ list: list.id, index: cueIndex ?? live!.current })}
         >
@@ -260,7 +260,7 @@
       </div>
     {:else}
       <div class="empty muted">
-        <p>Pick a cue list on the left to see and edit its cues.</p>
+        <p>Pick a cue list on the left.</p>
       </div>
     {/if}
   </section>
@@ -285,11 +285,10 @@
     {#if draftMode === "follow"}
       <NumberField label="Follow after (seconds)" fractional bind:value={draftFollow} min={0} max={3600} />
       <p class="muted">
-        Counted from GO, so it includes the fade. The next cue starts by itself; a follow on the last cue loops back to
-        the first.
+        Counted from GO, including the fade. On the last cue, loops to the first.
       </p>
     {:else}
-      <p class="muted">Stays on this cue until the next GO.</p>
+      <p class="muted">Waits for the next GO.</p>
     {/if}
     {#snippet actions()}
       <button onclick={() => (dialog = null)}>Cancel</button>
@@ -318,7 +317,7 @@
         </button>
       {/each}
     </div>
-    <p class="muted">Loading into a slot that has a list swaps it out; that list stays here in Cue Lists.</p>
+    <p class="muted">Replaces the slot's current list (it stays in Cue Lists).</p>
   </Dialog>
 {/if}
 

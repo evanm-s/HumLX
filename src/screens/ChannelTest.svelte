@@ -29,7 +29,7 @@
 <div class="test">
   <header class="row">
     <h1>Channel test</h1>
-    <span class="muted">Drag a fader to set a channel directly. Released channels go back to their resting level.</span>
+    <span class="muted">Drag to set channels directly. Released channels return to rest.</span>
     <span class="spacer"></span>
     <button disabled={show.live.tested.length === 0} onclick={() => attempt(() => api.release(null))}>
       Release all

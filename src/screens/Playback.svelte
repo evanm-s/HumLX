@@ -122,17 +122,17 @@
   <header class="row">
     <h1>Playback</h1>
     {#if programmed > 0}
-      <span class="programmer-note">Programmer has values or effects for {programmed} fixtures, shown on top of playback</span>
+      <span class="programmer-note">Programmer: {programmed} fixtures on top of playback</span>
       <button onclick={() => show.program(() => api.clearProgrammer(null))}>Clear programmer</button>
     {/if}
     <span class="spacer"></span>
     {#if recording}
-      <span class="record-hint">Tap an empty button to save a new look, or a look to add a cue to it.</span>
+      <span class="record-hint">Tap an empty button for a new look, or a look to add a cue.</span>
       {#if list}<button onclick={() => openRecord(list.id)}>Record into {list.name}…</button>{/if}
       <button onclick={() => (recording = false)}>Cancel</button>
     {:else}
       <button class="record" disabled={programmed === 0} onclick={() => (recording = true)}>● Record</button>
-      <button title="Merge the programmer into the cue running now (U)" disabled={programmed === 0} onclick={() => updateCue.open()}
+      <button title="Merge programmer into the running cue (U)" disabled={programmed === 0} onclick={() => updateCue.open()}
         >Update</button
       >
     {/if}
@@ -155,7 +155,7 @@
       </div>
       <CueTable {list} compact picked={cueIndex} onpick={(i) => (cueIndex = i)}>
         {#snippet empty()}
-          <p class="muted empty">No cues yet. Set a look in the Programmer, then tap <strong>Record cue</strong>.</p>
+          <p class="muted empty">No cues yet. Set a look, then tap <strong>Record cue</strong>.</p>
         {/snippet}
       </CueTable>
       <div class="row actions">
@@ -169,7 +169,7 @@
     {:else}
       <div class="empty muted">
         <p>
-          Tap a fader slot's name to select its cue list, or pick one on
+          Tap a fader slot's name, or pick a list on
           <button class="ghost" onclick={() => showScreen("cuelists")}>Cue Lists</button>.
         </p>
       </div>
@@ -233,7 +233,7 @@
       <button
         class="fx-tab ghost"
         aria-expanded={fxOpen}
-        title={fxOpen ? "Hide the effect controls" : "Show the effect controls"}
+        title={fxOpen ? "Hide effect controls" : "Show effect controls"}
         onclick={() => toggleFx()}
       >
         <span class="fx-arrow">{fxOpen ? "›" : "‹"}</span>
@@ -303,7 +303,7 @@
       <input bind:value={lookName} placeholder="e.g. Blue wash" />
     </label>
     <NumberField label="Fade time (seconds)" fractional bind:value={lookFade} min={0} max={600} />
-    <p class="muted">Saves the Programmer as a new one-cue list on this button. Tap the button to bring the look up, and again to release it.</p>
+    <p class="muted">Saves the Programmer as a one-cue list. Tap the button to bring it up, again to release.</p>
     {#snippet actions()}
       <button onclick={() => (dialog = null)}>Cancel</button>
       <button class="primary" onclick={() => saveLook(page, button)}>Save look</button>

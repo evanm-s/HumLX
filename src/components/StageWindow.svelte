@@ -691,15 +691,15 @@
       {#if mode === "point"}
         <p class="lead">
           {#if pointing > 0}
-            Tap or drag on the plan to point {pointing === 1 ? "the selected mover" : `the ${pointing} selected movers`}.
+            Tap or drag the plan to point {pointing === 1 ? "the selected mover" : `${pointing} selected movers`}.
           {:else if selectedMovers.length > 0}
-            The selected movers aren't calibrated yet.
+            Selected movers aren't calibrated.
           {:else}
             Select movers to point them.
           {/if}
         </p>
         {#if uncalibrated.length > 0}
-          <p class="muted">Not calibrated, so left alone: {uncalibrated.map((f) => f.id).join(", ")}</p>
+          <p class="muted">Not calibrated, skipped: {uncalibrated.map((f) => f.id).join(", ")}</p>
         {/if}
         {#if target}
           <p class="readout">
@@ -709,7 +709,7 @@
           </p>
         {/if}
         <label class="field">
-          Height above the floor: {height.toFixed(1)} m
+          Height: {height.toFixed(1)} m
           <input
             type="range"
             min="0"
@@ -725,11 +725,11 @@
           <button aria-pressed={fine} class:on={fine} onclick={() => (fine = !fine)}>Fine</button>
         </div>
         <p class="muted small">
-          Fine moves the spot a tenth as far as your finger, from where it is, so you can nudge it into place.
+          Fine moves the spot a tenth as far as your finger, for nudging.
         </p>
       {:else if mode === "calibrate"}
         {#if movers.length === 0}
-          <p class="muted">There are no movers in the patch.</p>
+          <p class="muted">No movers in the patch.</p>
         {:else}
           <div class="movers">
             {#each movers as f (f.id)}
@@ -742,7 +742,7 @@
           </div>
           {#if calibrating != null}
             <p class="lead">
-              Put the beam's centre on <strong>{stage.marks.find((m) => m.id === currentMark)?.name ?? "a mark"}</strong>,
+              Centre the beam on <strong>{stage.marks.find((m) => m.id === currentMark)?.name ?? "a mark"}</strong>,
               then Confirm.
             </p>
             <PositionPad
@@ -781,21 +781,18 @@
             </div>
             <p class="muted">
               {#if calibration?.solution}
-                Worked out: hangs {calibration.solution.position[2].toFixed(1)} m above the stage floor, and the
-                worst mark is {Math.round(worst * 100)} cm off.
+                Hangs {calibration.solution.position[2].toFixed(1)} m above the stage; worst mark
+                {Math.round(worst * 100)} cm off.
                 {#if worst > 0.15}Redo the marks in orange.{/if}
               {:else}
-                Needs {needed} marks to work this mover out; more makes it more accurate and shows up a bad
-                reading.
+                Needs {needed} marks. More improves accuracy and shows up bad readings.
               {/if}
             </p>
             <section class="hang">
               <h3>Hang position</h3>
               <p class="muted small">
-                Anything measured here is held while the rest is worked out from the marks, which helps a lot
-                with wide beams. Leave a field blank if you don't know it.
-                {#if measured === 3}With all three, {needed} marks are enough.{:else if measured > 0}With some of it,
-                  {needed} marks are enough.{/if}
+                Measured values are kept fixed, which helps a lot with wide beams. Leave unknowns blank.
+                {#if measured > 0}With these, {needed} marks will do.{/if}
               </p>
               <div class="hang-fields">
                 <NumberField label="Across (m)" value={measuredPart(plan, hang[0], 0)} onchange={(v) => (hang[0] = fromMeasuredPart(plan, v, 0))} fractional increment={0.05} min={-500} max={500} />
@@ -804,8 +801,8 @@
               </div>
               {#if plan.riser > 0}
                 <p class="muted small">
-                  Measured from the top of the stage, which is {plan.riser} m above the studio floor.
-                  {#if hang[2] != null}That's {(hang[2] + plan.riser).toFixed(2)} m above the studio floor.{/if}
+                  From the stage deck, {plan.riser} m up.
+                  {#if hang[2] != null}{(hang[2] + plan.riser).toFixed(2)} m above the studio floor.{/if}
                 </p>
               {/if}
               <div class="row wrap">
@@ -834,7 +831,7 @@
           <NumberField label="Stage height above studio floor (m)" value={draft.riser} onchange={(v) => draft && v != null && (draft.riser = v)} fractional increment={0.05} max={10} />
         </div>
         <h3>Studio floor round the stage</h3>
-        <p class="muted small">How much floor to show on each side, in metres; left and right as seen from the desk.</p>
+        <p class="muted small">Metres shown each side; left and right as seen from the desk.</p>
         <div class="sizes">
           {#each margins as [side, label] (side)}
             <NumberField {label} value={draft.margin[side]} onchange={(v) => draft && v != null && (draft.margin[side] = v)} fractional increment={0.5} max={50} />
@@ -842,8 +839,8 @@
         </div>
         <h3>Measured from</h3>
         <p class="muted small">
-          Every position is typed in and shown from this point, in metres: across to the right as seen from the desk
-          (left is minus) and up stage away from the desk. Changing it moves nothing, only the numbers.
+          Positions are in metres from here: across to the right from the desk (left is minus), up stage away from
+          it. Changing it only changes the numbers.
         </p>
         <div class="row wrap">
           {#each REFERENCE_POINTS as [point, label] (point)}
@@ -852,12 +849,12 @@
         </div>
         {#if draft.reference.from === "custom"}
           <p class="muted small">
-            {pickingReference ? "Tap the plan where you measure from." : ""}
+            {pickingReference ? "Tap the plan to set it." : ""}
             <button class="ghost" aria-pressed={pickingReference} onclick={() => pickReference()}>Move it</button>
           </p>
         {/if}
         <h3>Marks</h3>
-        <p class="muted small">Pick a mark and tap the plan to drop it there.</p>
+        <p class="muted small">Pick a mark, then tap the plan to place it.</p>
         <div class="setup-marks">
           {#each draft.marks as mark (mark.id)}
             <div class="setup-mark" class:picked={pickedMark === mark.id}>
@@ -882,13 +879,12 @@
         </div>
         {#if hasCalibration}
           <p class="muted small">
-            Moving or removing marks works the calibrated movers out again from the readings left.
+            Moving or removing marks recalculates calibrated movers.
           </p>
         {/if}
         <h3>Scenery</h3>
         <p class="muted small">
-          Drawn on the plan for reference, such as the LED wall. Pick a piece and tap the plan to add its corners in
-          order, or type them.
+          For reference, like the LED wall. Pick a piece, then tap its corners in order or type them.
         </p>
         {#each draft.scenery as piece, i (i)}
           <div class="piece" class:picked={pickedPiece === i}>
@@ -911,7 +907,7 @@
               </div>
             {/each}
             {#if piece.points.length < 2}
-              <p class="muted small">Needs at least two points; tap the plan to add them.</p>
+              <p class="muted small">Needs two or more points.</p>
             {/if}
           </div>
         {/each}

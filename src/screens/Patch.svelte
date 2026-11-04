@@ -323,7 +323,7 @@
     <button
       aria-pressed={multi}
       class:on={multi}
-      title="Tap fixtures to add or remove them. Ctrl+click and Shift+click also work."
+      title="Tap to add or remove fixtures (Ctrl/Shift+click also work)"
       onclick={() => (multi = !multi)}>Multi-select</button
     >
     <button onclick={selectAll} disabled={show.patch.fixtures.length === 0}>All</button>
@@ -335,7 +335,7 @@
     {#if show.patch.fixtures.length === 0}
       <div class="empty muted">
         <p>No fixtures patched yet.</p>
-        <p>Choose a fixture type on the right, set how many and where they start, then tap <strong>Add</strong>.</p>
+        <p>Pick a type on the right, set count and address, then tap <strong>Add</strong>.</p>
       </div>
     {:else}
       <div class="head row muted">
@@ -371,8 +371,8 @@
         </button>
       </div>
       <p class="muted">
-        {[...new Set(selection.map((f) => f.typeName))].join(", ")}. Changes apply in fixture number order; leave a
-        field blank to keep it.
+        {[...new Set(selection.map((f) => f.typeName))].join(", ")}. Applied in number order; blank fields
+        stay.
       </p>
       <div class="pair">
         <NumberField
@@ -409,7 +409,7 @@
           {#if bulk.address != null}Back to back at {range(bulk.address, bulkSpan)}.{/if}
           {#if bulk.name.trim()}Named {bulk.name.trim()} 1 to {selection.length}.{/if}
           {#if bulk.mode}All set to {bulk.mode}.{/if}
-          {#if bulkOptionsTouched}Limits and orientation set the same on all {selection.length}.{/if}
+          {#if bulkOptionsTouched}Same limits and orientation on all {selection.length}.{/if}
         </p>
       {/if}
       <div class="row actions">
@@ -503,12 +503,12 @@
           <label class="field">Name <input bind:value={name} placeholder={profile.model} /></label>
         </div>
         <p class="muted summary">
-          {mode.channels.length} channels each. Uses addresses
+          {mode.channels.length} channels each, using
           {range(address ?? autoAddress ?? 0, needed)}.
         </p>
         <button class="primary wide" onclick={add}>Add {count ?? 1} × {profile.model}</button>
       {:else}
-        <p class="muted">Pick a type to continue. Missing one? Import it from the Open Fixture Library.</p>
+        <p class="muted">Pick a type. Missing one? Import it.</p>
       {/if}
     {/if}
   </aside>
@@ -530,21 +530,20 @@
 {#if importing}
   <Dialog title="Import fixture type" onclose={() => (importing = false)}>
     <p>
-      Pick a fixture file. These work:
+      Supported files:
     </p>
     <ul>
       <li>
-        <strong>QLC+</strong> fixture definitions (<em>.qxf</em>), from QLC+'s library or ones you made in its
-        fixture editor.
+        <strong>QLC+</strong> definitions (<em>.qxf</em>).
       </li>
       <li>
-        <strong>Open Fixture Library</strong>: find the fixture on open-fixture-library.org, choose
-        <em>Download</em>, then <em>Open Fixture Library JSON</em>.
+        <strong>Open Fixture Library</strong>: on open-fixture-library.org, <em>Download</em> ›
+        <em>Open Fixture Library JSON</em>.
       </li>
       <li>HumLX fixture files.</li>
     </ul>
     <label class="field">
-      Manufacturer (needed for Open Fixture Library files, optional otherwise)
+      Manufacturer (needed for Open Fixture Library files)
       <input bind:value={manufacturer} placeholder="e.g. Chauvet DJ" />
     </label>
     <input bind:this={fileInput} type="file" accept=".json,.qxf,application/json" hidden onchange={importFile} />

@@ -74,29 +74,27 @@
         {/each}
       </div>
       <span class="muted">
-        Several cue lists are running, so Update uses the selected one{target ? "" : ", and none of them is selected"}. Tap
-        another here to update that instead.
+        {target ? "Updates the selected list. Tap another to change." : "None of these is selected. Pick one."}
       </span>
     </div>
   {/if}
 
   {#if into && list && target}
     <p class="what">
-      Update <strong>{cueName(target.list, target.index)}</strong> of <strong>{list.name}</strong>{isCurrent ? ", the cue running now" : ""}?
+      Update <strong>{cueName(target.list, target.index)}</strong> of <strong>{list.name}</strong>{isCurrent ? " (running now)" : ""}?
     </p>
     <p>
-      The programmer's values for {plural(fixtures.length, "fixture")}{families.length ? ` (${families.join(", ")})` : ""}{effects
+      Merges {plural(fixtures.length, "fixture")}{families.length ? ` (${families.join(", ")})` : ""}{effects
         ? ` and ${plural(effects, "effect")}`
-        : ""} are merged into the cue{added ? `, adding ${plural(added, "fixture")} the cue didn't have` : ""}. Anything the
-      programmer doesn't set stays as the cue had it.
+        : ""} into the cue{added ? `, adding ${plural(added, "fixture")}` : ""}. Everything else in the cue stays.
     </p>
     <p class="muted">
-      The programmer is then cleared{isCurrent ? ", and the stage stays the same because the cue now holds these values" : ""}.
+      Then clears the programmer{isCurrent ? "; the stage doesn't change" : ""}.
     </p>
   {:else if !choosing}
     <p>
       {running.length === 0
-        ? "No cue list is running, so there's no current cue to update. GO the cue you want to change first, or pick it on the Cue Lists page."
+        ? "No cue is running. GO the cue to change, or pick it on the Cue Lists page."
         : "That cue no longer exists."}
     </p>
   {/if}

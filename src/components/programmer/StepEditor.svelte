@@ -149,7 +149,7 @@
         {/each}
       </div>
     </div>
-    <p class="muted">Tap the pad to move step {index + 1}. The middle is the fixture's own position.</p>
+    <p class="muted">Tap to move step {index + 1}. Centre is the fixture's own position.</p>
   {:else}
     {#each beamKeys as key (key)}
       <label class="field">

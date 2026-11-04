@@ -174,8 +174,7 @@
 
   {#if remote}
     <p class="remote-note">
-      This screen controls the Studio PC over the network. Show files, Art-Net output, OSC and updates can only be
-      changed on the Studio PC.
+      Remote screen. Show files, Art-Net, OSC and updates are set on the Studio PC.
     </p>
   {/if}
 
@@ -190,27 +189,26 @@
         </div>
       </div>
       <p class="muted">
-        Run this show from a laptop on the same network, for example to point and calibrate movers while walking the
-        stage. The laptop opens HumLX in its web browser; only this computer sends Art-Net.
+        Run the show from a laptop browser on the same network. Only this computer sends Art-Net.
       </p>
       {#if remoteStatus.error}
         <p class="bad">{remoteStatus.error}</p>
       {:else if remoteStatus.running}
         <p>
-          Open {remoteStatus.addresses.length > 1 ? "one of these" : "this"} in a browser on the laptop:
+          Open {remoteStatus.addresses.length > 1 ? "one of these" : "this"} on the laptop:
           {#each remoteStatus.addresses as address (address)}
             <br /><code class="address">{address}</code>
           {:else}
-            <br /><span class="bad">This computer isn't on a network.</span>
+            <br /><span class="bad">Not on a network.</span>
           {/each}
         </p>
         <div class="row">
           {#if remoteStatus.code}
-            <span>Type this code on the new device:</span>
+            <span>Pairing code:</span>
             <strong class="pair-code">{remoteStatus.code}</strong>
             <span class="muted">{remoteStatus.codeSeconds}s left</span>
           {:else}
-            <span class="muted">Each new device needs a code from here once.</span>
+            <span class="muted">New devices need a code once.</span>
           {/if}
           <span class="spacer"></span>
           <button class="primary" onclick={pairingCode}>{remoteStatus.code ? "New code" : "Pair a device"}</button>
@@ -254,8 +252,7 @@
         </div>
       </div>
       <p class="muted">
-        How big everything is drawn. Auto fits the layout to this screen: 100% on a 2560×1440 screen, 75% on
-        1920×1080. Remembered on this computer.
+        Auto fits this screen (100% at 2560×1440, 75% at 1080p). Saved on this computer.
       </p>
     </section>
   {/if}
@@ -269,10 +266,9 @@
       <button class="primary" onclick={saveAs}>Save as…</button>
     </div>
     <p class="muted">
-      Everything saves automatically on this computer. Save a show file to keep a copy, move it to another computer
-      or keep different setups. Fixture types you imported, the stage plan and calibration are saved inside it.
-      Opening one keeps this computer's Art-Net and OSC settings.
-      {#if file}<br />Last saved or opened: <strong>{file}</strong>{/if}
+      Saves automatically. Save a file to back up or move the show, including imported fixtures and the stage
+      plan. Opening one keeps this computer's Art-Net and OSC settings.
+      {#if file}<br />Last file: <strong>{file}</strong>{/if}
     </p>
   </section>
 
@@ -287,16 +283,16 @@
     </div>
 
     <label class="field">
-      Send to (node IP address, or 255.255.255.255 to broadcast)
+      Node IP (255.255.255.255 to broadcast)
       <input bind:value={draft.target} inputmode="decimal" class:invalid={!isIPv4(draft.target)} />
     </label>
 
     <div class="pair">
       <div>
-        <NumberField label="Art-Net universe (port-address)" bind:value={draft.universe} min={0} max={32767} />
+        <NumberField label="Universe (port-address)" bind:value={draft.universe} min={0} max={32767} />
         <p class="muted hint">Net {parts.net} · Sub-net {parts.subNet} · Universe {parts.universe}</p>
       </div>
-      <NumberField label="Refresh rate (packets per second)" bind:value={draft.rateHz} min={1} max={44} />
+      <NumberField label="Refresh rate (Hz)" bind:value={draft.rateHz} min={1} max={44} />
     </div>
 
     <div class="row">
@@ -324,8 +320,7 @@
       {/if}
     </div>
     <p class="muted">
-      Run cue lists from other software or a phone, such as QLab, Bitfocus Companion or TouchOSC. Send OSC over UDP
-      to this computer's IP address.
+      Trigger cues from QLab, Companion, TouchOSC and the like. Send OSC over UDP to this computer's IP.
     </p>
     {#if osc}
       <div class="pair">
@@ -351,20 +346,20 @@
       <tbody>
         <tr><td><code>/humlx/cuelist/{example}/go</code></td><td>GO</td></tr>
         <tr><td><code>/humlx/cuelist/{example}/back</code></td><td>Back one cue</td></tr>
-        <tr><td><code>/humlx/cuelist/{example}/goto/3</code></td><td>Go to cue 3 (or send the number to <code>…/goto</code>)</td></tr>
-        <tr><td><code>/humlx/cuelist/{example}/release</code></td><td>Release the cue list</td></tr>
-        <tr><td><code>/humlx/cuelist/{example}/master</code> 0.5</td><td>Set the master, from 0 to 1</td></tr>
-        <tr><td><code>/humlx/selected/go</code></td><td>The same actions on the selected cue list</td></tr>
-        <tr><td><code>/humlx/slot/2/go</code></td><td>The same actions on the list in fader slot 2</td></tr>
-        <tr><td><code>/humlx/grid/1/12</code></td><td>Tap button 12 on grid page 1</td></tr>
+        <tr><td><code>/humlx/cuelist/{example}/goto/3</code></td><td>Go to cue 3 (or send 3 to <code>…/goto</code>)</td></tr>
+        <tr><td><code>/humlx/cuelist/{example}/release</code></td><td>Release</td></tr>
+        <tr><td><code>/humlx/cuelist/{example}/master</code> 0.5</td><td>Master, 0 to 1</td></tr>
+        <tr><td><code>/humlx/selected/go</code></td><td>Same, on the selected list</td></tr>
+        <tr><td><code>/humlx/slot/2/go</code></td><td>Same, on fader slot 2</td></tr>
+        <tr><td><code>/humlx/grid/1/12</code></td><td>Tap grid page 1, button 12</td></tr>
         <tr><td><code>/humlx/releaseall</code></td><td>Release everything</td></tr>
         <tr><td><code>/humlx/blackout</code> 1 or 0</td><td>Blackout on or off</td></tr>
-        <tr><td><code>/humlx/grandmaster</code> 0.5</td><td>Set the grand master, from 0 to 1</td></tr>
+        <tr><td><code>/humlx/grandmaster</code> 0.5</td><td>Grand master, 0 to 1</td></tr>
       </tbody>
     </table>
     <p class="muted hint">
-      Use the cue list's number (shown on the Playback screen) or its name with <code>_</code> for spaces, such as
-      <code>/humlx/cuelist/walk_in/go</code>. Buttons that send 0 when let go are ignored on release.
+      Use the list's number or its name with <code>_</code> for spaces, e.g. <code>/humlx/cuelist/walk_in/go</code>.
+      A 0 sent on button release is ignored.
     </p>
   </section>
 
@@ -375,8 +370,7 @@
       {#if highlightColour}<span class="current" style:background={rgbCss(highlightColour)}></span>{/if}
     </div>
     <p class="muted">
-      The colour that <strong>Highlight</strong> turns the selected fixtures. Pick one that stands out from what's
-      already on stage. Fixtures without colour mixing still go to full.
+      What <strong>Highlight</strong> turns the selection. Fixtures without colour just go to full.
     </p>
     {#if highlightColour}
       <div class="highlight-colour">
@@ -404,7 +398,7 @@
       <button onclick={search} disabled={searching}>{searching ? "Searching…" : "Search network"}</button>
     </div>
     {#if nodes && nodes.length === 0}
-      <p class="muted">No nodes answered. Check the node is powered and on the same network as this PC.</p>
+      <p class="muted">No nodes found. Check power and network.</p>
     {:else if nodes}
       {#each nodes as node (node.ip + node.shortName)}
         <button class="node" onclick={() => useNode(node)}>
@@ -414,7 +408,7 @@
         </button>
       {/each}
     {:else}
-      <p class="muted">Searches the network for Art-Net nodes. Tap one to send to it.</p>
+      <p class="muted">Find Art-Net nodes, then tap one to use it.</p>
     {/if}
   </section>
 
@@ -432,11 +426,11 @@
       {:else if updates.error}
         <span class="bad">Couldn't check for updates: {updates.error}</span>
       {:else if updates.available}
-        Version {updates.available.version} is available. Tap <strong>Update</strong> in the side bar to install it.
+        Version {updates.available.version} is ready. Tap <strong>Update</strong> in the side bar.
       {:else if updates.lastChecked}
-        HumLX {updates.version} is the latest version.
+        HumLX {updates.version} is up to date.
       {:else}
-        HumLX {updates.version ?? ""} checks for a new version when it starts and every few hours.
+        HumLX {updates.version ?? ""} checks at startup and every few hours.
       {/if}
     </p>
   </section>
@@ -445,8 +439,8 @@
 {#if confirmNew}
   <Dialog title="Start a new show?" onclose={() => (confirmNew = false)}>
     <p>
-      This clears the patch, groups, presets, cue lists and effects. Output and OSC settings stay. Save a show file
-      first if you want to keep the current show.
+      Clears the patch, groups, presets, cue lists and effects. Output and OSC settings stay. Save first to keep
+      this show.
     </p>
     {#snippet actions()}
       <button onclick={() => (confirmNew = false)}>Cancel</button>

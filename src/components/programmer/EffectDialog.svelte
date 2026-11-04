@@ -184,7 +184,7 @@
     </label>
   {:else}
     <div class="field">
-      Speed: {Math.round(masterBpm * draft.multiplier)} BPM, following {draft.speed === "a" ? "Speed A" : "Speed B"} ({Math.round(masterBpm)} BPM)
+      Speed: {Math.round(masterBpm * draft.multiplier)} BPM ({draft.speed === "a" ? "Speed A" : "Speed B"} is {Math.round(masterBpm)})
       <div class="segmented">
         {#each MULTIPLIERS as [m, label] (m)}
           <button aria-pressed={draft.multiplier === m} onclick={() => (draft.multiplier = m)}>{label}</button>
@@ -263,11 +263,10 @@
     <input bind:value={draft.name} placeholder={SHAPES[draft.shape].label} />
   </label>
   {#if effect}
-    <p class="muted">Runs on {effect.fixtures.length} fixtures. Record a cue to keep it.</p>
+    <p class="muted">On {effect.fixtures.length} fixtures. Record a cue to keep it.</p>
   {:else}
     <p class="muted">
-      Runs on the {show.programmer.selection.length} selected fixtures, in the order you picked them. It goes in the programmer;
-      record a cue to keep it.
+      On the {show.programmer.selection.length} selected fixtures, in pick order. Record a cue to keep it.
     </p>
   {/if}
   {#snippet actions()}
