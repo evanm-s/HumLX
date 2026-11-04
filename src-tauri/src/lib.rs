@@ -141,6 +141,8 @@ fn apply_show(state: &mut State, show: Show) {
     state.osc_settings = show.osc;
     state.highlight_colour = show.highlight_colour;
     state.stage = show.stage;
+    // Calibrations are worked out again, so a better solver fixes old ones.
+    state.stage.refit_all();
     let now = std::time::Instant::now();
     for (master, bpm) in state.speed_masters.0.iter_mut().zip(show.speed_bpm) {
         master.set_bpm(bpm, now);
