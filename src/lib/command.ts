@@ -1,15 +1,14 @@
 // The command line typed on a control surface keypad, Onyx style:
-// "1 Thru 4 - 2 @ 5", "Group 3 @ Full", "Cue 7", "Clear 1 + 3".
+// "1 Thru 4 - 2 @ 5", "Group 3 @ Full", "Cue 7".
 
-export type Token = "Thru" | "+" | "-" | "@" | "Full" | "Group" | "Cue" | "Clear" | string;
+export type Token = "Thru" | "+" | "-" | "@" | "Full" | "Group" | "Cue" | string;
 
 export type Command =
   | { kind: "fixtures"; fixtures: number[] | null; level: number | null }
   | { kind: "groups"; groups: number[]; level: number | null }
-  | { kind: "cue"; cue: number }
-  | { kind: "clear"; fixtures: number[] };
+  | { kind: "cue"; cue: number };
 
-const WORDS = new Set(["Thru", "+", "-", "@", "Full", "Group", "Cue", "Clear"]);
+const WORDS = new Set(["Thru", "+", "-", "@", "Full", "Group", "Cue"]);
 const isNumber = (t: Token | undefined): t is string => t != null && !WORDS.has(t);
 
 /** Adds a keypad digit or "." to the line, joining it to a number being typed. */
@@ -76,13 +75,6 @@ export function parse(line: Token[], fixtureIds: number[], groupIds: number[]): 
     if (line.length !== at + 2 || (lvl = level(line[at + 1])) == null) return "@ needs a level, such as @ 5 or @ Full";
   }
 
-  if (target[0] === "Clear") {
-    if (at >= 0) return "Clear takes fixture numbers, such as Clear 1 + 3";
-    const fixtures = ids(target.slice(1), fixtureIds);
-    if (typeof fixtures === "string") return fixtures;
-    if (fixtures.length === 0) return "No such fixture";
-    return { kind: "clear", fixtures };
-  }
   if (target[0] === "Cue") {
     if (at >= 0 || target.length !== 2 || !isNumber(target[1])) return "Type Cue, a number, then Enter";
     return { kind: "cue", cue: Number(target[1]) };
