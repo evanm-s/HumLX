@@ -30,6 +30,8 @@ class ShowState {
     beats: [0, 0],
     osc: { listening: false, error: null, received: 0, last: null },
     remotes: 0,
+    values: {},
+    intensity: {},
   });
   playback = $state<PlaybackView>({
     cueLists: [],
@@ -100,6 +102,19 @@ class ShowState {
   get current(): Values {
     const first = this.programmer.selection[0];
     return (first != null && this.programmer.values[first]) || {};
+  }
+
+  /**
+   * What the first selected fixture is being given right now: cues with the
+   * programmer on top. Programmer values come straight from the programmer
+   * so a change shows before the next live poll.
+   */
+  get onStage(): Values {
+    const first = this.programmer.selection[0];
+    if (first == null) return {};
+    const live = this.live.values?.[first] ?? {};
+    const own = this.programmer.values[first] ?? {};
+    return { ...live, ...own, other: { ...live.other, ...own.other } };
   }
 
   /** Runs a programmer command and keeps its result. */

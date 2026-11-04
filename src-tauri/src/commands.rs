@@ -73,6 +73,11 @@ pub struct Live {
     /// Beats counted by speed masters A and B, for their beat lights.
     beats: [f32; 2],
     osc: humlx_core::osc::OscStatus,
+    /// What each fixture is being given now, from cues and the programmer,
+    /// for the Programmer screen's controls.
+    values: std::collections::BTreeMap<u32, Values>,
+    /// Each fixture's intensity as put out, for the fixture tiles.
+    intensity: std::collections::BTreeMap<u32, f32>,
     /// Remotes connected to this computer now.
     remotes: usize,
 }
@@ -242,6 +247,8 @@ pub fn live(app: State<'_, App>) -> Live {
         beats: state.speed_masters.beats(std::time::Instant::now()).0,
         osc: state.osc.clone(),
         remotes: app.remote.connected(),
+        values: state.live_values(std::time::Instant::now()),
+        intensity: state.output_intensity().clone(),
     }
 }
 

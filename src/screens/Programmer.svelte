@@ -29,7 +29,12 @@
 
   const selection = $derived(show.programmer.selection);
   const selected = $derived(new Set(selection));
+  // What's in the programmer for the first selected fixture, and what it's
+  // actually being given right now (cues with the programmer on top). The
+  // controls show the second, and light up only for the first.
   const current = $derived(show.current);
+  const stage = $derived(show.onStage);
+  const ON_STAGE = "On stage";
   const program = show.program.bind(show);
 
   // Fixtures in ID order, split into runs of the same type (profile and
@@ -169,7 +174,7 @@
     const first = selection[0];
     const fx = show.programmer.effects.find((e) => SHAPES[e.shape]?.family === "position" && e.fixtures.includes(first));
     if (!fx) return undefined;
-    return pathOf(fx, fx.fixtures.indexOf(first), fx.fixtures.length, { pan: current.pan, tilt: current.tilt });
+    return pathOf(fx, fx.fixtures.indexOf(first), fx.fixtures.length, { pan: stage.pan, tilt: stage.tilt });
   });
 
   const BEAM: Attribute[] = [
@@ -281,10 +286,10 @@
       .map((attribute) => ({ attribute, channel: colourChannels.get(attribute)! })),
   );
 
-  // The level the first selected fixture's emitter gets from the picked
-  // colour, mirroring how the engine splits a colour into its channels.
+  // The level the first selected fixture's emitter gets from its colour,
+  // mirroring how the engine splits a colour into its channels.
   function emitterFromColour(attribute: Attribute): number | undefined {
-    const colour = current.colour;
+    const colour = stage.colour;
     const fixture = show.fixture(selection[0] ?? null);
     if (!colour || !fixture) return undefined;
     const channels = show.channels(fixture).filter((c) => !c.fineOf);
@@ -296,7 +301,7 @@
       const slot = wheel && nearestWheelSlot(wheel, colour);
       return slot == null ? undefined : slot / 255;
     }
-    const scale = own.has("intensity") ? 1 : (current.intensity ?? 0);
+    const scale = own.has("intensity") ? 1 : (stage.intensity ?? 0);
     const [r, g, b] = [colour.r * scale, colour.g * scale, colour.b * scale];
     if (own.has("red") || own.has("green") || own.has("blue")) {
       const white = WHITES.some((a) => own.has(a)) ? Math.min(r, g, b) : 0;
@@ -494,10 +499,16 @@
       {#each fixtureTypes as type, i (type[0].id)}
         {#if i > 0}<span class="type-break" aria-hidden="true"></span>{/if}
         {#each type as f (f.id)}
+          {@const level = show.live.intensity?.[f.id]}
           <button class="tile" title={f.name} aria-pressed={selected.has(f.id)} onclick={() => tapFixture(f.id)}>
             <span class="num" style:color={fixtureColour(f.id)}>{f.id}</span>
             <span class="name">{f.name}</span>
-            {#if show.programmer.values[f.id]}<span class="dot" aria-label="Has programmer values"></span>{/if}
+            <span class="side">
+              {#if level != null}
+                <span class="level" class:lit={level > 0} title="Intensity on stage">{Math.round(level * 100)}%</span>
+              {/if}
+              {#if show.programmer.values[f.id]}<span class="dot" aria-label="Has programmer values"></span>{/if}
+            </span>
           </button>
         {/each}
       {:else}
@@ -554,9 +565,10 @@
         wide
         max={100}
         colour="var(--f-intensity)"
-        value={Math.round((current.intensity ?? 0) * 100)}
+        value={Math.round((stage.intensity ?? 0) * 100)}
         label="Intensity"
-        detail={current.intensity == null ? "Not set" : `${Math.round(current.intensity * 100)}%`}
+        sublabel={current.intensity == null && stage.intensity != null ? ON_STAGE : undefined}
+        detail={stage.intensity == null ? "Not set" : `${Math.round(stage.intensity * 100)}%`}
         active={current.intensity != null}
         onchange={(v) => program(() => api.setIntensity(v / 100))}
       />
@@ -572,13 +584,15 @@
     <div class="faders">
       {#each colourFaderList as { attribute, channel } (attribute)}
         {@const set = current.other?.[attribute]}
+        {@const live = stage.other?.[attribute]}
         {@const derived = attribute === "color_temperature" ? undefined : emitterFromColour(attribute)}
-        <!-- Emitters not set directly show what the picked colour gives them. -->
-        {@const value = Math.round(set != null ? set * 255 : derived != null ? derived * 255 : (channel.default ?? 0))}
+        <!-- Emitters not set directly show what the colour gives them. -->
+        {@const level = set ?? live ?? derived}
+        {@const value = Math.round(level != null ? level * 255 : (channel.default ?? 0))}
         <Fader
           {value}
           label={attributeName(attribute)}
-          sublabel={set != null ? undefined : derived != null ? "From colour" : "Not set"}
+          sublabel={set != null ? undefined : live != null ? ON_STAGE : derived != null ? "From colour" : "Not set"}
           detail={capabilityAt(channel.capabilities, value)}
           colour={attributeColour(attribute)}
           active={set != null}
@@ -591,7 +605,7 @@
   {:else if id === "colour"}
     <div class="colour" class:with-balance={canMix && canBalance}>
       {#if canMix || !canBalance}
-        <ColourPicker colour={current.colour} onchange={(c) => program(() => api.setColour(c))} />
+        <ColourPicker colour={stage.colour} live={current.colour == null} onchange={(c) => program(() => api.setColour(c))} />
         <div class="swatches">
           {#each SWATCHES as s (s.name)}
             <button
@@ -607,7 +621,8 @@
       {/if}
       {#if canBalance}
         <WhiteBalance
-          value={current.other?.color_temperature}
+          value={stage.other?.color_temperature}
+          live={current.other?.color_temperature == null}
           onchange={(v) => program(() => api.setAttribute("color_temperature", v))}
         />
       {/if}
@@ -624,7 +639,7 @@
       </div>
       {#if positionFaders}
         <div class="pos-faders">
-          {#each [{ axis: "pan", label: "Pan", level: current.pan }, { axis: "tilt", label: "Tilt", level: current.tilt }] as f (f.axis)}
+          {#each [{ axis: "pan", label: "Pan", level: stage.pan, own: current.pan }, { axis: "tilt", label: "Tilt", level: stage.tilt, own: current.tilt }] as f (f.axis)}
             <Fader
               wide
               {fine}
@@ -633,8 +648,8 @@
               format={positionPercent}
               value={Math.round((f.level ?? 0.5) * POSITION_STEPS)}
               label={f.label}
-              detail={f.level == null ? "Not set" : undefined}
-              active={f.level != null}
+              detail={f.level == null ? "Not set" : f.own == null ? ON_STAGE : undefined}
+              active={f.own != null}
               onchange={(v) =>
                 program(() =>
                   f.axis === "pan" ? api.setPosition(v / POSITION_STEPS, null) : api.setPosition(null, v / POSITION_STEPS),
@@ -644,8 +659,9 @@
         </div>
       {:else}
         <PositionPad
-          pan={current.pan}
-          tilt={current.tilt}
+          pan={stage.pan}
+          tilt={stage.tilt}
+          live={current.pan == null && current.tilt == null}
           {fine}
           path={positionPath}
           onchange={(pan, tilt) => program(() => api.setPosition(pan, tilt))}
@@ -663,12 +679,13 @@
     <div class="beam">
       {#each beamChannels as { attribute, channel } (attribute)}
         {@const set = current.other?.[attribute]}
+        {@const level = set ?? stage.other?.[attribute]}
         <!-- Unset channels show the level they are resting at. -->
-        {@const value = set == null ? channel.default : Math.round(set * 255)}
+        {@const value = level == null ? channel.default : Math.round(level * 255)}
         <Fader
           {value}
           label={attributeName(attribute)}
-          sublabel={set == null ? "Not set" : undefined}
+          sublabel={set != null ? undefined : level != null ? ON_STAGE : "Not set"}
           detail={capabilityAt(channel.capabilities, value)}
           colour="var(--f-beam)"
           active={set != null}
@@ -776,6 +793,28 @@
     line-clamp: 2;
     overflow: hidden;
     overflow-wrap: anywhere;
+  }
+
+  /* Intensity on stage, and a dot when the programmer has values. */
+  .side {
+    display: grid;
+    justify-items: end;
+    gap: 4px;
+  }
+
+  .level {
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--muted);
+  }
+
+  .level.lit {
+    color: var(--f-intensity);
+  }
+
+  .tile[aria-pressed="true"] .level {
+    color: var(--accent-text);
   }
 
   .dot {

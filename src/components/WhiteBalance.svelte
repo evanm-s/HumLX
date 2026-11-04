@@ -4,12 +4,14 @@
 
   interface Props {
     value: number | undefined;
+    /** The value is what's on stage from a cue, not in the programmer: drawn dimmer. */
+    live?: boolean;
     onchange: (value: number) => void;
   }
 
   import { drag, type DragPoint } from "../lib/drag";
 
-  let { value, onchange }: Props = $props();
+  let { value, live = false, onchange }: Props = $props();
 
   const STOPS = [
     { label: "Warm", value: 0 },
@@ -43,8 +45,8 @@
   }
 </script>
 
-<div class="balance">
-  <div class="ends muted"><span>Warm</span><span>{value == null ? "Not set" : `${Math.round(value * 100)}% cool`}</span><span>Cool</span></div>
+<div class="balance" class:live>
+  <div class="ends muted"><span>Warm</span><span>{value == null ? "Not set" : `${Math.round(value * 100)}% cool${live ? " on stage" : ""}`}</span><span>Cool</span></div>
   <div
     class="strip"
     bind:this={strip}
@@ -94,6 +96,10 @@
 
   .strip:focus-visible {
     outline: 2px solid var(--accent);
+  }
+
+  .live .marker {
+    opacity: 0.5;
   }
 
   .marker {

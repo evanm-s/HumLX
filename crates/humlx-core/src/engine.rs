@@ -1,7 +1,7 @@
 //! The live engine: holds the show, works out the DMX levels and sends them
 //! over Art-Net at a steady rate on a background thread.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::net::{Ipv4Addr, SocketAddr, UdpSocket};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -118,6 +118,10 @@ pub struct State {
     pub osc: OscStatus,
     /// The stage plan and where each mover hangs.
     pub stage: crate::stage::Stage,
+    /// Each fixture's intensity as last put out, from 0 to 1, after effects,
+    /// highlight, the grand master and blackout. Fixtures with nothing setting
+    /// their intensity are left out.
+    output_intensity: BTreeMap<u32, f32>,
     /// Raw channel levels set from the channel test screen, by fixture
     /// number and channel index within the fixture.
     test_levels: HashMap<u32, HashMap<usize, u8>>,
@@ -171,6 +175,30 @@ impl State {
         } else {
             self.go(list, now)
         }
+    }
+
+    /// What each fixture is being given right now: running cue lists with
+    /// the programmer on top, as the Programmer screen shows it. Like Load,
+    /// effects are left out so controls hold still, and the grand master and
+    /// highlight aren't applied. Includes the default white (see
+    /// [`Values::default_colour`]).
+    pub fn live_values(&self, now: Instant) -> BTreeMap<u32, Values> {
+        let mut look = self.playbacks.values(now);
+        for (fixture, values) in &self.programmer.values {
+            look.entry(*fixture).or_default().merge(values);
+        }
+        look.into_iter()
+            .filter(|(id, values)| self.patch.get(*id).is_some() && !values.is_empty())
+            .map(|(id, mut values)| {
+                values.default_colour();
+                (id, values)
+            })
+            .collect()
+    }
+
+    /// Each fixture's intensity as last put out (see `output_intensity`).
+    pub fn output_intensity(&self) -> &BTreeMap<u32, f32> {
+        &self.output_intensity
     }
 
     /// Load: copies what running cue lists are putting out for `fixtures`
@@ -308,6 +336,10 @@ impl State {
         self.running_effects.start_new(&self.programmer.effects, now);
         self.running_effects
             .apply(&self.programmer.effects, &mut look, now, &beats, size);
+        // Colour fixtures with an intensity but no colour come on white.
+        for values in look.values_mut() {
+            values.default_colour();
+        }
         if self.highlight {
             for fixture in self.patch.fixtures() {
                 let values = look.entry(fixture.id).or_default();
@@ -324,6 +356,14 @@ impl State {
                 }
             }
         }
+
+        let master = if self.blackout { 0.0 } else { self.grand_master.0 };
+        self.output_intensity = self
+            .patch
+            .fixtures()
+            .iter()
+            .filter_map(|f| Some((f.id, look.get(&f.id)?.intensity?.clamp(0.0, 1.0) * master)))
+            .collect();
 
         let mut universe = Universe::default();
         for fixture in self.patch.fixtures() {
@@ -634,6 +674,76 @@ mod tests {
         state.blackout = true;
         state.compose();
         assert_eq!(state.universe().get(1), 0);
+    }
+
+    #[test]
+    fn colour_fixtures_default_to_white() {
+        use crate::programmer::SelectMode;
+        let mut state = state_with("generic/rgbw-par", "6ch DRGBW Strobe", 1);
+        let levels = |state: &State| (1..=6).map(|a| state.universe().get(a)).collect::<Vec<_>>();
+        state.compose();
+        assert_eq!(levels(&state), vec![0, 0, 0, 0, 0, 0]); // nothing set: resting levels
+
+        // Intensity alone comes on white, without white going in the programmer.
+        state.programmer.select(&[1], SelectMode::Set);
+        state.programmer.update(|v| v.intensity = Some(1.0));
+        state.compose();
+        assert_eq!(levels(&state), vec![255, 0, 0, 0, 255, 0]);
+        assert_eq!(state.programmer.values[&1].colour, None);
+        assert_eq!(state.live_values(Instant::now())[&1].colour, Some(Rgb::WHITE));
+
+        // A colour, or an emitter set directly, replaces it.
+        state.programmer.update(|v| {
+            v.other.insert(Attribute::Red, 1.0);
+        });
+        state.compose();
+        assert_eq!(levels(&state), vec![255, 255, 0, 0, 0, 0]);
+    }
+
+    #[test]
+    fn live_values_and_output_intensity() {
+        use crate::effect::{Effect, Shape};
+        use crate::playback::{Cue, CueList};
+        use crate::programmer::SelectMode;
+        let mut state = state_with("generic/rgb-par", "3ch RGB", 1);
+        let now = Instant::now();
+        state.cue_lists.push(CueList {
+            id: 1,
+            name: "Main".into(),
+            cues: vec![Cue {
+                name: "Red".into(),
+                fade: 0.0,
+                values: [(
+                    1,
+                    Values {
+                        intensity: Some(0.8),
+                        colour: Some(Rgb { r: 1.0, g: 0.0, b: 0.0 }),
+                        ..Default::default()
+                    },
+                )]
+                .into(),
+                effects: vec![Effect::new(1, "Chase".into(), Shape::Chase, &[], vec![1])],
+                ..Default::default()
+            }],
+            ..Default::default()
+        });
+        state.go(1, now).unwrap();
+        state.programmer.select(&[1], SelectMode::Set);
+        state.programmer.update(|v| v.intensity = Some(0.5));
+
+        // The cue's colour with the programmer's intensity on top, effects left out.
+        let live = state.live_values(now);
+        assert_eq!(live[&1].intensity, Some(0.5));
+        assert_eq!(live[&1].colour, Some(Rgb { r: 1.0, g: 0.0, b: 0.0 }));
+
+        // Output intensity follows the grand master and blackout.
+        state.effect_size = EffectSize(0.0);
+        state.grand_master.set(0.5);
+        state.compose_at(now);
+        assert_eq!(state.output_intensity()[&1], 0.25);
+        state.blackout = true;
+        state.compose_at(now);
+        assert_eq!(state.output_intensity()[&1], 0.0);
     }
 
     #[test]

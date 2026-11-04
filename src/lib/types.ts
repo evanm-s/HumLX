@@ -142,6 +142,13 @@ export interface Live {
   osc: OscStatus;
   /** Remotes connected to the Studio PC now. */
   remotes: number;
+  /**
+   * What each fixture is being given now, from running cues with the
+   * programmer on top (effects left out), by fixture number.
+   */
+  values: Record<number, Values>;
+  /** Each fixture's intensity as put out, 0 to 1, by fixture number. */
+  intensity: Record<number, number>;
 }
 
 export interface OscSettings {

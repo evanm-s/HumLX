@@ -6,6 +6,8 @@
     pan: number | undefined;
     tilt: number | undefined;
     fine: boolean;
+    /** The value is what's on stage from a cue, not in the programmer: drawn dimmer. */
+    live?: boolean;
     /** A position effect's path to draw, if one is running. */
     path?: { pan: number; tilt: number }[];
     onchange: (pan: number, tilt: number) => void;
@@ -13,7 +15,7 @@
 
   import { drag, type DragPoint } from "../lib/drag";
 
-  let { pan, tilt, fine, path, onchange }: Props = $props();
+  let { pan, tilt, fine, path, live = false, onchange }: Props = $props();
 
   let pad: HTMLDivElement;
   let start: { x: number; y: number; pan: number; tilt: number } | null = null;
@@ -40,6 +42,7 @@
 <div
   class="pad"
   class:unset={pan == null && tilt == null}
+  class:live
   bind:this={pad}
   role="application"
   aria-label="Pan and tilt"
@@ -133,6 +136,12 @@
   .unset .dot,
   .unset .cross {
     opacity: 0.4;
+  }
+
+  /* Showing a cue's position rather than one in the programmer. */
+  .live .dot {
+    border-style: dashed;
+    opacity: 0.65;
   }
 
   .label {
