@@ -266,12 +266,17 @@ pub struct Calibration {
     pub readings: Vec<Reading>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub solution: Option<Solution>,
+    /// Pan and tilt travel in degrees the fixture is meant to have, from its
+    /// patch, which the fit starts from and keeps near.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expected: Option<(f32, f32)>,
 }
 
 impl Calibration {
-    /// Pan and tilt travel from the last fit, to start the next one from.
+    /// The travel to expect. Not the last fit's, which could drift further
+    /// with every refit.
     fn ranges(&self) -> Option<(f32, f32)> {
-        self.solution.as_ref().map(|s| (s.pan_range, s.tilt_range))
+        self.expected
     }
 }
 
@@ -425,6 +430,16 @@ impl Stage {
         }
     }
 
+    /// Works every mover out again, such as after loading a show whose
+    /// calibrations an older version solved.
+    pub fn refit_all(&mut self) {
+        let fixtures: Vec<u32> = self.movers.iter().map(|c| c.fixture).collect();
+        for fixture in fixtures {
+            let position = self.position(fixture);
+            self.resolve(fixture, position);
+        }
+    }
+
     pub fn solution(&self, fixture: u32) -> Option<&Solution> {
         self.calibration(fixture).and_then(|c| c.solution.as_ref())
     }
@@ -513,6 +528,7 @@ impl Stage {
                     fixture,
                     readings: Vec::new(),
                     solution: None,
+                    expected: None,
                 });
                 self.movers.len() - 1
             }
@@ -522,6 +538,7 @@ impl Stage {
         calibration.readings.retain(|r| r.mark != mark);
         calibration.readings.push(Reading { mark, pan, tilt });
         calibration.readings.sort_by_key(|r| r.mark);
+        calibration.expected = Some(ranges);
         calibration.solution = solve(&self.marks, &calibration.readings, Some(ranges), known);
         Ok(&self.movers[index])
     }
@@ -616,6 +633,9 @@ struct Model {
     base_ranges: (f64, f64),
     /// Measured parts of its position, which the fit holds the mover to.
     known: [Option<f64>; 3],
+    /// The lowest mark. With marks on the floor, a mirror image of the mover
+    /// under the floor fits them just as well, so the fit keeps above it.
+    floor: f64,
 }
 
 /// Parameters: position (3), rotation tweak (3), log scale of pan and tilt range (2).
@@ -646,6 +666,13 @@ impl Model {
         }
         out.push(q[6] * 0.05);
         out.push(q[7] * 0.05);
+        // Beyond half as much again either way, the ranges are pulled back
+        // hard: otherwise a mover far off with a tiny tilt range can fit a
+        // handful of marks better than the real answer.
+        let limit = 1.5f64.ln();
+        out.push((q[6].abs() - limit).max(0.0) * 10.0);
+        out.push((q[7].abs() - limit).max(0.0) * 10.0);
+        out.push((self.floor - q[2]).max(0.0) * 10.0);
         out.extend((0..3).map(|i| self.known[i].map_or(0.0, |k| (q[i] - k) * 100.0)));
     }
 }
@@ -777,17 +804,26 @@ pub fn solve(marks: &[Mark], readings: &[Reading], ranges: Option<(f32, f32)>, k
     let reach = ((max[0] - min[0]).max(max[1] - min[1]) / 2.0).max(1.0);
 
     // Try hung (axis down) and standing (axis up) movers from a few places
-    // and headings, then keep the best fit.
+    // and headings, then keep the best fit. Movers don't all pan the same way
+    // round, so each is also tried mirrored: pan going the other way.
     let down: M3 = [[1.0, 0.0, 0.0], [0.0, -1.0, 0.0], [0.0, 0.0, -1.0]];
     let up: M3 = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
+    let mirror: M3 = [[1.0, 0.0, 0.0], [0.0, -1.0, 0.0], [0.0, 0.0, 1.0]];
     let mut best: Option<(Model, Params, f64)> = None;
-    for (base, height) in [(down, max[2] + 4.0), (up, min[2] + 0.5)] {
+    let bases = [
+        (down, max[2] + 4.0),
+        (matmul(&down, &mirror), max[2] + 4.0),
+        (up, min[2] + 0.5),
+        (matmul(&up, &mirror), min[2] + 0.5),
+    ];
+    for (base, height) in bases {
         for heading in 0..8 {
             let yaw = rotation([0.0, 0.0, f64::from(heading) * std::f64::consts::FRAC_PI_4]);
             let model = Model {
                 base: matmul(&yaw, &base),
                 base_ranges,
                 known,
+                floor: min[2],
             };
             // A known position needs only the one start for each heading.
             let offsets: &[(f64, f64)] = if fully_known {
@@ -970,6 +1006,52 @@ mod tests {
         let old: Placed = serde_json::from_str(r#"{"fixture":2,"z":4.5}"#).unwrap();
         assert_eq!(old.aim, None);
         assert!(old.copies.is_empty());
+    }
+
+    #[test]
+    fn finds_a_mover_that_pans_the_other_way() {
+        let marks = default_marks(7.0, 5.0);
+        let mirror = [[1.0, 0.0, 0.0], [0.0, -1.0, 0.0], [0.0, 0.0, 1.0]];
+        let truth = fake([-1.8, 3.6, 4.25], matmul(&hung(70.0), &mirror), (540.0, 270.0));
+        let solution = solve(&marks, &readings(&truth, &marks), Some((540.0, 270.0)), [None; 3]).unwrap();
+        assert_close(solution.position, truth.position, 0.02);
+        let aim = solution.aim([1.0, 1.0, 0.0], (0.5, 0.5));
+        let landing = truth.landing(aim.pan, aim.tilt, 0.0).unwrap();
+        assert!(
+            (landing[0] - 1.0).abs() < 0.02 && (landing[1] - 1.0).abs() < 0.02,
+            "{landing:?}"
+        );
+    }
+
+    /// Readings from the studio's first calibration, which landed the mover
+    /// 30 m away with a pan range of thousands of degrees. It hangs about
+    /// 2 m left of centre and 4 m up stage, 4.25 m up.
+    #[test]
+    fn four_studio_marks_and_a_height_give_a_sensible_answer() {
+        let m = |id, x, y, z| Mark {
+            id,
+            name: String::new(),
+            x,
+            y,
+            z,
+        };
+        let marks = vec![
+            m(1, -3.635, 0.0, 0.0),
+            m(2, 3.635, 0.0, 0.0),
+            m(3, -0.045, -3.0, -0.1),
+            m(5, 0.0, 3.0, 0.0),
+        ];
+        let r = |mark, pan, tilt| Reading { mark, pan, tilt };
+        let readings = vec![
+            r(1, 0.451_153_84, 0.304_761_92),
+            r(2, 0.609_927_7, 0.225_180_8),
+            r(3, 0.197_304_2, 0.768_507_6),
+            r(5, 0.308_809_97, 0.621_762),
+        ];
+        let s = solve(&marks, &readings, Some((540.0, 270.0)), [None, None, Some(4.25)]).unwrap();
+        assert_close(s.position, [-1.8, 3.6, 4.25], 0.5);
+        assert!((360.0..=810.0).contains(&s.pan_range), "{}", s.pan_range);
+        assert!((180.0..=405.0).contains(&s.tilt_range), "{}", s.tilt_range);
     }
 
     #[test]
