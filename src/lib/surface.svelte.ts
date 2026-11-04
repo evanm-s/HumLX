@@ -145,8 +145,8 @@ class Surface {
    * press empties the command line, cancels Record or Delete, unpicks the
    * programmer sheet and deselects,
    * leaving the values on stage. A second press straight after clears the
-   * programmer. Fixture numbers and Enter after the first press clear just
-   * those fixtures instead.
+   * programmer. Anything typed after the first press starts a fresh command
+   * line, so Clear 1 Thru 4 @ 5 sets those fixtures to 50%.
    */
   async clear() {
     if (this.clearClears) {
@@ -179,10 +179,7 @@ class Surface {
       this.clearedOnce = null;
       return void this.load();
     }
-    const afterClear = this.clearClears;
     this.clearedOnce = null;
-    // Numbers straight after Clear pick fixtures to clear: Clear 1 + 3 Enter.
-    if (afterClear && (/^[0-9]$/.test(key) || key === "point")) this.line = ["Clear"];
     if (/^[0-9]$/.test(key)) return void (this.line = typeDigit(this.line, key));
     if (key in WORD_KEYS) return void (this.line = [...this.line, WORD_KEYS[key]]);
     switch (key) {
@@ -264,11 +261,6 @@ class Surface {
       show.programmer.groups.map((g) => g.id),
     );
     if (typeof command === "string") return notify(command, "warning");
-
-    if (command.kind === "clear") {
-      show.program(() => api.clearProgrammer(null, command.fixtures));
-      return;
-    }
 
     if (command.kind === "cue") {
       const list = show.playback.cueLists.find((l) => l.id === this.cueList);
