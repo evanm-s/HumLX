@@ -92,6 +92,13 @@ fn list_mut(state: &mut EngineState, id: u32) -> Result<&mut CueList> {
         .ok_or(Error::UnknownCueList(id))
 }
 
+/// Empties the programmer after recording into a cue, selection included, as
+/// Clear Clear does, so nothing is left for Clear (or its NX-K LED) to clear.
+fn clear_programmer(state: &mut EngineState) {
+    state.programmer.clear(None);
+    state.programmer.selection.clear();
+}
+
 /// Restarts a running list on its current cue after its cues changed.
 fn refresh(state: &mut EngineState, id: u32) {
     if let Some(list) = state.cue_lists.iter().find(|l| l.id == id) {
@@ -319,7 +326,7 @@ pub fn record_cue(
             },
         );
         let snapshot = cue_list.clone();
-        state.programmer.clear(None);
+        clear_programmer(state);
         state.go_to(snapshot.id, index, Instant::now())?;
         state.playbacks.refresh(&snapshot, Instant::now());
         Ok(())
@@ -345,7 +352,7 @@ pub fn update_cue(app: State<'_, App>, list: u32, index: usize) -> Result<Playba
         for effect in effects {
             lay_over(&mut cue.effects, effect);
         }
-        state.programmer.clear(None);
+        clear_programmer(state);
         refresh(state, list);
         Ok(())
     })
