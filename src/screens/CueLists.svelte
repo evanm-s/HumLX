@@ -11,6 +11,7 @@
   import { goKeys, placements, selectedList, selectList, showScreen, status } from "../lib/cuelists.svelte";
   import { show } from "../lib/show.svelte";
   import { RECORD_EVENT } from "../lib/surface.svelte";
+  import { updateCue } from "../lib/updatecue.svelte";
   import type { CueMode } from "../lib/types";
 
   const play = show.play.bind(show);
@@ -55,6 +56,12 @@
   });
 
   const live = $derived(list ? status(list.id) : undefined);
+
+  // While a cue is picked here, Update (the NX-K key or U) updates that cue.
+  $effect(() => {
+    updateCue.picked = list && cueIndex != null ? { list: list.id, index: cueIndex } : null;
+    return () => (updateCue.picked = null);
+  });
   const programmed = $derived(
     new Set([...Object.keys(show.programmer.values).map(Number), ...show.programmer.effects.flatMap((e) => e.fixtures)]).size,
   );
@@ -229,8 +236,12 @@
         <button class="record" disabled={programmed === 0} onclick={() => (dialog = "record")}>
           ● Record cue{cueIndex != null && cueIndex < list.cues.length - 1 ? ` after ${cueIndex + 1}` : ""}
         </button>
-        <button disabled={cueIndex == null || programmed === 0} onclick={() => play(() => api.updateCue(list.id, cueIndex!))}>
-          Update cue
+        <button
+          title="Merge the programmer into the picked cue, or the cue running now (U)"
+          disabled={(cueIndex == null && !live) || programmed === 0}
+          onclick={() => updateCue.open({ list: list.id, index: cueIndex ?? live!.current })}
+        >
+          Update cue{cueIndex == null && live ? ` ${live.current + 1}` : ""}
         </button>
         <button disabled={cueIndex == null} onclick={openEdit}>Edit cue</button>
         <button class="danger" disabled={cueIndex == null} onclick={deleteCue}>

@@ -3,6 +3,8 @@
   import Fader from "./components/Fader.svelte";
   import Toasts from "./components/Toasts.svelte";
   import UpdateButton from "./components/UpdateButton.svelte";
+  import UpdateCue from "./components/UpdateCue.svelte";
+  import { updateCue } from "./lib/updatecue.svelte";
   import { api, inApp, remote } from "./lib/api";
   import { listen } from "@tauri-apps/api/event";
   import { link } from "./lib/remote.svelte";
@@ -79,14 +81,15 @@
     };
   });
 
-  // Esc is the keyboard's Clear key, unless typing or a dialog is open
-  // (dialogs close on Esc themselves).
+  // Esc is the keyboard's Clear key and U is Update, unless typing or a
+  // dialog is open (dialogs close on Esc themselves).
   function keys(e: KeyboardEvent) {
-    if (e.key !== "Escape" || e.defaultPrevented || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+    const key = e.key === "Escape" ? "clear" : e.key.toLowerCase() === "u" ? "update" : null;
+    if (!key || e.defaultPrevented || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
     if (document.querySelector("[role=dialog]")) return;
     if ((e.target as HTMLElement).closest?.("input, textarea, select")) return;
     e.preventDefault();
-    surface.press("clear");
+    surface.press(key);
   }
 
   const status = $derived(
@@ -181,6 +184,7 @@
     </div>
   </main>
 </div>
+{#if updateCue.request}<UpdateCue cue={updateCue.request.cue} />{/if}
 {/if}
 
 <Toasts />

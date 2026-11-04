@@ -15,6 +15,7 @@
   import { goKeys, master, selectedList, selectList, showScreen, status } from "../lib/cuelists.svelte";
   import { show } from "../lib/show.svelte";
   import { RECORD_EVENT } from "../lib/surface.svelte";
+  import { updateCue } from "../lib/updatecue.svelte";
 
   const play = show.play.bind(show);
 
@@ -131,6 +132,9 @@
       <button onclick={() => (recording = false)}>Cancel</button>
     {:else}
       <button class="record" disabled={programmed === 0} onclick={() => (recording = true)}>● Record</button>
+      <button title="Merge the programmer into the cue running now (U)" disabled={programmed === 0} onclick={() => updateCue.open()}
+        >Update</button
+      >
     {/if}
     <button class="danger" onclick={() => play(() => api.releaseAll())}>Release all</button>
   </header>

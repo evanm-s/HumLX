@@ -9,6 +9,7 @@ import { endSelectWindow } from "./selection";
 import { sheetPicks } from "./sheet.svelte";
 import { attempt, notify, show } from "./show.svelte";
 import type { Attribute, Led, ProgrammerView, SurfaceStatus } from "./types";
+import { updateCue } from "./updatecue.svelte";
 
 type SurfaceEvent = { kind: "key"; key: string; down: boolean } | { kind: "encoder"; index: number; delta: number };
 
@@ -88,6 +89,7 @@ class Surface {
     if (show.live.highlight) leds.highlight = "blink";
     if (this.mode === "record") leds.record = "on";
     if (this.mode === "delete") leds.delete = "on";
+    if (Object.keys(show.programmer.values).length || show.programmer.effects.length) leds.update = "on";
     // Clear blinks when the next press clears the programmer, and is lit
     // when there's anything for it to clear.
     const { selection, values, effects } = show.programmer;
@@ -163,7 +165,9 @@ class Surface {
 
   press(key: string) {
     // With a dialog open, Enter presses its main button and Clear cancels it.
+    // Update again in the Update prompt confirms it, as Enter does.
     const dialog = document.querySelector<HTMLElement>("[role=dialog]");
+    if (dialog && key === "update" && updateCue.request) key = "enter";
     if (dialog && (key === "enter" || key === "clear")) {
       if (key === "enter") dialog.querySelector<HTMLButtonElement>("button.primary:not(:disabled)")?.click();
       else window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
@@ -207,6 +211,11 @@ class Surface {
       case "record":
         // Record twice records a cue, as does Record then Enter.
         window.dispatchEvent(new CustomEvent(RECORD_EVENT, { detail: { cue: this.mode === "record" } }));
+        return;
+      case "update":
+        // Merges the programmer into the current cue, after a prompt.
+        this.setMode(null);
+        updateCue.open();
         return;
       case "delete":
         // With values picked on the programmer sheet, Delete takes them out;
