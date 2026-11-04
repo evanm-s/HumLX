@@ -569,7 +569,7 @@
     </div>
 
     {#if tab === "look"}
-      <p class="lead">Tap a light to select it. Each one shows its colour and the floor it lights, live.</p>
+      <p class="lead">Tap a light to select it. Colours and beams are live.</p>
       <div class="row wrap">
         <button aria-pressed={pointing} onclick={() => (pointing = !pointing)}>Point movers</button>
         {#if pointing}
@@ -580,25 +580,24 @@
       {#if pointing}
         <p class="muted small">
           {#if aimable > 0}
-            Tap or drag on the floor to point {aimable === 1 ? "the selected mover" : `the ${aimable} selected movers`} there.
+            Tap or drag the floor to point {aimable === 1 ? "the selected mover" : `${aimable} selected movers`}.
           {:else if selectedMovers.length > 0}
-            The selected movers aren't calibrated yet.
+            Selected movers aren't calibrated.
           {:else}
-            Select movers, then tap the floor to point them.
+            Select movers, then tap the floor.
           {/if}
         </p>
       {/if}
       {#if offPlan.length > 0}
         <p class="muted">
-          Not on the plan yet: {offPlan.map((l) => l.fixture.id).join(", ")}.
+          Not on the plan: {offPlan.map((l) => l.fixture.id).join(", ")}.
           <button class="ghost link" onclick={() => (tab = "place")}>Place them</button>
         </p>
       {/if}
       <button class="ghost" onclick={() => (windowFor = { setup: true })}>Stage size, marks and scenery</button>
     {:else}
       <p class="muted small">
-        Pick a light, then tap the plan where it hangs. For a fixed light, tap again where it points. Movers point
-        from their calibration. Positions are in metres from the orange 0, which you can move in
+        Pick a light, then tap where it hangs. Fixed lights: tap again where it points. Metres from the orange 0, set in
         <button class="ghost link" onclick={() => (windowFor = { setup: true })}>Stage set up</button>.
       </p>
       <div class="lights">
@@ -620,15 +619,15 @@
             <div class="row wrap copies" role="group" aria-label="Lights on this address">
               <span class="muted small">
                 {pickedBodies.length > 1
-                  ? `${pickedBodies.length} lights share this address, all showing its output`
-                  : "Another light on the same address, such as a pair of pars?"}
+                  ? `${pickedBodies.length} lights on this address`
+                  : "More than one light on this address?"}
               </span>
               {#if pickedBodies.length > 1}
                 {#each pickedBodies as l (l.key)}
                   <button aria-pressed={pickedCopy === l.copy} onclick={() => pick(l.fixture.id, l.copy)}>{l.label}</button>
                 {/each}
               {/if}
-              <button onclick={addCopy}>Add another on this address</button>
+              <button onclick={addCopy}>Add another</button>
             </div>
           {/if}
           {#if !pickedLight.mover}
@@ -645,7 +644,7 @@
               <button aria-pressed={tapSets === "position"} onclick={() => (tapSets = "position")}>Measured position</button>
             </div>
             <h4>Drawn at</h4>
-            <p class="muted small">Only moves it on this page, to tidy the plan. Its calibration and pointing use where it really is.</p>
+            <p class="muted small">Only changes the drawing. Pointing uses the measured position.</p>
             <div class="fields">
               <NumberField label="Across (m)" value={measuredPart(stage, pickedLight.at?.[0], 0)} onchange={(v) => setShownPart(0, fromMeasuredPart(stage, v, 0))} fractional increment={0.05} min={-500} max={500} />
               <NumberField label="Up stage (m)" value={measuredPart(stage, pickedLight.at?.[1], 1)} onchange={(v) => setShownPart(1, fromMeasuredPart(stage, v, 1))} fractional increment={0.05} min={-500} max={500} />
@@ -663,17 +662,17 @@
           </div>
           {#if stage.riser > 0}
             <p class="muted small">
-              The stage is {stage.riser} m above the studio floor{#if b.z != null}, so this hangs
+              Stage is {stage.riser} m up{#if b.z != null}, so this is
                 {(b.z + stage.riser).toFixed(2)} m above the studio floor{/if}.
             </p>
           {/if}
           {#if pickedLight.mover}
             <p class="muted small">
               {#if pickedLight.calibrated}
-                {pickedLight.redrawn ? "Drawn where you put it above." : "Drawn where its calibration puts it."} Anything measured
-                here is held by the calibration too.
+                {pickedLight.redrawn ? "Drawn where you put it." : "Drawn where calibration puts it."} Measurements here are
+                kept by calibration.
               {:else}
-                Calibrate it to see where it points; anything measured here helps the calibration.
+                Calibrate to see where it points. Measurements here help.
               {/if}
             </p>
             <button onclick={() => (windowFor = { fixture: picked! })}>Calibrate</button>

@@ -41,7 +41,7 @@
       <button class="remove" aria-label="Remove {e.name}" onclick={() => show.play(() => api.deleteEffect(e.id))}>✕</button>
     </div>
   {:else}
-    <p class="muted">No {FAMILY_LABELS[family]} effects in the programmer. Effects in cues show on stage but not here.</p>
+    <p class="muted">No {FAMILY_LABELS[family]} effects in the programmer (cue effects aren't listed).</p>
   {/each}
 </div>
 

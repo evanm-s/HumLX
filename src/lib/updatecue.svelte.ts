@@ -19,7 +19,7 @@ class UpdateCue {
   open(cue: UpdateTarget | null = this.picked) {
     const { values, effects } = show.programmer;
     if (Object.keys(values).length === 0 && effects.length === 0)
-      return notify("The programmer is empty, so there's nothing to update a cue with", "warning");
+      return notify("The programmer is empty", "warning");
     this.request = { cue };
   }
 

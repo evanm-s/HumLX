@@ -87,14 +87,13 @@
   <NumberField label="Fade time (seconds)" fractional bind:value={fade} min={0} max={600} />
   <p class="muted">
     {#if into}
-      Becomes cue {at + 1} of {into.name}{at < into.cues.length ? ", and the cues after it move down one" : ""}.
+      Becomes cue {at + 1} of {into.name}{at < into.cues.length ? "; later cues move down" : ""}.
     {:else}
-      Starts a new cue list with this as its first cue.
+      Starts a new cue list.
     {/if}
-    It stores what the Programmer is setting on {programmed} fixtures{effects
-      ? `, and ${effects} ${effects === 1 ? "effect" : "effects"}, which run on into later cues until a cue sets those fixtures again`
-      : ""}. The Programmer is then cleared and the cue list
-    goes to the new cue, so the stage stays the same.
+    Stores {programmed} fixtures{effects
+      ? ` and ${effects} ${effects === 1 ? "effect" : "effects"} (effects carry on until a later cue sets those fixtures)`
+      : ""}, then clears the Programmer. The stage doesn't change.
   </p>
   {#snippet actions()}
     <button onclick={onclose}>Cancel</button>

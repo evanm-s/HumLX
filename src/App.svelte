@@ -114,7 +114,7 @@
     <div class="brand">
       HumLX
       {#if remote}
-        <span class="remote-tag" title="This screen controls the Studio PC over the network">Remote</span>
+        <span class="remote-tag" title="Controlling the Studio PC remotely">Remote</span>
       {:else if show.live.remotes > 0}
         <button class="remote-tag" onclick={() => (screen = "output")} title="Devices controlling this computer">
           {show.live.remotes} remote{show.live.remotes === 1 ? "" : "s"}
@@ -134,7 +134,7 @@
     <button class="status {status.kind}" onclick={() => (screen = "output")} title={show.live.status.lastError ?? ""}>
       <span class="led"></span>{status.text}
     </button>
-    <div class="grand-master" title="Grand master: scales all intensity output">
+    <div class="grand-master" title="Grand master: scales all intensity">
       <Fader
         max={100}
         value={grandMaster}
@@ -156,9 +156,9 @@
 
   <main>
     {#if remote && link.state === "lost"}
-      <div class="preview">Lost the connection to the Studio PC. Reconnecting… The lights keep running.</div>
+      <div class="preview">Connection to the Studio PC lost. Reconnecting… Lights keep running.</div>
     {:else if !inApp && !remote}
-      <div class="preview">Preview mode in a browser. Run the desktop app to control lights.</div>
+      <div class="preview">Browser preview. Use the desktop app to control lights.</div>
     {/if}
     {#if surface.status.connected || surface.status.problem}
       <div class="surface" class:bad={surface.status.problem}>
@@ -167,7 +167,7 @@
           <span>{surface.status.problem}</span>
         {:else}
           <span class="line" class:empty={surface.line.length === 0}
-            >{lineText(surface.line) || "Type on the keypad, e.g. 1 Thru 4 @ 5 Enter"}</span
+            >{lineText(surface.line) || "e.g. 1 Thru 4 @ 5 Enter"}</span
           >
           {#if surface.fine}<span class="fine">Fine</span>{/if}
           <span class="muted">Encoders: {surface.encoders.map((e) => e.label).join(" · ")}</span>

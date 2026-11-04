@@ -33,7 +33,7 @@
     />
     <p class="muted hint">
       {options.intensityLimit < 100
-        ? `Full sends ${options.intensityLimit}%, and everything below scales with it.`
+        ? `Full sends ${options.intensityLimit}%; lower levels scale.`
         : "Full sends full."}
     </p>
   </div>
@@ -101,8 +101,7 @@
       />
     </div>
     <p class="muted hint">
-      Applied as DMX goes out, so cues and presets stay the same. Offsets move the home position too; the range is the
-      fixture's full travel, from its manual.
+      Applied at output; cues and presets don't change. Range is the fixture's full travel from its manual.
     </p>
   {/if}
 </div>

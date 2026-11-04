@@ -67,7 +67,7 @@
 {/if}
 {#if rows.length === 0}
   <p class="empty muted">
-    {show.programmer.effects.length ? "No values" : "Nothing in the programmer"}. Values you set on the selected fixtures show up here.
+    {show.programmer.effects.length ? "No values" : "Nothing in the programmer"}.
   </p>
 {:else}
   <table>

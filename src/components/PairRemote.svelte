@@ -22,8 +22,8 @@
     <div class="brand">HumLX<span class="gels" aria-hidden="true"></span></div>
     <h1>Control the Studio PC from here</h1>
     <p class="muted">
-      On the Studio PC, go to <strong>Settings</strong>, then <strong>Remote control</strong>, and tap
-      <strong>Pair a device</strong>. Type the code it shows.
+      On the Studio PC, tap <strong>Settings</strong> › <strong>Remote control</strong> ›
+      <strong>Pair a device</strong>, then type the code here.
     </p>
     <label class="field">
       Code
@@ -39,7 +39,7 @@
       />
     </label>
     <label class="field">
-      Name for this device
+      Device name
       <input bind:value={name} maxlength="40" placeholder="Evan's laptop" />
     </label>
     {#if error}<p class="bad">{error}</p>{/if}

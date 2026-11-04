@@ -139,7 +139,7 @@
   {#if editing}
     <div class="row hint">
       {#if picked == null}
-        <span class="muted">Tap a button to pick it, then tap another to swap them.</span>
+        <span class="muted">Tap a button, then another to swap.</span>
       {:else}
         <span>Button {picked + 1} picked. Tap another to swap, or:</span>
         <button onclick={() => (dialog = { assign: picked! })}>Assign list…</button>

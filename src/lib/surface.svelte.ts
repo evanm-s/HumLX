@@ -226,7 +226,7 @@ class Surface {
       case "next":
       case "last": {
         const list = this.cueList;
-        if (list == null) return notify("There are no cue lists to run yet", "warning");
+        if (list == null) return notify("No cue lists yet", "warning");
         show.play(() => (key === "next" ? api.go(list) : api.back(list)));
         return;
       }
@@ -272,7 +272,7 @@ class Surface {
 
     if (command.kind === "cue") {
       const list = show.playback.cueLists.find((l) => l.id === this.cueList);
-      if (!list) return notify("There are no cue lists to run yet", "warning");
+      if (!list) return notify("No cue lists yet", "warning");
       if (command.cue < 1 || command.cue > list.cues.length) return notify(`${list.name} has no cue ${command.cue}`, "warning");
       show.play(() => api.goTo(list.id, command.cue - 1));
       return;

@@ -16,12 +16,11 @@
 {#if open && updates.available}
   <Dialog title="Update HumLX" onclose={() => updates.progress == null && (open = false)}>
     <p>
-      Version <strong>{updates.available.version}</strong> is available. You have {updates.version ?? "an older version"}.
+      Version <strong>{updates.available.version}</strong> is ready. You have {updates.version ?? "an older version"}.
     </p>
     {#if updates.available.body}<p class="notes">{updates.available.body}</p>{/if}
     <p class="muted">
-      HumLX closes, installs the update and opens again, which takes a minute. Lighting output stops while it
-      restarts, so update between sessions, not during one. The show is kept.
+      HumLX restarts, taking about a minute. Output stops meanwhile, so update between sessions. The show is kept.
     </p>
     {#if updates.progress != null}
       <div class="bar"><span style:width="{updates.progress * 100}%"></span></div>

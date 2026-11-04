@@ -383,15 +383,15 @@
       {selection.length === 0 ? "Nothing selected" : `${selection.length} selected`}
     </span>
     {#if surface.mode === "record"}
-      <span class="mode">Record: tap a preset slot, or Enter to record a cue. Esc cancels.</span>
+      <span class="mode">Record: tap a preset slot, or Enter for a cue. Esc cancels.</span>
     {:else if surface.mode === "delete"}
       <span class="mode">Delete: tap a preset, then Enter. Esc cancels.</span>
     {:else if sheetPicks.count > 0}
-      <span class="mode">{sheetPicks.count} picked on the sheet: Delete takes them out. Esc unpicks.</span>
+      <span class="mode">{sheetPicks.count} picked: Delete removes, Esc unpicks.</span>
     {/if}
     <span class="spacer"></span>
     {#if editing}
-      <span class="muted">Drag title bars to move, corners to resize.</span>
+      <span class="muted">Drag titles to move, corners to resize.</span>
       {#each hidden as w (w.id)}
         <button onclick={() => workspace.restore(w.id)}>+ {w.title}</button>
       {/each}
@@ -402,7 +402,7 @@
       <button
         class="highlight"
         aria-pressed={highlight}
-        title="Selected fixtures full, white and tight; everything else out (H)"
+        title="Selection full, white and tight; rest out (H)"
         onclick={() => setHighlight(!highlight)}
       >
         {highlight ? "Highlight on" : "Highlight"}
@@ -415,7 +415,7 @@
         ● Record cue
       </button>
       <button
-        title="Merge the programmer into the cue running now (U)"
+        title="Merge programmer into the running cue (U)"
         disabled={Object.keys(show.programmer.values).length === 0 && show.programmer.effects.length === 0}
         onclick={() => updateCue.open()}
       >
@@ -424,7 +424,7 @@
       <button
         class="load"
         class:armed={surface.loadLoadsAll && show.programmer.selection.length > 0}
-        title="Load what's on stage from running cues into the programmer: the selected fixtures, and Load again for everything (L)"
+        title="Load stage values for the selection; again for all (L)"
         onclick={() => surface.press("load")}
       >
         {surface.loadLoadsAll ? "Load all" : "Load"}
@@ -432,7 +432,7 @@
       <button
         class="danger"
         class:armed={surface.clearClears}
-        title="Clear deselects, and Clear again clears the programmer (Esc)"
+        title="Deselect; again to clear the programmer (Esc)"
         onclick={() => surface.press("clear")}
       >
         {surface.clearClears ? "Clear all" : show.programmer.selection.length > 0 ? "Deselect" : "Clear"}
@@ -451,7 +451,7 @@
   {:else if id === "sheet"}
     {#if sheetPicks.count > 0}
       <button class="small" onclick={() => sheetPicks.clear()}>Unpick</button>
-      <button class="small danger" title="Take the picked values out of the programmer (Delete)" onclick={() => surface.press("delete")}>
+      <button class="small danger" title="Remove picked values (Delete)" onclick={() => surface.press("delete")}>
         Delete {sheetPicks.count}
       </button>
     {/if}
@@ -554,11 +554,11 @@
   {:else if selection.length === 0}
     {@render noSelection()}
   {:else if id === "intensity" && !hasIntensity}
-    <p class="muted">The selected fixtures have no intensity control.</p>
+    <p class="muted">No intensity controls on the selection.</p>
   {:else if id === "colour" && !hasColour}
-    <p class="muted">The selected fixtures have no colour controls.</p>
+    <p class="muted">No colour controls on the selection.</p>
   {:else if id === "position" && !hasPosition}
-    <p class="muted">The selected fixtures have no position controls.</p>
+    <p class="muted">No position controls on the selection.</p>
   {:else if id === "intensity"}
     <div class="intensity">
       <Fader
@@ -599,7 +599,7 @@
           onchange={(v) => program(() => api.setAttribute(attribute, v / 255))}
         />
       {:else}
-        <p class="muted">The selected fixtures have no colour channels.</p>
+        <p class="muted">No colour channels on the selection.</p>
       {/each}
     </div>
   {:else if id === "colour"}
@@ -692,7 +692,7 @@
           onchange={(v) => program(() => api.setAttribute(attribute, v / 255))}
         />
       {:else}
-        <p class="muted">The selected fixtures have no beam controls.</p>
+        <p class="muted">No beam controls on the selection.</p>
       {/each}
     </div>
   {/if}
