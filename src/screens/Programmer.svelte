@@ -24,6 +24,7 @@
   import { attempt, show } from "../lib/show.svelte";
   import { RECORD_EVENT, surface } from "../lib/surface.svelte";
   import { sheetPicks } from "../lib/sheet.svelte";
+  import { updateCue } from "../lib/updatecue.svelte";
   import type { Attribute, Channel, Family, Fixture, Rgb } from "../lib/types";
 
   const selection = $derived(show.programmer.selection);
@@ -407,6 +408,13 @@
         onclick={() => (recordingCue = true)}
       >
         ● Record cue
+      </button>
+      <button
+        title="Merge the programmer into the cue running now (U)"
+        disabled={Object.keys(show.programmer.values).length === 0 && show.programmer.effects.length === 0}
+        onclick={() => updateCue.open()}
+      >
+        Update
       </button>
       <button
         class="load"

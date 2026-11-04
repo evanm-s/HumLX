@@ -17,6 +17,12 @@ up quickly.
   screen, then pick a cue list or name a new one. Cues track, so each
   one only stores what changed. Give a cue a name and fade time, and update or
   delete it later. **GO** fades to the next cue, **Back** steps back.
+- **Update** (Programmer and Playback screens, U, or the NX-K's Update key)
+  merges the Programmer into the cue running now, after a prompt that says
+  which cue and what changes (Enter or Update again confirms, Esc cancels).
+  With several cue lists running it updates the *selected* list's cue, and
+  the prompt lets you tap another running list instead. On the Cue Lists
+  screen it updates the picked cue.
 - **Cue Lists screen**: every cue list in the show, with search, sorting and
   filters (in slots, on the grid, unplaced). Pick one to build and edit its
   cues, rename, duplicate or delete it, or load it into a fader slot. The list
@@ -87,6 +93,7 @@ connected.
 | `Cue 4 Enter` | Goes to cue 4 of the selected cue list |
 | Next / Last | GO / Back on that cue list |
 | Record | Opens Record cue |
+| Update | Prompts to merge the programmer into the current cue; Update again confirms |
 | Highlight | Highlight on or off |
 | Clear | Clears the command line, or the programmer when the line is empty |
 | Encoders 1 to 4 | Intensity, pan, tilt and zoom of the selection; press any to toggle fine |
@@ -94,7 +101,7 @@ connected.
 Other keys do nothing yet.
 
 Key LEDs show what is going on: Highlight flashes while it is on, Record and
-Delete light while armed, Clear lights while there is something to clear,
+Delete light while armed, Update lights while the programmer has something to update with, Clear lights while there is something to clear,
 and the encoder LEDs light in fine mode.
 
 **Linux** needs permission to use the device. As root:
