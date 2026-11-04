@@ -178,6 +178,11 @@ pub struct Placed {
     /// the fixture's output. Only for fixed lights.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub copies: Vec<Extra>,
+    /// Where a mover is drawn on the Stage page, across, up stage and height,
+    /// when its calibrated position looks untidy. Only for show: the
+    /// calibration and pointing still use where it really is.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shown: Option<[f32; 3]>,
 }
 
 /// Another light sharing a fixture's address: where it hangs and points.
@@ -197,7 +202,11 @@ impl Placed {
     }
 
     fn is_empty(&self) -> bool {
-        self.known().iter().all(Option::is_none) && self.aim.is_none() && self.beam.is_none() && self.copies.is_empty()
+        self.known().iter().all(Option::is_none)
+            && self.aim.is_none()
+            && self.beam.is_none()
+            && self.copies.is_empty()
+            && self.shown.is_none()
     }
 }
 
@@ -397,7 +406,11 @@ impl Stage {
             .copies
             .iter()
             .all(|c| [c.x, c.y, c.z].iter().all(finite) && c.aim.iter().flatten().all(finite));
-        if !placed.known().iter().flatten().all(finite) || !placed.aim.iter().flatten().all(finite) || !copies_finite {
+        if !placed.known().iter().flatten().all(finite)
+            || !placed.aim.iter().flatten().all(finite)
+            || !placed.shown.iter().flatten().all(finite)
+            || !copies_finite
+        {
             return Err(Error::InvalidStage("that position is out of range".into()));
         }
         if placed.copies.len() > 16 {
@@ -408,8 +421,12 @@ impl Stage {
         }
         let fixture = placed.fixture;
         let position = placed.known();
+        // Only a change to the measured position needs the fit worked out again.
+        let moved = self.position(fixture) != position;
         self.store(placed);
-        self.resolve(fixture, position);
+        if moved {
+            self.resolve(fixture, position);
+        }
         Ok(())
     }
 
@@ -979,6 +996,7 @@ mod tests {
                 z: 4.5,
                 aim: None,
             }],
+            shown: None,
         };
         stage.set_placement(placed.clone()).unwrap();
         stage.set_position(3, [Some(1.5), Some(2.0), Some(4.5)]).unwrap();
@@ -1052,6 +1070,72 @@ mod tests {
         assert_close(s.position, [-1.8, 3.6, 4.25], 0.5);
         assert!((360.0..=810.0).contains(&s.pan_range), "{}", s.pan_range);
         assert!((180.0..=405.0).contains(&s.tilt_range), "{}", s.tilt_range);
+    }
+
+    #[test]
+    fn a_display_position_leaves_the_calibration_alone() {
+        let mut stage = Stage::default();
+        let (x, y) = (stage.width / 2.0, stage.depth);
+        stage.marks = vec![
+            Mark {
+                id: 1,
+                name: String::new(),
+                x: -x,
+                y: 0.0,
+                z: 0.0,
+            },
+            Mark {
+                id: 2,
+                name: String::new(),
+                x,
+                y: 0.0,
+                z: 0.0,
+            },
+            Mark {
+                id: 3,
+                name: String::new(),
+                x: 0.0,
+                y: y / 2.0,
+                z: 0.0,
+            },
+            Mark {
+                id: 4,
+                name: String::new(),
+                x: -x,
+                y,
+                z: 0.0,
+            },
+            Mark {
+                id: 5,
+                name: String::new(),
+                x,
+                y,
+                z: 0.0,
+            },
+        ];
+        let truth = fake([-1.0, 3.0, 4.5], hung(30.0), (540.0, 270.0));
+        for r in readings(&truth, &stage.marks.clone()) {
+            stage.record(12, r.mark, r.pan, r.tilt, (540.0, 270.0)).unwrap();
+        }
+        let before = stage.movers[0].solution.clone().unwrap();
+        let shown = Placed {
+            shown: Some([-1.5, 3.0, 4.5]),
+            ..stage.placement(12)
+        };
+        stage.set_placement(shown).unwrap();
+        assert_eq!(stage.movers[0].solution.as_ref(), Some(&before));
+        assert_eq!(stage.placement(12).shown, Some([-1.5, 3.0, 4.5]));
+        let bad = Placed {
+            shown: Some([f32::NAN, 0.0, 0.0]),
+            ..stage.placement(12)
+        };
+        assert!(stage.set_placement(bad).is_err());
+        let cleared = Placed {
+            shown: None,
+            ..stage.placement(12)
+        };
+        stage.set_placement(cleared).unwrap();
+        assert!(stage.positions.is_empty());
     }
 
     #[test]
