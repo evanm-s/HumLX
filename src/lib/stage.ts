@@ -55,6 +55,8 @@ export interface Placed {
   beam?: number | null;
   /** More lights on the same address, such as pars run in pairs. Fixed lights only. */
   copies?: Extra[];
+  /** Where a calibrated mover is drawn on the Stage page, when tidier than where it really is. Only for show. */
+  shown?: [number, number, number] | null;
 }
 
 /** Another light sharing a fixture's address: where it hangs and points. */

@@ -557,7 +557,7 @@ const commands: Record<string, (args: Args) => unknown> = {
   set_placement: ({ placed }) => {
     const p = placed as Placed;
     stage.positions = stage.positions.filter((q) => q.fixture !== p.fixture);
-    if ([p.x, p.y, p.z, p.aim, p.beam].some((v) => v != null)) {
+    if ([p.x, p.y, p.z, p.aim, p.beam, p.shown].some((v) => v != null) || p.copies?.length) {
       stage.positions.push(structuredClone(p));
       stage.positions.sort((a, b) => a.fixture - b.fixture);
     }

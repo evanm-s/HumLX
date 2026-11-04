@@ -59,6 +59,8 @@
     channels: Channel[];
     mover: boolean;
     calibrated: boolean;
+    /** A calibrated mover drawn at a display position rather than where it really is. */
+    redrawn: boolean;
     placed: Placed;
     /** Where it hangs, when known. */
     at: Vec3 | null;
@@ -103,12 +105,15 @@
       return Array.from({ length: copies + 1 }, (_, copy): Light => {
         const body = bodyOf(placed, copy);
         const known = body.x != null && body.y != null && body.z != null;
-        const at: Vec3 | null = solution ? [...solution.position] : known ? [body.x!, body.y!, body.z!] : null;
+        const real: Vec3 | null = solution ? [...solution.position] : known ? [body.x!, body.y!, body.z!] : null;
+        // A calibrated mover can be drawn somewhere tidier; its beam still lands where it really does.
+        const at: Vec3 | null = solution && placed.shown ? [...placed.shown] : real;
         let axis: Vec3 | null = null;
         if (solution && look.position) axis = beam(solution, look.position[0], look.position[1]);
         else if (!mover && at)
           axis = body.aim ? towards(at, [body.aim[0], body.aim[1], floorAt(stage, ...body.aim)]) : [0, 0, -1];
-        const centre = at && axis ? hit(stage, at, axis) : null;
+        const centre = real && axis ? hit(stage, real, axis) : null;
+        if (centre && at && at !== real) axis = towards(at, centre);
         const lit = look.intensity > 0.01;
         return {
           fixture,
@@ -118,6 +123,7 @@
           channels,
           mover,
           calibrated: !!solution,
+          redrawn: !!(solution && placed.shown),
           placed,
           at,
           axis,
@@ -217,7 +223,7 @@
     return best?.light;
   }
 
-  let dragging: "point" | "position" | "aim" | null = null;
+  let dragging: "point" | "position" | "aim" | "shown" | null = null;
 
   function planDown(p: DragPoint) {
     const at = toStage(p);
@@ -249,7 +255,7 @@
   }
 
   function planEnd() {
-    if ((dragging === "position" || dragging === "aim") && picked != null) {
+    if (dragging && dragging !== "point" && picked != null) {
       const done = dragging;
       save(picked);
       // A fixed light placed for the first time goes on to where it points.
@@ -301,7 +307,7 @@
   let picked = $state<number | null>(null);
   /** Which light on the picked fixture's address: 0 for the fixture, then its copies. */
   let pickedCopy = $state(0);
-  let tapSets = $state<"position" | "aim">("position");
+  let tapSets = $state<"position" | "aim" | "shown">("position");
   /** Height given to a light placed for the first time: the last one used. */
   let lastHeight = 4.5;
 
@@ -313,7 +319,8 @@
     pickedCopy = copy;
     const light = lights.find((l) => l.fixture.id === id && l.copy === copy);
     const body = light && bodyOf(light.placed, copy);
-    tapSets = !light?.mover && light?.at && !body?.aim ? "aim" : "position";
+    if (light?.mover) tapSets = light.calibrated ? "shown" : "position";
+    else tapSets = light?.at && !body?.aim ? "aim" : "position";
   }
 
   const round5 = (v: number) => Math.round(v * 20) / 20;
@@ -340,7 +347,10 @@
   function placeAt(at: { x: number; y: number }) {
     if (picked == null) return;
     const spot: [number, number] = [round5(at.x), round5(at.y)];
-    if (tapSets === "aim") editBody({ aim: spot });
+    if (tapSets === "shown") {
+      const z = placementOf(picked).shown?.[2] ?? pickedLight?.at?.[2] ?? lastHeight;
+      edit(picked, { shown: [spot[0], spot[1], z] });
+    } else if (tapSets === "aim") editBody({ aim: spot });
     else editBody({ x: spot[0], y: spot[1], z: bodyOf(placementOf(picked), pickedCopy).z ?? lastHeight });
   }
 
@@ -363,6 +373,14 @@
     if (picked == null) return;
     editBody(change);
     save(picked);
+  }
+
+  /** Sets one part of where the picked mover is drawn, starting from where it is drawn now. */
+  function setShownPart(i: 0 | 1 | 2, v: number | null) {
+    if (picked == null || pickedLight?.at == null) return;
+    const shown = [...(placementOf(picked).shown ?? pickedLight.at)] as [number, number, number];
+    if (v != null) shown[i] = v;
+    setField({ shown });
   }
 
   function setAimPart(i: 0 | 1, v: number | null) {
@@ -399,11 +417,11 @@
       pickedCopy = 0;
       return setField({ copies });
     }
-    setField({ x: null, y: null, z: null, aim: null, beam: null, copies: [] });
+    setField({ x: null, y: null, z: null, aim: null, beam: null, copies: [], shown: null });
   }
 
   function status(l: Light) {
-    if (l.mover) return l.calibrated ? "Calibrated" : l.at ? "Not calibrated" : "Not placed";
+    if (l.mover) return l.calibrated ? (l.redrawn ? "Calibrated · redrawn" : "Calibrated") : l.at ? "Not calibrated" : "Not placed";
     if (!l.at) return l.placed.x != null ? "Needs a height" : "Not placed";
     const more = l.placed.copies?.length ? ` · ${l.placed.copies.length + 1} lights` : "";
     return (l.placed.aim ? "Placed and aimed" : "Placed, pointing down") + more;
@@ -620,6 +638,24 @@
               <button aria-pressed={tapSets === "aim"} disabled={!pickedLight.at} onclick={() => (tapSets = "aim")}>Where it points</button>
             </div>
           {/if}
+          {#if pickedLight.mover && pickedLight.calibrated}
+            <div class="row wrap tap-sets" role="group" aria-label="Tapping the plan sets">
+              <span class="muted small">Tapping the plan sets</span>
+              <button aria-pressed={tapSets === "shown"} onclick={() => (tapSets = "shown")}>Where it's drawn</button>
+              <button aria-pressed={tapSets === "position"} onclick={() => (tapSets = "position")}>Measured position</button>
+            </div>
+            <h4>Drawn at</h4>
+            <p class="muted small">Only moves it on this page, to tidy the plan. Its calibration and pointing use where it really is.</p>
+            <div class="fields">
+              <NumberField label="Across (m)" value={measuredPart(stage, pickedLight.at?.[0], 0)} onchange={(v) => setShownPart(0, fromMeasuredPart(stage, v, 0))} fractional increment={0.05} min={-500} max={500} />
+              <NumberField label="Up stage (m)" value={measuredPart(stage, pickedLight.at?.[1], 1)} onchange={(v) => setShownPart(1, fromMeasuredPart(stage, v, 1))} fractional increment={0.05} min={-500} max={500} />
+              <NumberField label="Height above stage deck (m)" value={pickedLight.at?.[2] ?? null} onchange={(v) => setShownPart(2, v)} fractional increment={0.05} min={-50} max={50} />
+            </div>
+            <div class="row wrap">
+              <button disabled={!p.shown} onclick={() => setField({ shown: null })}>Draw where it really is</button>
+            </div>
+            <h4>Measured position</h4>
+          {/if}
           <div class="fields">
             <NumberField label="Across (m)" value={measuredPart(stage, b.x, 0)} onchange={(v) => setBody({ x: fromMeasuredPart(stage, v, 0) })} fractional increment={0.05} min={-500} max={500} />
             <NumberField label="Up stage (m)" value={measuredPart(stage, b.y, 1)} onchange={(v) => setBody({ y: fromMeasuredPart(stage, v, 1) })} fractional increment={0.05} min={-500} max={500} />
@@ -634,7 +670,8 @@
           {#if pickedLight.mover}
             <p class="muted small">
               {#if pickedLight.calibrated}
-                Drawn where its calibration puts it. Anything measured here is held by the calibration too.
+                {pickedLight.redrawn ? "Drawn where you put it above." : "Drawn where its calibration puts it."} Anything measured
+                here is held by the calibration too.
               {:else}
                 Calibrate it to see where it points; anything measured here helps the calibration.
               {/if}
@@ -889,8 +926,14 @@
     padding-top: 10px;
   }
   .placing h3,
+  .placing h4,
   .placing p {
     margin: 0;
+  }
+  .placing h4 {
+    font-size: 0.85rem;
+    color: var(--muted);
+    font-weight: 600;
   }
   .fields {
     display: grid;
