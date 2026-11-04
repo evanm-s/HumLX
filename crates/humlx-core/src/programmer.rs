@@ -138,6 +138,21 @@ impl Values {
         self.other.extend(other.other.iter().map(|(a, v)| (*a, *v)));
     }
 
+    /// Fills in white when nothing sets a colour but an intensity is set, so
+    /// a colour fixture lights when only its intensity is brought up. A
+    /// colour wheel or emitter levels set directly count as a colour. Only
+    /// ever applied on the way out, never written into the programmer or a cue.
+    pub fn default_colour(&mut self) {
+        let coloured = self.colour.is_some()
+            || self
+                .other
+                .keys()
+                .any(|a| *a == Attribute::ColorWheel || a.is_colour_mix());
+        if !coloured && self.intensity.is_some() {
+            self.colour = Some(Rgb::WHITE);
+        }
+    }
+
     /// Works out the DMX value of each of `mode`'s channels. `None` means the
     /// channel is not controlled by these values.
     pub fn render(&self, mode: &Mode) -> Vec<Option<u8>> {

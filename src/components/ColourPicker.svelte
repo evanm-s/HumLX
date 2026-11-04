@@ -7,10 +7,12 @@
 
   interface Props {
     colour: Rgb | undefined;
+    /** The value is what's on stage from a cue, not in the programmer: drawn dimmer. */
+    live?: boolean;
     onchange: (colour: Rgb) => void;
   }
 
-  let { colour, onchange }: Props = $props();
+  let { colour, live = false, onchange }: Props = $props();
 
   let disc: HTMLDivElement;
 
@@ -61,6 +63,7 @@
   {#if marker && colour}
     <div
       class="marker"
+      class:live
       style:left="{50 + marker.x * 50}%"
       style:top="{50 + marker.y * 50}%"
       style:background={rgbCss(colour)}
@@ -94,5 +97,11 @@
       0 0 0 2px #000,
       0 6px 16px rgb(0 0 0 / 0.5);
     pointer-events: none;
+  }
+
+  /* Showing a cue's colour rather than one in the programmer. */
+  .marker.live {
+    border-style: dashed;
+    opacity: 0.65;
   }
 </style>

@@ -157,10 +157,23 @@ const playback = (): PlaybackView => ({
   layout: structuredClone(layout),
 });
 
-/** Playbacks (tracked, no fades) with the programmer on top. */
-function combined(): Record<number, Values> {
+/** Fills in white when an intensity is set but nothing sets a colour, as the engine does. */
+function defaultColour(v: Values): Values {
+  const coloured = v.colour || Object.keys(v.other ?? {}).some((a) => COLOUR_ATTRIBUTES.includes(a as Attribute));
+  return coloured || v.intensity == null ? v : { ...v, colour: { r: 1, g: 1, b: 1 } };
+}
+
+/** Playbacks with the programmer on top, as the Programmer screen shows them. */
+function onStage(): Record<number, Values> {
   const out = live();
   for (const [f, v] of Object.entries(values)) out[+f] = { ...out[+f], ...v };
+  for (const f of Object.keys(out)) out[+f] = defaultColour(out[+f]);
+  return out;
+}
+
+/** Playbacks (tracked, no fades) with the programmer on top. */
+function combined(): Record<number, Values> {
+  const out = onStage();
   if (highlight)
     for (const f of fixtures)
       out[f.id] = selection.includes(f.id)
@@ -399,6 +412,12 @@ const commands: Record<string, (args: Args) => unknown> = {
     beats: beats(),
     osc: { listening: osc.enabled, error: null, received: 0, last: null },
     remotes: 0,
+    values: onStage(),
+    intensity: Object.fromEntries(
+      Object.entries(combined())
+        .filter(([, v]) => v.intensity != null)
+        .map(([f, v]) => [f, blackout ? 0 : v.intensity! * grandMaster]),
+    ),
   }),
   osc_settings: () => osc,
   remote_status: () => remoteView(),
