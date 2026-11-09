@@ -2,6 +2,7 @@
 // request. Only works in the desktop app.
 
 import { getVersion } from "@tauri-apps/api/app";
+import { invoke } from "@tauri-apps/api/core";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { inApp } from "./api";
@@ -29,10 +30,10 @@ class Updates {
     this.checking = true;
     this.error = null;
     try {
-      this.available = await check();
+      this.available = await checkWithRetry();
       this.lastChecked = new Date();
     } catch (error) {
-      this.error = String(error);
+      this.error = await explain(error);
     } finally {
       this.checking = false;
     }
@@ -59,6 +60,28 @@ class Updates {
       this.error = String(error);
       this.progress = null;
     }
+  }
+}
+
+/** GitHub sometimes answers with a passing error, so try once more before giving up. */
+async function checkWithRetry(): Promise<Update | null> {
+  try {
+    return await check();
+  } catch {
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+    return await check();
+  }
+}
+
+/** The updater's "Could not fetch a valid release JSON" hides the cause, so ask again and say why. */
+async function explain(error: unknown): Promise<string> {
+  const text = String(error);
+  if (!text.includes("valid release JSON")) return text;
+  try {
+    const why = await invoke<string>("probe_update_endpoint");
+    return `${text} (${why})`;
+  } catch {
+    return text;
   }
 }
 

@@ -6,6 +6,7 @@ mod playback;
 mod remote;
 mod shows;
 mod surface;
+mod updates;
 
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
@@ -267,6 +268,7 @@ pub fn run() {
             shows::save_show_as,
             shows::open_show,
             shows::new_show,
+            updates::probe_update_endpoint,
             surface::surface_status,
             surface::set_surface_leds,
             playback::update_cue,
