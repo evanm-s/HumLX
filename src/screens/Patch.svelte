@@ -65,6 +65,17 @@
     return !!mode?.channels.some((c) => c.attribute === "pan" || c.attribute === "tilt");
   }
 
+  // Colour fixtures without a dimmer channel, which get a virtual intensity.
+  const MIXERS = ["red", "green", "blue", "white", "warm_white", "cool_white", "amber", "lime", "uv", "cyan", "magenta", "yellow"];
+  function dimmerless(fixture: Fixture): boolean {
+    const mode = show.profile(fixture.profile)?.modes.find((m) => m.name === fixture.mode);
+    return (
+      !!mode &&
+      !mode.channels.some((c) => c.attribute === "intensity") &&
+      mode.channels.some((c) => MIXERS.includes(c.attribute))
+    );
+  }
+
   const sameOptions = (a: FixtureOptions, b: FixtureOptions) =>
     (Object.keys(DEFAULT_OPTIONS) as (keyof FixtureOptions)[]).every((k) => a[k] === b[k]);
 
@@ -78,6 +89,7 @@
     if (o.invertTilt) tags.push("inv tilt");
     if (o.panOffset) tags.push(`pan ${o.panOffset > 0 ? "+" : ""}${o.panOffset}°`);
     if (o.tiltOffset) tags.push(`tilt ${o.tiltOffset > 0 ? "+" : ""}${o.tiltOffset}°`);
+    if (o.virtualIntensity === false) tags.push("no virtual int");
     return tags;
   }
 
@@ -234,6 +246,7 @@
     bulk.firstId != null || bulk.address != null || bulk.name.trim() !== "" || bulk.mode != null || bulkOptionsTouched,
   );
   const bulkMoves = $derived(selection.some(moves));
+  const bulkDimmerless = $derived(selection.some(dimmerless));
   const bulkLocated = $derived(selection.length > 0 && selection.every((f) => show.live.tested.includes(f.id)));
 
   async function saveBulk() {
@@ -402,7 +415,7 @@
           </div>
         </div>
       {/if}
-      <FixtureOptionsForm bind:options={bulkOptions} moves={bulkMoves} onchange={() => (bulkOptionsTouched = true)} />
+      <FixtureOptionsForm bind:options={bulkOptions} moves={bulkMoves} dimmerless={bulkDimmerless} onchange={() => (bulkOptionsTouched = true)} />
       {#if bulkDirty}
         <p class="muted summary">
           {#if bulk.firstId != null}Numbers {bulk.firstId}–{bulk.firstId + selection.length - 1}.{/if}
@@ -452,7 +465,7 @@
           </div>
         </div>
       {/if}
-      <FixtureOptionsForm bind:options={edit.options} moves={moves(selected)} />
+      <FixtureOptionsForm bind:options={edit.options} moves={moves(selected)} dimmerless={dimmerless(selected)} />
       <div class="row actions">
         <button class="danger" onclick={remove}>{confirmRemove ? "Tap again to remove" : "Remove"}</button>
         <span class="spacer"></span>

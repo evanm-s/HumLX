@@ -196,6 +196,12 @@ impl State {
             .collect()
     }
 
+    /// True for a colour fixture without a dimmer channel whose virtual
+    /// intensity is turned off, so its colour channels run as set.
+    fn raw_colour(&self, fixture: &crate::patch::PatchedFixture) -> bool {
+        !fixture.options.virtual_intensity && mode_of(&self.library, fixture).is_some_and(dimmerless_colour)
+    }
+
     /// Each fixture's intensity as last put out (see `output_intensity`).
     pub fn output_intensity(&self) -> &BTreeMap<u32, f32> {
         &self.output_intensity
@@ -336,6 +342,15 @@ impl State {
         self.running_effects.start_new(&self.programmer.effects, now);
         self.running_effects
             .apply(&self.programmer.effects, &mut look, now, &beats, size);
+        // Dimmerless colour fixtures with their virtual intensity turned off
+        // ignore intensity; the colour alone sets how bright they are.
+        for fixture in self.patch.fixtures() {
+            if self.raw_colour(fixture) {
+                if let Some(values) = look.get_mut(&fixture.id) {
+                    values.intensity = None;
+                }
+            }
+        }
         // Colour fixtures with an intensity but no colour come on white.
         for values in look.values_mut() {
             values.default_colour();
@@ -362,7 +377,15 @@ impl State {
             .patch
             .fixtures()
             .iter()
-            .filter_map(|f| Some((f.id, look.get(&f.id)?.intensity?.clamp(0.0, 1.0) * master)))
+            .filter_map(|f| {
+                let values = look.get(&f.id)?;
+                let level = if self.raw_colour(f) {
+                    values.colour.map(|c| c.clamped()).map(|c| c.r.max(c.g).max(c.b))?
+                } else {
+                    values.intensity?.clamp(0.0, 1.0)
+                };
+                Some((f.id, level * master))
+            })
             .collect();
 
         let mut universe = Universe::default();
@@ -382,9 +405,10 @@ impl State {
                 );
                 values.pan = Some(pan);
                 values.tilt = Some(tilt);
-                Some(values.render(mode))
+                Some(values.render_with(mode, options.virtual_intensity))
             } else {
-                look.get(&fixture.id).map(|v| v.render(mode))
+                look.get(&fixture.id)
+                    .map(|v| v.render_with(mode, options.virtual_intensity))
             };
             // Without a dimmer channel, blackout has to pull the colour mix down instead.
             let has_dimmer = mode.channels.iter().any(|c| c.attribute == Attribute::Intensity);
@@ -419,6 +443,13 @@ impl State {
         self.universe = universe;
         &self.universe
     }
+}
+
+/// True for a fixture that mixes colour but has no dimmer channel, so its
+/// intensity comes from scaling the colour mix (a virtual dimmer).
+pub fn dimmerless_colour(mode: &Mode) -> bool {
+    !mode.channels.iter().any(|c| c.attribute == Attribute::Intensity)
+        && mode.channels.iter().any(|c| c.attribute.is_colour_mix())
 }
 
 fn has_position(mode: &Mode) -> bool {
@@ -1028,6 +1059,34 @@ mod tests {
         assert!(!plain.reorients());
         plain.pan_offset = 600;
         assert_eq!(plain.orient(0.5, 0.5).0, 1.0);
+    }
+
+    #[test]
+    fn virtual_intensity_off_runs_colour_raw() {
+        let mut state = state_with("generic/rgb-par", "3ch RGB", 1);
+        state.programmer.select(&[1], crate::programmer::SelectMode::Set);
+        state.programmer.update(|v| {
+            v.intensity = Some(0.5);
+            v.colour = Some(Rgb { r: 1.0, g: 0.0, b: 0.0 });
+        });
+        state.compose();
+        let levels = |state: &State| (1..=3).map(|a| state.universe().get(a)).collect::<Vec<_>>();
+        assert_eq!(levels(&state), vec![128, 0, 0]);
+        assert_eq!(state.output_intensity().get(&1), Some(&0.5));
+
+        state.patch.fixtures_mut()[0].options.virtual_intensity = false;
+        state.compose();
+        assert_eq!(levels(&state), vec![255, 0, 0]);
+        assert_eq!(state.output_intensity().get(&1), Some(&1.0));
+        // Intensity alone no longer turns it on white.
+        state.programmer.update(|v| v.colour = None);
+        state.compose();
+        assert_eq!(levels(&state), vec![0, 0, 0]);
+        // The grand master still pulls the colour down.
+        state.programmer.update(|v| v.colour = Some(Rgb::WHITE));
+        state.grand_master.set(0.5);
+        state.compose();
+        assert_eq!(levels(&state), vec![128, 128, 128]);
     }
 
     #[test]

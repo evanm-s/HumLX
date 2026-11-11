@@ -43,6 +43,10 @@ pub struct FixtureOptions {
     /// offsets into DMX.
     pub pan_range: u16,
     pub tilt_range: u16,
+    /// For colour fixtures without a dimmer channel: intensity scales the
+    /// colour mix, as if the fixture had a dimmer. Off, the colour channels
+    /// run at the levels the colour gives and intensity does nothing.
+    pub virtual_intensity: bool,
 }
 
 impl Default for FixtureOptions {
@@ -56,6 +60,7 @@ impl Default for FixtureOptions {
             tilt_offset: 0,
             pan_range: 540,
             tilt_range: 270,
+            virtual_intensity: true,
         }
     }
 }
