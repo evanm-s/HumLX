@@ -85,6 +85,8 @@ export interface FixtureOptions {
   /** Full pan and tilt travel in degrees. */
   panRange: number;
   tiltRange: number;
+  /** Colour fixtures without a dimmer: intensity scales the colour mix. */
+  virtualIntensity: boolean;
 }
 
 export const DEFAULT_OPTIONS: FixtureOptions = {
@@ -96,6 +98,7 @@ export const DEFAULT_OPTIONS: FixtureOptions = {
   tiltOffset: 0,
   panRange: 540,
   tiltRange: 270,
+  virtualIntensity: true,
 };
 
 export interface PatchView {

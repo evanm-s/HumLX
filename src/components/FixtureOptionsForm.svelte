@@ -7,10 +7,12 @@
     options: FixtureOptions;
     /** Show the pan and tilt controls. */
     moves: boolean;
+    /** Show the virtual intensity switch: colour mixing, no dimmer channel. */
+    dimmerless?: boolean;
     onchange?: () => void;
   }
 
-  let { options = $bindable(), moves, onchange }: Props = $props();
+  let { options = $bindable(), moves, dimmerless = false, onchange }: Props = $props();
 
   function set(changes: Partial<FixtureOptions>) {
     options = { ...options, ...changes };
@@ -37,6 +39,20 @@
         : "Full sends full."}
     </p>
   </div>
+
+  {#if dimmerless}
+    <div class="pair">
+      <div class="segmented">
+        <button
+          aria-pressed={options.virtualIntensity}
+          onclick={() => set({ virtualIntensity: !options.virtualIntensity })}>Virtual intensity</button
+        >
+      </div>
+      <p class="muted hint">
+        {options.virtualIntensity ? "No dimmer channel; intensity scales the colour." : "Colour sets brightness; intensity does nothing."}
+      </p>
+    </div>
+  {/if}
 
   {#if moves}
     <div class="segmented">

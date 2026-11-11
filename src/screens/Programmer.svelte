@@ -275,8 +275,16 @@
   // instead of offering controls that would do nothing; a mixed selection
   // gets the controls if any fixture can use them.
   const MIXERS: Attribute[] = ["red", "green", "blue", "white", "warm_white", "cool_white", "cyan", "magenta", "yellow"];
-  // Fixtures without a dimmer take their intensity from their colour mix.
-  const hasIntensity = $derived(colourHas("intensity") || MIXERS.some(colourHas));
+  // Fixtures without a dimmer take their intensity from their colour mix,
+  // unless their virtual intensity is turned off on the Patch page.
+  const hasIntensity = $derived(
+    colourHas("intensity") ||
+      selection.some((id) => {
+        const fixture = show.fixture(id);
+        if (!fixture || fixture.options?.virtualIntensity === false) return false;
+        return show.channels(fixture).some((c) => MIXERS.includes(c.attribute));
+      }),
+  );
   const hasColour = $derived([...EMITTERS, "color_temperature", "color_wheel"].some((a) => colourHas(a as Attribute)));
   const hasPosition = $derived(colourHas("pan") || colourHas("tilt"));
   // Colour wheels get a fader too, so wheel-only fixtures are not left out.
@@ -301,7 +309,7 @@
       const slot = wheel && nearestWheelSlot(wheel, colour);
       return slot == null ? undefined : slot / 255;
     }
-    const scale = own.has("intensity") ? 1 : (stage.intensity ?? 0);
+    const scale = own.has("intensity") || fixture.options?.virtualIntensity === false ? 1 : (stage.intensity ?? 0);
     const [r, g, b] = [colour.r * scale, colour.g * scale, colour.b * scale];
     if (own.has("red") || own.has("green") || own.has("blue")) {
       const white = WHITES.some((a) => own.has(a)) ? Math.min(r, g, b) : 0;

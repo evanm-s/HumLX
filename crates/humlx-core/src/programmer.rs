@@ -154,8 +154,16 @@ impl Values {
     }
 
     /// Works out the DMX value of each of `mode`'s channels. `None` means the
-    /// channel is not controlled by these values.
+    /// channel is not controlled by these values. A fixture without a dimmer
+    /// gets a virtual one: intensity scales its colour mix.
     pub fn render(&self, mode: &Mode) -> Vec<Option<u8>> {
+        self.render_with(mode, true)
+    }
+
+    /// Like [`render`](Self::render), with the virtual dimmer for fixtures
+    /// without a dimmer channel turned on or off. Off, the colour channels
+    /// take the colour as it is and intensity is ignored.
+    pub fn render_with(&self, mode: &Mode, virtual_intensity: bool) -> Vec<Option<u8>> {
         let channels = &mode.channels;
         let mut out = vec![None; channels.len()];
         let has = |attribute: Attribute| coarse(channels, attribute).next().is_some();
@@ -171,17 +179,22 @@ impl Values {
             set(&mut out, Attribute::Intensity, level);
         }
 
-        // Without a dimmer, the colour mix doubles as the intensity.
-        let mix = if has_dimmer {
+        // Without a dimmer, the colour mix doubles as the intensity: a
+        // virtual dimmer scales it, including emitter levels set directly.
+        let virtual_dimmer = !has_dimmer && virtual_intensity;
+        let level = self.intensity.unwrap_or(0.0).clamp(0.0, 1.0);
+        let direct = self.other.keys().any(|a| a.is_colour_mix());
+        let scale = |colour: Rgb| Rgb {
+            r: colour.r * level,
+            g: colour.g * level,
+            b: colour.b * level,
+        };
+        let mix = if !virtual_dimmer {
             self.colour
-        } else if self.colour.is_some() || self.intensity.is_some() {
-            let colour = self.colour.unwrap_or(Rgb::WHITE);
-            let level = self.intensity.unwrap_or(0.0).clamp(0.0, 1.0);
-            Some(Rgb {
-                r: colour.r * level,
-                g: colour.g * level,
-                b: colour.b * level,
-            })
+        } else if let Some(colour) = self.colour {
+            Some(scale(colour))
+        } else if self.intensity.is_some() && !direct {
+            Some(scale(Rgb::WHITE))
         } else {
             None
         };
@@ -237,8 +250,10 @@ impl Values {
             if bi_colour {
                 let level = if has_dimmer {
                     1.0
-                } else {
+                } else if virtual_dimmer {
                     mix.map(Rgb::clamped).map_or(0.0, |c| c.r.max(c.g).max(c.b))
+                } else {
+                    mix.map(Rgb::clamped).map_or(1.0, |c| c.r.max(c.g).max(c.b))
                 };
                 let balance = balance.clamp(0.0, 1.0);
                 set(&mut out, Attribute::WarmWhite, level * (2.0 * (1.0 - balance)).min(1.0));
@@ -253,7 +268,12 @@ impl Values {
             set(&mut out, Attribute::Tilt, tilt);
         }
         for (attribute, value) in &self.other {
-            set(&mut out, *attribute, *value);
+            let value = if virtual_dimmer && attribute.is_colour_mix() {
+                value * level
+            } else {
+                *value
+            };
+            set(&mut out, *attribute, value);
         }
         out
     }
@@ -637,6 +657,34 @@ mod tests {
         assert_eq!(
             render(&values, "generic/rgb-par", "3ch RGB"),
             vec![Some(255), Some(255), Some(255)]
+        );
+    }
+
+    #[test]
+    fn virtual_dimmer_scales_direct_emitters_and_can_be_turned_off() {
+        let mode = mode("generic/rgbw-par", "4ch RGBW");
+        // Emitter faders set directly follow the virtual dimmer, and the
+        // emitters they don't set stay out.
+        let values = Values {
+            intensity: Some(0.5),
+            other: [(Attribute::Red, 1.0)].into(),
+            ..Default::default()
+        };
+        assert_eq!(values.render(&mode), vec![Some(128), None, None, None]);
+
+        // Off: colour runs as set and intensity does nothing.
+        let values = Values {
+            intensity: Some(0.25),
+            colour: Some(ORANGE),
+            ..Default::default()
+        };
+        assert_eq!(
+            values.render_with(&mode, false),
+            vec![Some(255), Some(128), Some(0), Some(0)]
+        );
+        assert_eq!(
+            values.render_with(&mode, true),
+            vec![Some(64), Some(32), Some(0), Some(0)]
         );
     }
 
