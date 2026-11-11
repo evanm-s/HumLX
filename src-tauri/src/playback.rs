@@ -366,6 +366,8 @@ fn fade_out_time(fade: f32, fade_out: Option<f32>) -> Option<f32> {
     fade_out.map(|t| t.clamp(0.0, 600.0)).filter(|t| *t != fade)
 }
 
+// Each argument is a named field the screen sends, so they stay separate.
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub fn edit_cue(
     app: State<'_, App>,
