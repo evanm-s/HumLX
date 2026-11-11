@@ -635,7 +635,7 @@ const commands: Record<string, (args: Args) => unknown> = {
   delete_cue_list: ({ id }) => (
     (cueLists = cueLists.filter((l) => l.id !== id)), forget(id), running.delete(id), playback()
   ),
-  record_cue: ({ target, name, fade, after }) => {
+  record_cue: ({ target, name, fade, fadeOut, after }) => {
     if (!Object.keys(values).length && !effects.length) throw "There is nothing in the programmer to record";
     const list = "list" in target ? target.list : addCueList("new" in target ? target.new : target.button.name || "Look");
     if ("button" in target) layout.pages[target.button.page].buttons[target.button.button] = list;
@@ -646,7 +646,7 @@ const commands: Record<string, (args: Args) => unknown> = {
     layout.selected = list;
     const l = cueLists.find((x) => x.id === list)!;
     const index = after == null ? l.cues.length : Math.min(after + 1, l.cues.length);
-    l.cues.splice(index, 0, { name: name.trim() || `Cue ${index + 1}`, fade, mode: "hold", follow: 0, values: structuredClone(values), effects: structuredClone(effects) });
+    l.cues.splice(index, 0, { name: name.trim() || `Cue ${index + 1}`, fade, fadeOut: fadeOut ?? undefined, mode: "hold", follow: 0, values: structuredClone(values), effects: structuredClone(effects) });
     values = {};
     effects = [];
     running.set(list, index);
@@ -660,10 +660,13 @@ const commands: Record<string, (args: Args) => unknown> = {
     effects = [];
     return playback();
   },
-  edit_cue: ({ list, index, name, fade, mode, follow }) => {
+  edit_cue: ({ list, index, name, fade, fadeOut, mode, follow }) => {
     const cue = cueLists.find((x) => x.id === list)!.cues[index];
     if (name != null) cue.name = name;
-    if (fade != null) cue.fade = fade;
+    if (fade != null) {
+      cue.fade = fade;
+      cue.fadeOut = fadeOut != null && fadeOut !== fade ? fadeOut : undefined;
+    }
     if (mode != null) cue.mode = mode;
     if (follow != null) cue.follow = follow;
     return playback();

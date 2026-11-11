@@ -96,6 +96,7 @@ impl Show {
                 cues: vec![crate::playback::Cue {
                     name: effect.name.clone(),
                     fade: 0.0,
+                    fade_out: None,
                     effects: vec![effect],
                     ..Default::default()
                 }],
@@ -163,6 +164,7 @@ mod tests {
             cues: vec![crate::playback::Cue {
                 name: "Preset".into(),
                 fade: 3.0,
+                fade_out: None,
                 mode: Default::default(),
                 follow: 0.0,
                 values: programmer.values.clone(),

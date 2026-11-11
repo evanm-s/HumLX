@@ -43,6 +43,8 @@
   let listName = $state("");
   let name = $state("");
   let fade = $state<number | null>(2);
+  /** Null: the same as the fade in. */
+  let fadeOut = $state<number | null>(null);
 
   const into = $derived(show.playback.cueLists.find((l) => l.id === target));
   // Where the cue lands: after the picked cue in the suggested list, else at the end.
@@ -51,7 +53,7 @@
 
   async function record() {
     const ok = await show.play(() =>
-      api.recordCue(target == null ? { new: listName } : { list: target }, name, Math.max(0, fade ?? 0), insertAfter),
+      api.recordCue(target == null ? { new: listName } : { list: target }, name, Math.max(0, fade ?? 0), insertAfter, fadeOut == null ? null : Math.max(0, fadeOut)),
     );
     if (!ok) return;
     const id = target ?? ok.cueLists[ok.cueLists.length - 1].id;
@@ -84,7 +86,10 @@
     Cue name
     <input bind:value={name} placeholder={`Cue ${at + 1}`} />
   </label>
-  <NumberField label="Fade time (seconds)" fractional bind:value={fade} min={0} max={600} />
+  <div class="fades">
+    <NumberField label="Fade in (s)" fractional bind:value={fade} min={0} max={600} />
+    <NumberField label="Fade out (s)" fractional bind:value={fadeOut} placeholder={String(fade ?? 0)} min={0} max={600} />
+  </div>
   <p class="muted">
     {#if into}
       Becomes cue {at + 1} of {into.name}{at < into.cues.length ? "; later cues move down" : ""}.
@@ -104,5 +109,11 @@
 <style>
   .wrap {
     flex-wrap: wrap;
+  }
+
+  .fades {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--gap);
   }
 </style>

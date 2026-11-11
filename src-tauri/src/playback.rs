@@ -279,6 +279,7 @@ pub fn record_cue(
     target: RecordTarget,
     name: String,
     fade: f32,
+    fade_out: Option<f32>,
     after: Option<usize>,
 ) -> Result<PlaybackView> {
     change(&app, true, |state| {
@@ -320,6 +321,7 @@ pub fn record_cue(
             Cue {
                 name,
                 fade: fade.max(0.0),
+                fade_out: fade_out_time(fade, fade_out),
                 values,
                 effects,
                 ..Default::default()
@@ -358,6 +360,14 @@ pub fn update_cue(app: State<'_, App>, list: u32, index: usize) -> Result<Playba
     })
 }
 
+/// A cue's fade out time as stored: none when it's the same as the fade in.
+fn fade_out_time(fade: f32, fade_out: Option<f32>) -> Option<f32> {
+    let fade = fade.clamp(0.0, 600.0);
+    fade_out.map(|t| t.clamp(0.0, 600.0)).filter(|t| *t != fade)
+}
+
+// Each argument is a named field the screen sends, so they stay separate.
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub fn edit_cue(
     app: State<'_, App>,
@@ -365,6 +375,7 @@ pub fn edit_cue(
     index: usize,
     name: Option<String>,
     fade: Option<f32>,
+    fade_out: Option<f32>,
     mode: Option<CueMode>,
     follow: Option<f32>,
 ) -> Result<PlaybackView> {
@@ -376,8 +387,10 @@ pub fn edit_cue(
         if let Some(name) = name {
             cue.name = name.trim().to_string();
         }
+        // A fade out goes with the fade in; none means the same as the fade in.
         if let Some(fade) = fade {
             cue.fade = fade.clamp(0.0, 600.0);
+            cue.fade_out = fade_out_time(cue.fade, fade_out);
         }
         let timing = mode.is_some() || follow.is_some();
         if let Some(mode) = mode {

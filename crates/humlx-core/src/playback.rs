@@ -21,9 +21,14 @@ pub use crate::effect::{Effect, Look, RunningEffects};
 #[serde(rename_all = "camelCase")]
 pub struct Cue {
     pub name: String,
-    /// Seconds to fade into this cue.
+    /// Seconds to fade into this cue: levels going up, and everything
+    /// other than intensity.
     #[serde(default = "default_fade")]
     pub fade: f32,
+    /// Seconds for levels going down, and for fading the list out when it's
+    /// released or replaced. The fade in time when not set, as before.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fade_out: Option<f32>,
     /// What happens once the cue has been gone to.
     #[serde(default)]
     pub mode: CueMode,
@@ -44,6 +49,7 @@ impl Default for Cue {
         Self {
             name: String::new(),
             fade: default_fade(),
+            fade_out: None,
             mode: CueMode::Hold,
             follow: 0.0,
             values: Look::new(),
@@ -53,6 +59,16 @@ impl Default for Cue {
 }
 
 impl Cue {
+    /// How long levels take to come up, and everything else to move.
+    pub fn fade_in_time(&self) -> Duration {
+        Duration::from_secs_f32(self.fade.max(0.0))
+    }
+
+    /// How long levels take to go down, and the list to fade out on release.
+    pub fn fade_out_time(&self) -> Duration {
+        Duration::from_secs_f32(self.fade_out.unwrap_or(self.fade).max(0.0))
+    }
+
     /// How long after this cue is gone to that the next cue follows, if it does.
     pub fn follow_time(&self) -> Option<Duration> {
         (self.mode == CueMode::Follow).then(|| Duration::from_secs_f32(self.follow.max(0.0)))
@@ -140,7 +156,14 @@ impl CueList {
 /// fades from and to zero when one side has none; anything else only on one
 /// side snaps to the side that has it.
 pub fn blend(from: &Values, to: &Values, t: f32) -> Values {
-    let t = t.clamp(0.0, 1.0);
+    blend_split(from, to, t, t)
+}
+
+/// As [`blend`], with intensity going down at `t_out` and everything else at
+/// `t_in`, for split fade times.
+pub fn blend_split(from: &Values, to: &Values, t_in: f32, t_out: f32) -> Values {
+    let t = t_in.clamp(0.0, 1.0);
+    let t_out = t_out.clamp(0.0, 1.0);
     let lerp = |a: f32, b: f32| a + (b - a) * t;
     let pair = |a: Option<f32>, b: Option<f32>| match (a, b) {
         (Some(a), Some(b)) => Some(lerp(a, b)),
@@ -148,7 +171,11 @@ pub fn blend(from: &Values, to: &Values, t: f32) -> Values {
     };
     let intensity = match (from.intensity, to.intensity) {
         (None, None) => None,
-        (a, b) => Some(lerp(a.unwrap_or(0.0), b.unwrap_or(0.0))),
+        (a, b) => {
+            let (a, b) = (a.unwrap_or(0.0), b.unwrap_or(0.0));
+            let t = if b < a { t_out } else { t };
+            Some(a + (b - a) * t)
+        }
     };
     let colour = match (from.colour, to.colour) {
         (Some(a), Some(b)) => Some(Rgb {
@@ -172,14 +199,14 @@ pub fn blend(from: &Values, to: &Values, t: f32) -> Values {
     }
 }
 
-fn blend_looks(from: &Look, to: &Look, t: f32) -> Look {
+fn blend_looks(from: &Look, to: &Look, t_in: f32, t_out: f32) -> Look {
     let empty = Values::default();
     from.keys()
         .chain(to.keys())
         .map(|fixture| {
             let a = from.get(fixture).unwrap_or(&empty);
             let b = to.get(fixture).unwrap_or(&empty);
-            (*fixture, blend(a, b, t))
+            (*fixture, blend_split(a, b, t_in, t_out))
         })
         .collect()
 }
@@ -202,7 +229,8 @@ pub struct Playback {
     /// When the list started running, which effects keep time from.
     clock: Instant,
     started: Instant,
-    fade: Duration,
+    fade_in: Duration,
+    fade_out: Duration,
     /// When the current cue was gone to, kept when the list is refreshed.
     entered: Instant,
     /// When the next cue follows, for a follow cue gone to with GO.
@@ -212,20 +240,35 @@ pub struct Playback {
 }
 
 impl Playback {
-    fn progress(&self, now: Instant) -> f32 {
-        if self.fade.is_zero() {
+    fn progress_over(&self, fade: Duration, now: Instant) -> f32 {
+        if fade.is_zero() {
             return 1.0;
         }
-        (now.saturating_duration_since(self.started).as_secs_f32() / self.fade.as_secs_f32()).min(1.0)
+        (now.saturating_duration_since(self.started).as_secs_f32() / fade.as_secs_f32()).min(1.0)
+    }
+
+    /// How far through the fade in, from 0 to 1.
+    fn progress(&self, now: Instant) -> f32 {
+        self.progress_over(self.fade_in, now)
+    }
+
+    /// How far through the fade out, from 0 to 1.
+    fn progress_out(&self, now: Instant) -> f32 {
+        self.progress_over(self.fade_out, now)
+    }
+
+    fn set_fades(&mut self, fade: Duration) {
+        self.fade_in = fade;
+        self.fade_out = fade;
     }
 
     /// The look this playback outputs right now, before its master.
     pub fn look(&self, now: Instant) -> Look {
-        let t = self.progress(now);
-        if t >= 1.0 {
+        let (t_in, t_out) = (self.progress(now), self.progress_out(now));
+        if t_in >= 1.0 && t_out >= 1.0 {
             self.to.clone()
         } else {
-            blend_looks(&self.from, &self.to, t)
+            blend_looks(&self.from, &self.to, t_in, t_out)
         }
     }
 
@@ -235,10 +278,11 @@ impl Playback {
     pub fn look_with_effects(&self, now: Instant, size: f32, beats: &Beats) -> Look {
         let mut look = self.look(now);
         let t = self.progress(now);
+        let t_out = self.progress_out(now);
         let elapsed = now.saturating_duration_since(self.clock).as_secs_f32();
-        if t < 1.0 {
+        if t_out < 1.0 {
             for effect in self.from_effects.iter().filter(|e| !self.to_effects.contains(e)) {
-                effect.apply_timed(&mut look, elapsed, beats, size * (1.0 - t));
+                effect.apply_timed(&mut look, elapsed, beats, size * (1.0 - t_out));
             }
         }
         for effect in &self.to_effects {
@@ -256,7 +300,7 @@ impl Playback {
 
     /// True while a fade is running.
     pub fn fading(&self, now: Instant) -> bool {
-        self.progress(now) < 1.0
+        self.progress(now) < 1.0 || self.progress_out(now) < 1.0
     }
 
     /// Seconds until the next cue follows, if one will.
@@ -309,7 +353,8 @@ impl Playbacks {
             to_effects: list.effects_at(index),
             clock,
             started: now,
-            fade: Duration::from_secs_f32(cue.fade.max(0.0)),
+            fade_in: cue.fade_in_time(),
+            fade_out: cue.fade_out_time(),
             entered: now,
             follow_at: cue.follow_time().map(|t| now + t),
             releasing: false,
@@ -363,7 +408,7 @@ impl Playbacks {
         let previous = playback.current.saturating_sub(1);
         self.go_to(list, previous, now)?;
         if let Some(p) = self.active.get_mut(&list.id) {
-            p.fade = Duration::from_millis(500);
+            p.set_fades(Duration::from_millis(500));
             p.follow_at = None;
         }
         Ok(())
@@ -386,13 +431,13 @@ impl Playbacks {
         p.from_effects = std::mem::take(&mut p.to_effects);
         p.to = Look::new();
         p.started = now;
-        p.fade = fade;
+        p.set_fades(fade);
         p.follow_at = None;
         p.releasing = true;
     }
 
-    /// After GO on `list`: fades out the lists it replaces, over the fade of
-    /// the cue it went to. A solo list replaces every other list; a list with
+    /// After GO on `list`: fades out the lists it replaces, over the fade out
+    /// time of the cue it went to. A solo list replaces every other list; a list with
     /// release on next go replaces the others that have it too.
     pub fn release_others(&mut self, list: &CueList, lists: &[CueList], now: Instant) {
         if !list.solo && !list.release_on_next_go {
@@ -401,7 +446,7 @@ impl Playbacks {
         let Some(current) = self.active.get(&list.id).map(|p| p.current) else {
             return;
         };
-        let fade = Duration::from_secs_f32(list.cues.get(current).map_or(0.0, |c| c.fade.max(0.0)));
+        let fade = list.cues.get(current).map_or(Duration::ZERO, Cue::fade_out_time);
         let others: Vec<u32> = self
             .active
             .iter()
@@ -430,7 +475,7 @@ impl Playbacks {
             if index < list.cues.len() {
                 let _ = self.go_to(list, index, now);
                 if let Some(p) = self.active.get_mut(&list.id) {
-                    p.fade = Duration::ZERO;
+                    p.set_fades(Duration::ZERO);
                     p.entered = entered;
                     p.follow_at = list.cues[index].follow_time().filter(|_| armed).map(|t| entered + t);
                 }
@@ -513,6 +558,7 @@ mod tests {
                 Cue {
                     name: "Red".into(),
                     fade: 0.0,
+                    fade_out: None,
                     mode: Default::default(),
                     follow: 0.0,
                     values: [(1, red)].into(),
@@ -521,6 +567,7 @@ mod tests {
                 Cue {
                     name: "Half".into(),
                     fade: 2.0,
+                    fade_out: None,
                     mode: Default::default(),
                     follow: 0.0,
                     values: [(1, values(0.5)), (2, values(1.0))].into(),
@@ -538,6 +585,7 @@ mod tests {
             name: format!("Look {id}"),
             cues: vec![Cue {
                 fade: 2.0,
+                fade_out: None,
                 values: [(1, values(level))].into(),
                 ..Default::default()
             }],
@@ -734,6 +782,40 @@ mod tests {
     }
 
     #[test]
+    fn split_fade_times() {
+        // Cue 2 fades fixture 1 down from 100% to 50% and fixture 2 up from
+        // nothing, in over 2s and out over 4s.
+        let mut list = list();
+        list.cues[1].fade_out = Some(4.0);
+        let mut playbacks = Playbacks::default();
+        let start = Instant::now();
+        let at = |ms: u64| start + Duration::from_millis(ms);
+        playbacks.go(&list, start).unwrap();
+        playbacks.go(&list, start).unwrap();
+        let out = playbacks.output(at(1000));
+        assert_eq!(out[&1].intensity, Some(0.875)); // a quarter of the way down
+        assert_eq!(out[&2].intensity, Some(0.5)); // halfway up
+        assert!(playbacks.get(1).unwrap().fading(at(3000)));
+        assert_eq!(playbacks.output(at(3000))[&2].intensity, Some(1.0));
+        assert!(!playbacks.get(1).unwrap().fading(at(4000)));
+
+        // Releasing fades out over the cue's fade out time.
+        let lists = [list.clone()];
+        playbacks.fade_out(1, list.cues[1].fade_out_time(), at(5000));
+        assert_eq!(playbacks.output(at(7000))[&2].intensity, Some(0.5));
+        playbacks.follow(&lists, at(9100));
+        assert!(playbacks.get(1).is_none());
+    }
+
+    #[test]
+    fn fade_out_is_fade_in_unless_set() {
+        let cue: Cue = serde_json::from_str(r#"{"name":"Old","fade":1.5}"#).unwrap();
+        assert_eq!(cue.fade_out, None);
+        assert_eq!(cue.fade_out_time(), Duration::from_secs_f32(1.5));
+        assert!(!serde_json::to_string(&cue).unwrap().contains("fadeOut"));
+    }
+
+    #[test]
     fn hold_is_the_default() {
         let cue: Cue = serde_json::from_str(r#"{"name":"Old","fade":1}"#).unwrap();
         assert_eq!(cue.mode, CueMode::Hold);
@@ -761,6 +843,7 @@ mod tests {
             cues: vec![Cue {
                 name: "".into(),
                 fade: 0.0,
+                fade_out: None,
                 mode: Default::default(),
                 follow: 0.0,
                 values: [(1, values(0.8))].into(),
