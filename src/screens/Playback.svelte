@@ -43,6 +43,49 @@
   $effect(() => {
     if (programmed === 0) recording = false;
   });
+  // Move, like Onyx: tap a look or a fader slot, then an empty grid button or
+  // slot to move it there. Tapping another filled one picks that instead.
+  type Place = { grid: [number, number] } | { slot: number };
+  let moving = $state(false);
+  let moveFrom = $state<Place | null>(null);
+
+  function startMove() {
+    recording = false;
+    moving = true;
+    moveFrom = null;
+  }
+
+  function stopMove() {
+    moving = false;
+    moveFrom = null;
+  }
+
+  const listAt = (p: Place) =>
+    "grid" in p ? (show.playback.layout.pages[p.grid[0]]?.buttons[p.grid[1]] ?? null) : (show.playback.layout.slots[p.slot] ?? null);
+  const samePlace = (a: Place, b: Place) =>
+    "grid" in a ? "grid" in b && a.grid[0] === b.grid[0] && a.grid[1] === b.grid[1] : "slot" in b && a.slot === b.slot;
+
+  async function moveTap(to: Place) {
+    const id = listAt(to);
+    if (id != null) {
+      // A filled one: pick it, or unpick it if it already is.
+      moveFrom = moveFrom && samePlace(moveFrom, to) ? null : to;
+      return;
+    }
+    const from = moveFrom;
+    if (!from) return;
+    const moved = listAt(from);
+    if (moved == null) return void (moveFrom = null);
+    let ok;
+    if ("grid" in from && "grid" in to) ok = await play(() => api.swapGridButtons(from.grid, to.grid));
+    else {
+      // Between the grid and the slots: put it in the new place, then empty the old.
+      ok = await play(() => ("grid" in to ? api.setGridButton(to.grid[0], to.grid[1], moved) : api.setSlot(to.slot, moved)));
+      if (ok) ok = await play(() => ("grid" in from ? api.setGridButton(from.grid[0], from.grid[1], null) : api.setSlot(from.slot, null)));
+    }
+    if (ok) stopMove();
+  }
+
   let lookName = $state("");
   let lookFade = $state<number | null>(2);
   // Where the record dialog records into, when not the selected list.
@@ -82,16 +125,17 @@
     const record = (e: Event) => {
       if (dialog || programmed === 0) return;
       if ((e as CustomEvent<{ cue?: boolean }>).detail?.cue || recording) openRecord(list?.id ?? null);
-      else recording = true;
+      else (stopMove(), (recording = true));
     };
     window.addEventListener(RECORD_EVENT, record);
     return () => window.removeEventListener(RECORD_EVENT, record);
   });
 
   function keys(e: KeyboardEvent) {
-    if (e.key === "Escape" && recording && !dialog) {
+    if (e.key === "Escape" && (recording || moving) && !dialog) {
       e.preventDefault();
       recording = false;
+      stopMove();
       return;
     }
     goKeys(e);
@@ -126,12 +170,16 @@
       <button onclick={() => show.program(() => api.clearProgrammer(null))}>Clear programmer</button>
     {/if}
     <span class="spacer"></span>
-    {#if recording}
+    {#if moving}
+      <span class="move-hint">{moveFrom ? "Tap an empty button or slot." : "Tap a look or fader to move."}</span>
+      <button onclick={stopMove}>Cancel</button>
+    {:else if recording}
       <span class="record-hint">Tap an empty button for a new look, or a look to add a cue.</span>
       {#if list}<button onclick={() => openRecord(list.id)}>Record into {list.name}…</button>{/if}
       <button onclick={() => (recording = false)}>Cancel</button>
     {:else}
       <button class="record" disabled={programmed === 0} onclick={() => (recording = true)}>● Record</button>
+      <button title="Move a look or fader (Esc cancels)" onclick={startMove}>Move</button>
       <button title="Merge programmer into the running cue (U)" disabled={programmed === 0} onclick={() => updateCue.open()}
         >Update</button
       >
@@ -139,7 +187,15 @@
     <button class="danger" onclick={() => play(() => api.releaseAll())}>Release all</button>
   </header>
 
-  <PlaybackGrid {recording} onrecordlook={recordLook} onrecordinto={openRecord} />
+  <PlaybackGrid
+    {recording}
+    onrecordlook={recordLook}
+    onrecordinto={openRecord}
+    {moving}
+    movePicked={moveFrom && "grid" in moveFrom ? moveFrom.grid : null}
+    moveReady={moveFrom != null}
+    onmovetap={(page, button) => moveTap({ grid: [page, button] })}
+  />
 
   <!-- The selected cue list -->
   <section class="panel cues">
@@ -178,7 +234,7 @@
 
   <!-- Playback faders, with the effect controls in a drawer on the right -->
   <section class="panel strips">
-    <div class="slots scroll-x">
+    <div class="slots scroll-x" class:moving>
       {#each show.playback.layout.slots as id, slot (slot)}
         {@const l = show.playback.cueLists.find((x) => x.id === id)}
         {#if l}
@@ -190,7 +246,11 @@
             class:fading={on && running?.fading}
             class:releasing={running?.releasing}
             class:selected={l.id === list?.id}
+            class:picked={moveFrom != null && "slot" in moveFrom && moveFrom.slot === slot}
           >
+            {#if moving}
+              <button class="move-catch" aria-label={`Move ${l.name}`} onclick={() => moveTap({ slot })}></button>
+            {/if}
             <div class="slot-head">
               <button class="strip-name ghost" title="Select this cue list" onclick={() => selectList(l.id)}>
                 <span class="slot-num">{slot + 1}</span>{l.name}
@@ -222,9 +282,9 @@
             </div>
           </div>
         {:else}
-          <button class="strip slot empty-slot" onclick={() => (dialog = { slot })}>
+          <button class="strip slot empty-slot" onclick={() => (moving ? moveTap({ slot }) : (dialog = { slot }))}>
             <span class="slot-num">{slot + 1}</span>
-            <span>+ Load list</span>
+            <span>{moving ? (moveFrom ? "Move here" : "Empty") : "+ Load list"}</span>
           </button>
         {/if}
       {/each}
@@ -327,6 +387,10 @@
     grid-column: 1 / -1;
   }
 
+  .move-hint {
+    font-weight: 600;
+  }
+
   .record-hint {
     color: var(--danger, #e5484d);
     font-weight: 600;
@@ -390,6 +454,29 @@
   .strip.slot.selected {
     outline: 3px solid var(--accent);
     outline-offset: 3px;
+  }
+
+  div.strip.slot {
+    position: relative;
+  }
+
+  /* While moving, a filled slot is one big tap target. */
+  .move-catch {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    background: transparent;
+    border: none;
+    padding: 0;
+  }
+
+  .strip.slot.picked {
+    outline: 3px dashed var(--accent);
+    outline-offset: 3px;
+  }
+
+  .moving .empty-slot {
+    border-color: var(--accent);
   }
 
   .slot-head {
