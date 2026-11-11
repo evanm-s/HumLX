@@ -247,7 +247,10 @@ export type CueMode = "hold" | "follow";
 
 export interface Cue {
   name: string;
+  /** Seconds for levels going up, and everything else. */
   fade: number;
+  /** Seconds for levels going down and for releases; the fade in if not set. */
+  fadeOut?: number;
   mode: CueMode;
   /** For a follow cue, seconds from GO until the next cue starts. */
   follow: number;

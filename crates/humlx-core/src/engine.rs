@@ -154,14 +154,14 @@ impl State {
         Ok(())
     }
 
-    /// Fades a running list out over the fade of the cue it's on.
+    /// Fades a running list out over the fade out time of the cue it's on.
     pub fn fade_out(&mut self, list: u32, now: Instant) {
         let fade = self
             .playbacks
             .get(list)
             .and_then(|p| self.cue_lists.iter().find(|l| l.id == list)?.cues.get(p.current))
-            .map_or(0.0, |c| c.fade.max(0.0));
-        self.playbacks.fade_out(list, Duration::from_secs_f32(fade), now);
+            .map_or(Duration::ZERO, crate::playback::Cue::fade_out_time);
+        self.playbacks.fade_out(list, fade, now);
     }
 
     /// A tap of a grid button: selects its list, then fades a live one-cue

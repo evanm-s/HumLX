@@ -48,7 +48,9 @@
           Hold
         {/if}
       </span>
-      <span class="fade">{cue.fade}s</span>
+      <span class="fade" title={cue.fadeOut != null ? "Fade in / out" : "Fade"}
+        >{cue.fade}{#if cue.fadeOut != null}<span class="out">/{cue.fadeOut}</span>{/if}s</span
+      >
     </button>
   {:else}
     {@render empty?.()}
@@ -65,7 +67,7 @@
 
   .cue {
     display: grid;
-    grid-template-columns: 32px 56px 1fr auto 130px 90px;
+    grid-template-columns: 32px 56px 1fr auto 130px 100px;
     gap: 12px;
     align-items: center;
     text-align: left;
@@ -76,7 +78,7 @@
   }
 
   .compact .cue {
-    grid-template-columns: 24px 44px 1fr auto 110px 64px;
+    grid-template-columns: 24px 44px 1fr auto 110px 76px;
     gap: 8px;
     min-height: 38px;
   }
@@ -130,5 +132,14 @@
     font-family: var(--mono);
     text-align: right;
     font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .fade .out {
+    color: var(--muted);
+  }
+
+  .cue.live .fade .out {
+    color: var(--accent-text);
   }
 </style>

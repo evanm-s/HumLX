@@ -70,6 +70,8 @@
   let dialog = $state<null | "record" | "edit" | "new" | "rename" | "slot">(null);
   let draftName = $state("");
   let draftFade = $state<number | null>(2);
+  /** Null: the same as the fade in. */
+  let draftFadeOut = $state<number | null>(null);
   let draftMode = $state<CueMode>("hold");
   let draftFollow = $state<number | null>(5);
   let confirmDelete = $state<"cue" | "list" | null>(null);
@@ -84,6 +86,7 @@
     const cue = list.cues[cueIndex];
     draftName = cue.name;
     draftFade = cue.fade;
+    draftFadeOut = cue.fadeOut ?? null;
     draftMode = cue.mode;
     // A new follow cue starts with its fade time, so it moves on once the fade is done.
     draftFollow = cue.follow > 0 ? cue.follow : cue.fade > 0 ? cue.fade : 5;
@@ -94,7 +97,8 @@
     if (!list || cueIndex == null) return;
     const fade = Math.max(0, draftFade ?? 0);
     const follow = draftMode === "follow" ? Math.max(0, draftFollow ?? 0) : null;
-    const ok = await play(() => api.editCue(list.id, cueIndex!, draftName, fade, draftMode, follow));
+    const fadeOut = draftFadeOut == null ? null : Math.max(0, draftFadeOut);
+    const ok = await play(() => api.editCue(list.id, cueIndex!, draftName, fade, draftMode, follow, fadeOut));
     if (ok) dialog = null;
   }
 
@@ -274,7 +278,18 @@
       Name
       <input bind:value={draftName} placeholder="e.g. Walk in" />
     </label>
-    <NumberField label="Fade time (seconds)" fractional bind:value={draftFade} min={0} max={600} />
+    <div class="fades">
+      <NumberField label="Fade in (s)" fractional bind:value={draftFade} min={0} max={600} />
+      <NumberField
+        label="Fade out (s)"
+        fractional
+        bind:value={draftFadeOut}
+        placeholder={String(draftFade ?? 0)}
+        min={0}
+        max={600}
+      />
+    </div>
+    <p class="muted">Out is for levels going down and releases. Blank = same as in.</p>
     <div class="field">
       Type
       <div class="segmented">
@@ -322,6 +337,12 @@
 {/if}
 
 <style>
+  .fades {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--gap);
+  }
+
   .cuelists {
     height: 100%;
     display: grid;

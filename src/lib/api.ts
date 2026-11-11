@@ -137,8 +137,8 @@ export const api = {
   renameGridPage: (page: number, name: string) => invoke<PlaybackView>("rename_grid_page", { page, name }),
   deleteGridPage: (page: number) => invoke<PlaybackView>("delete_grid_page", { page }),
   /** Records into an existing cue list, or a new one when `target` has a name. */
-  recordCue: (target: RecordTarget, name: string, fade: number, after: number | null) =>
-    invoke<PlaybackView>("record_cue", { target, name, fade, after }),
+  recordCue: (target: RecordTarget, name: string, fade: number, after: number | null, fadeOut: number | null = null) =>
+    invoke<PlaybackView>("record_cue", { target, name, fade, fadeOut, after }),
   updateCue: (list: number, index: number) => invoke<PlaybackView>("update_cue", { list, index }),
   editCue: (
     list: number,
@@ -147,7 +147,9 @@ export const api = {
     fade: number | null,
     mode: CueMode | null = null,
     follow: number | null = null,
-  ) => invoke<PlaybackView>("edit_cue", { list, index, name, fade, mode, follow }),
+    /** Goes with `fade`; null means the same as the fade in. */
+    fadeOut: number | null = null,
+  ) => invoke<PlaybackView>("edit_cue", { list, index, name, fade, fadeOut, mode, follow }),
   deleteCue: (list: number, index: number) => invoke<PlaybackView>("delete_cue", { list, index }),
   go: (list: number) => invoke<PlaybackView>("go", { list }),
   back: (list: number) => invoke<PlaybackView>("back", { list }),
