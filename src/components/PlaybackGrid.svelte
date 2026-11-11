@@ -18,9 +18,16 @@
     onrecordlook: (page: number, button: number) => void;
     /** A filled button tapped while recording: add a cue to its list. */
     onrecordinto: (list: number) => void;
+    /** Move is armed: taps go to onmovetap instead. */
+    moving?: boolean;
+    /** The button picked to move, as [page, button]. */
+    movePicked?: [number, number] | null;
+    /** Something (here or in a slot) is picked to move. */
+    moveReady?: boolean;
+    onmovetap?: (page: number, button: number, filled: boolean) => void;
   }
 
-  let { recording, onrecordlook, onrecordinto }: Props = $props();
+  let { recording, onrecordlook, onrecordinto, moving = false, movePicked = null, moveReady = false, onmovetap }: Props = $props();
 
   const play = show.play.bind(show);
   const layout = $derived(show.playback.layout);
@@ -37,6 +44,12 @@
   let dialog = $state<null | { assign: number } | "page" | "newPage">(null);
   let draftName = $state("");
   let confirmDeletePage = $state(false);
+  $effect(() => {
+    if (moving) {
+      editing = false;
+      picked = null;
+    }
+  });
 
   const listOf = (id: number | null) => (id == null ? undefined : show.playback.cueLists.find((l) => l.id === id));
 
@@ -48,6 +61,7 @@
       else onrecordlook(page, i);
       return;
     }
+    if (moving) return void onmovetap?.(page, i, list != null);
     if (editing) {
       if (picked == null) {
         picked = i;
@@ -102,7 +116,7 @@
   }
 </script>
 
-<section class="panel grid-panel" class:recording class:editing>
+<section class="panel grid-panel" class:recording class:editing class:moving>
   <div class="row bar">
     <div class="segmented pages">
       {#each layout.pages as _, i (i)}
@@ -131,7 +145,7 @@
       {/if}
     {/if}
     <span class="spacer"></span>
-    <button aria-pressed={editing} onclick={() => ((editing = !editing), (picked = null))}>
+    <button aria-pressed={editing} disabled={moving} onclick={() => ((editing = !editing), (picked = null))}>
       {editing ? "Done" : "Edit layout"}
     </button>
   </div>
@@ -161,7 +175,7 @@
         class:fading={live?.fading}
         class:releasing={running?.releasing}
         class:selected={list != null && list.id === layout.selected}
-        class:picked={editing && picked === i}
+        class:picked={(editing && picked === i) || (movePicked?.[0] === page && movePicked[1] === i)}
         onclick={() => tap(i)}
       >
         {#if list}
@@ -169,6 +183,8 @@
           <span class="meta">
             {#if list.cues.length > 1}{live ? live.current + 1 : "–"}/{list.cues.length}{:else if list.cues.length === 0}empty{/if}
           </span>
+        {:else if moving && moveReady}
+          <span class="plus">Move here</span>
         {:else if recording}
           <span class="plus">● Record here</span>
         {:else}
@@ -268,6 +284,10 @@
     align-items: center;
     justify-content: center;
     color: var(--muted);
+  }
+
+  .moving .cell.empty {
+    border-color: var(--accent);
   }
 
   .recording .cell.empty {
