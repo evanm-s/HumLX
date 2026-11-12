@@ -28,6 +28,7 @@ export type Attribute =
   | "focus"
   | "iris"
   | "frost"
+  | "column"
   | "effect"
   | "speed"
   | "control"
@@ -87,7 +88,18 @@ export interface FixtureOptions {
   tiltRange: number;
   /** Colour fixtures without a dimmer: intensity scales the colour mix. */
   virtualIntensity: boolean;
+  /** Resolume fixtures: where Resolume listens for OSC. */
+  oscHost: string;
+  oscPort: number;
+  /** Resolume fixtures: a name per column; blank shows "Column n". */
+  columns: string[];
 }
+
+/** Profile id of the Resolume fixture, driven over OSC. */
+export const RESOLUME = "resolume/composition";
+/** Column channel value that clears the composition. */
+export const CLEAR_COLUMN = 255;
+export const MAX_COLUMNS = 254;
 
 export const DEFAULT_OPTIONS: FixtureOptions = {
   intensityLimit: 100,
@@ -99,6 +111,9 @@ export const DEFAULT_OPTIONS: FixtureOptions = {
   panRange: 540,
   tiltRange: 270,
   virtualIntensity: true,
+  oscHost: "127.0.0.1",
+  oscPort: 7000,
+  columns: Array(8).fill(""),
 };
 
 export interface PatchView {

@@ -27,7 +27,7 @@ import type {
   OscSettings,
   Layout,
 } from "./types";
-import { DEFAULT_OPTIONS, emptyLayout } from "./types";
+import { DEFAULT_OPTIONS, emptyLayout, RESOLUME } from "./types";
 import { aim, defaultStage, floorAt, knownOf, minReadings, orient, unorient, type Known, type Placed, type Solution, type Stage } from "./stage";
 
 const files = import.meta.glob<Omit<Profile, "id">>("../../crates/humlx-core/fixtures/*.json", {
@@ -45,6 +45,33 @@ const profiles: Profile[] = Object.values(files).map((p) => ({
   ...p,
   id: `${slug(p.manufacturer)}/${slug(p.model)}`,
 }));
+// Built in on the Rust side (fixture::resolume) rather than from a file.
+profiles.push({
+  id: RESOLUME,
+  manufacturer: "Resolume",
+  model: "Composition",
+  categories: ["Media server"],
+  modes: [
+    {
+      name: "OSC",
+      channels: [
+        { name: "Master", attribute: "intensity", default: 0 },
+        { name: "Master fine", attribute: "intensity", fineOf: "Master", default: 0 },
+        {
+          name: "Column",
+          attribute: "column",
+          default: 0,
+          highlight: 0,
+          capabilities: [
+            { from: 0, to: 0, label: "None" },
+            ...Array.from({ length: 254 }, (_, i) => ({ from: i + 1, to: i + 1, label: `Column ${i + 1}` })),
+            { from: 255, to: 255, label: "Clear" },
+          ],
+        },
+      ],
+    },
+  ],
+});
 
 // A rig like the studio's: movers, RGBW pars, bi-colour panels and dimmers.
 const rig: [string, string, number][] = [
@@ -52,6 +79,7 @@ const rig: [string, string, number][] = [
   ["generic/rgbw-par", "Par", 4],
   ["generic/bi-colour-led-panel", "Panel", 2],
   ["generic/dimmer", "Dimmer", 2],
+  [RESOLUME, "Resolume", 1],
 ];
 let fixtures: Fixture[] = [];
 for (const [id, name, count] of rig) {

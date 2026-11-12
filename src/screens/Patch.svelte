@@ -8,7 +8,7 @@
   import { fixtureColour, range } from "../lib/format";
   import { formKeys } from "../lib/keys";
   import { attempt, notify, show } from "../lib/show.svelte";
-  import { DEFAULT_OPTIONS, type Fixture, type FixtureChanges, type FixtureOptions } from "../lib/types";
+  import { DEFAULT_OPTIONS, RESOLUME, type Fixture, type FixtureChanges, type FixtureOptions } from "../lib/types";
 
   // Selected fixture numbers. One opens the edit form; more open bulk edit.
   let selectedIds = $state<number[]>([]);
@@ -247,6 +247,7 @@
   );
   const bulkMoves = $derived(selection.some(moves));
   const bulkDimmerless = $derived(selection.some(dimmerless));
+  const bulkResolume = $derived(selection.length > 0 && selection.every((f) => f.profile === RESOLUME));
   const bulkLocated = $derived(selection.length > 0 && selection.every((f) => show.live.tested.includes(f.id)));
 
   async function saveBulk() {
@@ -415,7 +416,7 @@
           </div>
         </div>
       {/if}
-      <FixtureOptionsForm bind:options={bulkOptions} moves={bulkMoves} dimmerless={bulkDimmerless} onchange={() => (bulkOptionsTouched = true)} />
+      <FixtureOptionsForm bind:options={bulkOptions} moves={bulkMoves} dimmerless={bulkDimmerless} resolume={bulkResolume} onchange={() => (bulkOptionsTouched = true)} />
       {#if bulkDirty}
         <p class="muted summary">
           {#if bulk.firstId != null}Numbers {bulk.firstId}–{bulk.firstId + selection.length - 1}.{/if}
@@ -465,7 +466,7 @@
           </div>
         </div>
       {/if}
-      <FixtureOptionsForm bind:options={edit.options} moves={moves(selected)} dimmerless={dimmerless(selected)} />
+      <FixtureOptionsForm bind:options={edit.options} moves={moves(selected)} dimmerless={dimmerless(selected)} resolume={selected.profile === RESOLUME} />
       <div class="row actions">
         <button class="danger" onclick={remove}>{confirmRemove ? "Tap again to remove" : "Remove"}</button>
         <span class="spacer"></span>

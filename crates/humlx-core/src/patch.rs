@@ -1,5 +1,7 @@
 //! The patch: which fixtures exist and where they sit in the universe.
 
+use std::net::Ipv4Addr;
+
 use serde::{Deserialize, Serialize};
 
 use crate::dmx::{Address, UNIVERSE_SIZE};
@@ -25,7 +27,7 @@ pub struct PatchedFixture {
 /// Per-fixture output adjustments: an intensity limit and, for movers, how
 /// the fixture is hung. They apply at output, so cues and presets stay the
 /// same when a fixture is swapped or re-hung.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct FixtureOptions {
     /// Highest intensity sent, in percent. Full scales down to this, so the
@@ -47,6 +49,12 @@ pub struct FixtureOptions {
     /// colour mix, as if the fixture had a dimmer. Off, the colour channels
     /// run at the levels the colour gives and intensity does nothing.
     pub virtual_intensity: bool,
+    /// For a Resolume fixture: where Resolume listens for OSC.
+    pub osc_host: Ipv4Addr,
+    pub osc_port: u16,
+    /// For a Resolume fixture: a name per column, which also sets how many
+    /// columns the Programmer offers. Blank names show as "Column n".
+    pub columns: Vec<String>,
 }
 
 impl Default for FixtureOptions {
@@ -61,6 +69,9 @@ impl Default for FixtureOptions {
             pan_range: 540,
             tilt_range: 270,
             virtual_intensity: true,
+            osc_host: Ipv4Addr::LOCALHOST,
+            osc_port: 7000,
+            columns: vec![String::new(); 8],
         }
     }
 }
@@ -125,6 +136,15 @@ impl FixtureOptions {
             return Err(Error::InvalidOptions(
                 "pan and tilt range must be more than 0 degrees".into(),
             ));
+        }
+        if self.columns.is_empty() || self.columns.len() > usize::from(crate::fixture::MAX_COLUMNS) {
+            return Err(Error::InvalidOptions(format!(
+                "columns must be between 1 and {}",
+                crate::fixture::MAX_COLUMNS
+            )));
+        }
+        if self.osc_port == 0 {
+            return Err(Error::InvalidOptions("the OSC port must be more than 0".into()));
         }
         if self.pan_offset.unsigned_abs() > self.pan_range || self.tilt_offset.unsigned_abs() > self.tilt_range {
             return Err(Error::InvalidOptions(
@@ -259,8 +279,8 @@ impl Patch {
         if let Some(address) = changes.address {
             updated.address = address;
         }
-        if let Some(options) = changes.options {
-            updated.options = options;
+        if let Some(options) = &changes.options {
+            updated.options = options.clone();
         }
         self.check(library, &updated, Some(id))?;
         if let Some(slot) = self.fixtures.iter_mut().find(|f| f.id == id) {
@@ -296,8 +316,8 @@ impl Patch {
             if let Some(address) = changes.address {
                 fixture.address = address;
             }
-            if let Some(options) = changes.options {
-                fixture.options = options;
+            if let Some(options) = &changes.options {
+                fixture.options = options.clone();
             }
             changed.push(index);
         }
@@ -438,7 +458,7 @@ mod tests {
             ..Default::default()
         };
         let changes = FixtureChanges {
-            options: Some(options),
+            options: Some(options.clone()),
             ..Default::default()
         };
         patch.update(&library, 1, &changes).unwrap();

@@ -188,7 +188,13 @@ pub fn blend_split(from: &Values, to: &Values, t_in: f32, t_out: f32) -> Values 
     let mut other = from.other.clone();
     for (attribute, value) in &to.other {
         let start = from.other.get(attribute).copied();
-        other.insert(*attribute, pair(start, Some(*value)).unwrap_or(*value));
+        let value = match start {
+            // Snapping attributes jump as the fade starts.
+            Some(start) if attribute.snaps() && t <= 0.0 => start,
+            _ if attribute.snaps() => *value,
+            _ => pair(start, Some(*value)).unwrap_or(*value),
+        };
+        other.insert(*attribute, value);
     }
     Values {
         intensity,
@@ -659,6 +665,23 @@ mod tests {
         assert_eq!(one.intensity, Some(0.5));
         assert_eq!(one.colour, Some(Rgb { r: 1.0, g: 0.0, b: 0.0 }));
         assert_eq!(look[&2].intensity, Some(1.0));
+    }
+
+    #[test]
+    fn columns_snap_instead_of_fading() {
+        let at = |column: f32| Values {
+            other: [
+                (crate::fixture::Attribute::Column, column),
+                (crate::fixture::Attribute::Zoom, column),
+            ]
+            .into(),
+            ..Default::default()
+        };
+        let (from, to) = (at(0.0), at(1.0));
+        assert_eq!(blend(&from, &to, 0.0).other[&crate::fixture::Attribute::Column], 0.0);
+        let mid = blend(&from, &to, 0.5);
+        assert_eq!(mid.other[&crate::fixture::Attribute::Column], 1.0);
+        assert_eq!(mid.other[&crate::fixture::Attribute::Zoom], 0.5);
     }
 
     #[test]
