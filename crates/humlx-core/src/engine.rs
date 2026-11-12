@@ -366,7 +366,8 @@ impl State {
                         other: [(Attribute::Zoom, tight)].into(),
                         ..Default::default()
                     });
-                } else {
+                } else if fixture.profile != crate::fixture::RESOLUME {
+                    // Video carries on; only lights are taken out.
                     values.intensity = Some(0.0);
                 }
             }
@@ -538,14 +539,17 @@ pub(crate) fn lock(state: &Mutex<State>) -> MutexGuard<'_, State> {
 fn output_loop(socket: &UdpSocket, state: &Mutex<State>, running: &AtomicBool) {
     let mut sequence: u8 = 0;
     let mut next_tick = Instant::now();
+    let mut resolume = crate::resolume::Sender::default();
     while running.load(Ordering::Relaxed) {
-        let (packet, target, interval) = {
+        let (packet, target, interval, osc) = {
             let mut state = lock(state);
             let settings = state.output.clone();
             let data = *state.compose().as_bytes();
+            let feeds = crate::resolume::feeds(&state.patch, &state.library, &state.universe);
+            let osc = resolume.packets(&feeds, Instant::now());
             let interval = Duration::from_secs_f64(1.0 / f64::from(settings.rate_hz.clamp(1, 44)));
             if !settings.enabled {
-                (None, None, interval)
+                (None, None, interval, osc)
             } else {
                 sequence = if sequence == 255 { 1 } else { sequence + 1 };
                 let packet = artnet::dmx_packet(settings.universe, sequence, &data);
@@ -553,9 +557,16 @@ fn output_loop(socket: &UdpSocket, state: &Mutex<State>, running: &AtomicBool) {
                     Some(packet),
                     Some(SocketAddr::from((settings.target, artnet::PORT))),
                     interval,
+                    osc,
                 )
             }
         };
+
+        // Resolume fixtures go out over OSC. A lost packet is caught up by
+        // the next change or the master's regular resend.
+        for (to, packet) in osc {
+            let _ = socket.send_to(&packet, to);
+        }
 
         if let (Some(packet), Some(target)) = (packet, target) {
             let result = socket.send_to(&packet, target);

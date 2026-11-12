@@ -35,6 +35,8 @@ pub enum Attribute {
     Focus,
     Iris,
     Frost,
+    /// A media server column to trigger, such as a Resolume composition column.
+    Column,
     Effect,
     Speed,
     Control,
@@ -60,9 +62,15 @@ impl Attribute {
             Red | Green | Blue | White | WarmWhite | CoolWhite | Amber | Lime | Uv | Cyan | Magenta | Yellow
             | ColorWheel | ColorTemperature => Family::Colour,
             Pan | Tilt | PanTiltSpeed => Family::Position,
-            Shutter | Gobo | GoboRotation | Prism | Zoom | Focus | Iris | Frost => Family::Beam,
+            Shutter | Gobo | GoboRotation | Prism | Zoom | Focus | Iris | Frost | Column => Family::Beam,
             Effect | Speed | Control | Generic => Family::Control,
         }
+    }
+
+    /// True for attributes that jump to a new value instead of fading, so a
+    /// fade never passes through the values in between.
+    pub fn snaps(self) -> bool {
+        matches!(self, Attribute::Column)
     }
 
     /// True for additive or subtractive colour mixing channels.
@@ -198,10 +206,67 @@ pub fn bundled() -> Vec<Profile> {
         include_str!("../fixtures/event-lighting-lm6x15.json"),
         include_str!("../fixtures/philips-showline-sl-wash-180-rgbw.json"),
     ];
-    SOURCES
+    let mut profiles: Vec<Profile> = SOURCES
         .iter()
         .map(|json| Profile::from_json(json).expect("bundled profile is valid"))
-        .collect()
+        .collect();
+    profiles.push(resolume());
+    profiles
+}
+
+/// Profile id of the Resolume fixture, which HumLX drives over OSC.
+pub const RESOLUME: &str = "resolume/composition";
+
+/// Highest column the Resolume fixture can trigger.
+pub const MAX_COLUMNS: u8 = 254;
+
+/// DMX value of the Resolume column channel that clears the composition.
+pub const CLEAR_COLUMN: u8 = 255;
+
+/// A Resolume composition as a fixture: intensity is the composition master
+/// and the column channel triggers a column, picked like a gobo. Its levels go
+/// out over OSC (see `crate::resolume`) as well as in the universe.
+pub fn resolume() -> Profile {
+    let channel = |name: &str, attribute, fine_of: Option<&str>| Channel {
+        name: name.into(),
+        attribute,
+        fine_of: fine_of.map(Into::into),
+        default: 0,
+        highlight: None,
+        capabilities: vec![],
+    };
+    let mut column = channel("Column", Attribute::Column, None);
+    column.highlight = Some(0);
+    column.capabilities.push(Capability {
+        from: 0,
+        to: 0,
+        label: "None".into(),
+    });
+    for n in 1..=MAX_COLUMNS {
+        column.capabilities.push(Capability {
+            from: n,
+            to: n,
+            label: format!("Column {n}"),
+        });
+    }
+    column.capabilities.push(Capability {
+        from: CLEAR_COLUMN,
+        to: CLEAR_COLUMN,
+        label: "Clear".into(),
+    });
+    Profile {
+        manufacturer: "Resolume".into(),
+        model: "Composition".into(),
+        categories: vec!["Media server".into()],
+        modes: vec![Mode {
+            name: "OSC".into(),
+            channels: vec![
+                channel("Master", Attribute::Intensity, None),
+                channel("Master fine", Attribute::Intensity, Some("Master")),
+                column,
+            ],
+        }],
+    }
 }
 
 /// The set of profiles available to patch.
@@ -252,11 +317,13 @@ mod tests {
     #[test]
     fn bundled_profiles_load() {
         let library = Library::with_bundled();
-        assert_eq!(library.profiles().len(), 8);
+        assert_eq!(library.profiles().len(), 9);
         let wash = library.get("philips-showline/sl-wash-180-rgbw").expect("sl wash 180");
         assert_eq!(wash.mode("8-bit (16ch)").unwrap().channels.len(), 16);
         assert_eq!(wash.mode("16-bit (23ch)").unwrap().channels.len(), 23);
         assert_eq!(wash.mode("HSIC (16ch)").unwrap().channels.len(), 16);
+        let resolume = library.get(RESOLUME).expect("resolume");
+        assert_eq!(resolume.mode("OSC").unwrap().channels.len(), 3);
         let par = library.get("generic/rgbw-par").expect("rgbw par");
         assert_eq!(par.mode("4ch RGBW").unwrap().channels.len(), 4);
     }
@@ -273,7 +340,7 @@ mod tests {
         let mut dimmer = library.get("generic/dimmer").unwrap().clone();
         dimmer.categories = vec!["Replaced".into()];
         library.insert(dimmer);
-        assert_eq!(library.profiles().len(), 8);
+        assert_eq!(library.profiles().len(), 9);
         assert_eq!(library.get("generic/dimmer").unwrap().categories, vec!["Replaced"]);
     }
 

@@ -55,6 +55,14 @@ up quickly.
   fixture editor) or from the
   [Open Fixture Library](https://open-fixture-library.org) (download a fixture
   as "Open Fixture Library JSON").
+- **Resolume** (Arena or Avenue) as a fixture: patch "Resolume Composition"
+  and its intensity drives the composition master, while its Column
+  (in the Beam window, picked like a gobo) triggers a composition column, so
+  it works in the programmer, cues and presets. It goes out over OSC: set
+  Resolume's IP, port and column names on the Patch page, and turn on OSC
+  input in Resolume (Preferences > OSC, port 7000 by default). A column only
+  triggers when it changes; Clear disconnects everything. Highlight leaves the
+  video alone unless the Resolume fixture is selected.
 - **Channel test**: a fader per channel to check every fixture against the rig,
   with **Locate** to bring a fixture up at full in white, centred.
 - **Art-Net output** of one universe at up to 44 packets per second, to a node's

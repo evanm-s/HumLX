@@ -1,7 +1,7 @@
 <script lang="ts">
   // Output limits and orientation for one fixture, or several set the same.
   import NumberField from "./NumberField.svelte";
-  import type { FixtureOptions } from "../lib/types";
+  import { MAX_COLUMNS, type FixtureOptions } from "../lib/types";
 
   interface Props {
     options: FixtureOptions;
@@ -9,14 +9,26 @@
     moves: boolean;
     /** Show the virtual intensity switch: colour mixing, no dimmer channel. */
     dimmerless?: boolean;
+    /** Show the Resolume OSC target and column names. */
+    resolume?: boolean;
     onchange?: () => void;
   }
 
-  let { options = $bindable(), moves, dimmerless = false, onchange }: Props = $props();
+  let { options = $bindable(), moves, dimmerless = false, resolume = false, onchange }: Props = $props();
 
   function set(changes: Partial<FixtureOptions>) {
     options = { ...options, ...changes };
     onchange?.();
+  }
+
+  function setColumnCount(count: number) {
+    const columns = options.columns.slice(0, count);
+    while (columns.length < count) columns.push("");
+    set({ columns });
+  }
+
+  function nameColumn(index: number, name: string) {
+    set({ columns: options.columns.map((c, i) => (i === index ? name : c)) });
   }
 
   const PAN_STEPS = [-90, 0, 90, 180];
@@ -24,6 +36,24 @@
 </script>
 
 <div class="options">
+  {#if resolume}
+    <h3>Resolume</h3>
+    <div class="pair">
+      <label class="field">
+        Resolume IP
+        <input value={options.oscHost} onchange={(e) => set({ oscHost: e.currentTarget.value.trim() })} />
+      </label>
+      <NumberField label="OSC port" value={options.oscPort} min={1} max={65535} onchange={(v) => set({ oscPort: v ?? 7000 })} />
+    </div>
+    <NumberField label="Columns" value={options.columns.length} min={1} max={MAX_COLUMNS} onchange={(v) => setColumnCount(v ?? 8)} />
+    <div class="names">
+      {#each options.columns as name, i (i)}
+        <input placeholder={`Column ${i + 1}`} value={name} onchange={(e) => nameColumn(i, e.currentTarget.value)} />
+      {/each}
+    </div>
+    <p class="muted hint">Intensity is the composition master. Turn on OSC input in Resolume.</p>
+  {/if}
+
   <h3>Limits and orientation</h3>
   <div class="pair">
     <NumberField
@@ -141,6 +171,12 @@
     grid-template-columns: 1fr 1fr;
     gap: var(--gap);
     align-items: end;
+  }
+
+  .names {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 6px;
   }
 
   .hint {

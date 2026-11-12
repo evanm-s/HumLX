@@ -96,7 +96,7 @@ fn patch_view(app: &App) -> PatchView {
                 profile: fixture.profile.clone(),
                 mode: fixture.mode.clone(),
                 address: fixture.address,
-                options: fixture.options,
+                options: fixture.options.clone(),
                 footprint: mode_of(&state.library, fixture).map_or(0, |m| m.channels.len()),
                 type_name: profile.map_or_else(
                     || format!("Missing type ({})", fixture.profile),
@@ -514,7 +514,7 @@ pub fn calibrate_mark(app: State<'_, App>, fixture: u32, mark: u32) -> Result<St
         let mut state = app.engine.state();
         let state = &mut *state;
         let patched = state.patch.get(fixture).ok_or(Error::UnknownFixture(fixture))?;
-        let options = patched.options;
+        let options = patched.options.clone();
         let values = state.programmer.values.get(&fixture);
         let (Some(pan), Some(tilt)) = (values.and_then(|v| v.pan), values.and_then(|v| v.tilt)) else {
             return Err(Error::InvalidStage(
@@ -568,7 +568,7 @@ pub fn point_at(app: State<'_, App>, x: f32, y: f32, height: f32) -> ProgrammerV
             let (Some(patched), Some(solution)) = (state.patch.get(id), state.stage.solution(id)) else {
                 continue;
             };
-            let options = patched.options;
+            let options = patched.options.clone();
             let values = state.programmer.values.entry(id).or_default();
             let current = options.orient(values.pan.unwrap_or(0.5), values.tilt.unwrap_or(0.5));
             let aim = solution.aim([x, y, z], current);

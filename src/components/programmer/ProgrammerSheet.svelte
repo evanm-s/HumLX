@@ -8,6 +8,7 @@
   import { hasValue, sheetPicks, type Column } from "../../lib/sheet.svelte";
   import { show } from "../../lib/show.svelte";
   import type { Attribute, Rgb, Values } from "../../lib/types";
+  import { CLEAR_COLUMN } from "../../lib/types";
 
   const rows = $derived(
     Object.entries(show.programmer.values)
@@ -50,6 +51,10 @@
 
   function text(values: Values, column: Column): string {
     if (column === "intensity" || column === "pan" || column === "tilt") return pct(values[column]);
+    if (column === "o:column") {
+      const n = Math.round((values.other?.column ?? 0) * 255);
+      return n === CLEAR_COLUMN ? "Clear" : n === 0 ? "None" : `${n}`;
+    }
     if (column.startsWith("o:")) return dmx(values.other?.[column.slice(2) as Attribute]);
     return "";
   }

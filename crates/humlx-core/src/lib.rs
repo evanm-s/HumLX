@@ -15,6 +15,7 @@ pub mod patch;
 pub mod playback;
 pub mod programmer;
 pub mod qlc;
+pub mod resolume;
 pub mod show;
 pub mod stage;
 

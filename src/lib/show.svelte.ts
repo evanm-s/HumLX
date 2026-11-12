@@ -1,7 +1,7 @@
 // App-wide state shared by every screen.
 
 import { api } from "./api";
-import { emptyLayout } from "./types";
+import { emptyLayout, MAX_COLUMNS, RESOLUME } from "./types";
 import type {
   Fixture,
   Live,
@@ -95,7 +95,21 @@ class ShowState {
   }
 
   channels(fixture: Fixture) {
-    return this.profile(fixture.profile)?.modes.find((m) => m.name === fixture.mode)?.channels ?? [];
+    const channels = this.profile(fixture.profile)?.modes.find((m) => m.name === fixture.mode)?.channels ?? [];
+    if (fixture.profile !== RESOLUME) return channels;
+    // A Resolume fixture's columns carry the names given on the Patch page.
+    return channels.map((c) =>
+      c.attribute === "column"
+        ? {
+            ...c,
+            capabilities: c.capabilities?.map((cap) =>
+              cap.from >= 1 && cap.from <= MAX_COLUMNS
+                ? { ...cap, label: columnName(fixture, cap.from) }
+                : cap,
+            ),
+          }
+        : c,
+    );
   }
 
   /** Programmer values of the first selected fixture, which the controls show. */
@@ -185,4 +199,10 @@ export async function attempt<T>(action: () => Promise<T>): Promise<T | undefine
     notify(error instanceof Error ? error.message : String(error), "error");
     return undefined;
   }
+}
+
+/** A Resolume fixture's name for column `n`, counting from 1. */
+export function columnName(fixture: Fixture, n: number): string {
+  const name = fixture.options.columns?.[n - 1]?.trim();
+  return name ? `${n} ${name}` : `Column ${n}`;
 }

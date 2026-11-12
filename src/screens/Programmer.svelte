@@ -21,11 +21,12 @@
   import { nearestWheelSlot } from "../lib/wheel";
   import { loadLayout, saveLayout, type Grid, type Layout } from "../lib/layout";
   import { endSelectWindow, restartSelectWindow, tapSelectMode } from "../lib/selection";
-  import { attempt, show } from "../lib/show.svelte";
+  import { attempt, columnName, show } from "../lib/show.svelte";
   import { RECORD_EVENT, surface } from "../lib/surface.svelte";
   import { sheetPicks } from "../lib/sheet.svelte";
   import { updateCue } from "../lib/updatecue.svelte";
   import type { Attribute, Channel, Family, Fixture, Rgb } from "../lib/types";
+  import { CLEAR_COLUMN, RESOLUME } from "../lib/types";
 
   const selection = $derived(show.programmer.selection);
   const selected = $derived(new Set(selection));
@@ -191,6 +192,7 @@
     "speed",
     "effect",
     "control",
+    "column",
   ];
 
   // Beam attributes the selected fixtures have, with the first fixture's
@@ -208,6 +210,14 @@
     }
     return BEAM.filter((a) => found.has(a)).map((attribute) => ({ attribute, channel: found.get(attribute)! }));
   });
+
+  // Columns a Resolume fixture in the selection can trigger, by the first one's names.
+  const columnFixture = $derived(
+    selection.map((id) => show.fixture(id)).find((f): f is Fixture => f?.profile === RESOLUME),
+  );
+  const columnCount = $derived(
+    Math.max(1, ...selection.map((id) => show.fixture(id)).map((f) => (f?.profile === RESOLUME ? f.options.columns.length : 0))),
+  );
 
   // --- Colour ------------------------------------------------------------
 
@@ -690,6 +700,29 @@
         {@const level = set ?? stage.other?.[attribute]}
         <!-- Unset channels show the level they are resting at. -->
         {@const value = level == null ? channel.default : Math.round(level * 255)}
+        {#if attribute === "column"}
+          <div class="columns" role="group" aria-label="Column">
+            <span class="columns-head">
+              Column <span class="muted">{set != null ? "" : level != null ? ON_STAGE : "Not set"}</span>
+            </span>
+            <div class="column-buttons">
+              {#each Array.from({ length: columnCount }, (_, i) => i + 1) as n (n)}
+                <button
+                  class:live={set == null && value === n}
+                  aria-pressed={set != null && value === n}
+                  onclick={() => program(() => api.setAttribute("column", n / 255))}
+                >
+                  {columnFixture ? columnName(columnFixture, n) : `Column ${n}`}
+                </button>
+              {/each}
+              <button
+                class:live={set == null && value === CLEAR_COLUMN}
+                aria-pressed={set != null && value === CLEAR_COLUMN}
+                onclick={() => program(() => api.setAttribute("column", CLEAR_COLUMN / 255))}>Clear</button
+              >
+            </div>
+          </div>
+        {:else}
         <Fader
           {value}
           label={attributeName(attribute)}
@@ -699,6 +732,7 @@
           active={set != null}
           onchange={(v) => program(() => api.setAttribute(attribute, v / 255))}
         />
+        {/if}
       {:else}
         <p class="muted">No beam controls on the selection.</p>
       {/each}
@@ -1009,6 +1043,44 @@
   .beam :global(.fader),
   .faders :global(.fader) {
     flex-shrink: 0;
+  }
+
+  /* Resolume columns, picked like gobos. */
+  .columns {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex: 1;
+    min-width: 240px;
+  }
+
+  .columns-head {
+    font-weight: 600;
+  }
+
+  .column-buttons {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    grid-auto-rows: 52px;
+    gap: 6px;
+    overflow-y: auto;
+  }
+
+  .column-buttons button {
+    padding: 0 8px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .column-buttons button[aria-pressed="true"] {
+    background: var(--accent);
+    color: var(--accent-text);
+  }
+
+  .column-buttons button.live {
+    outline: 2px dashed var(--accent);
+    outline-offset: -2px;
   }
 
   /* Narrower faders so RGBW and white balance fit the colour window. */

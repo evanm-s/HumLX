@@ -103,6 +103,40 @@ impl std::fmt::Display for Message {
     }
 }
 
+// --- Encoding --------------------------------------------------------------
+
+/// Encodes a message the way OSC senders do.
+pub fn encode(address: &str, args: &[Arg]) -> Vec<u8> {
+    fn pad_str(out: &mut Vec<u8>, s: &str) {
+        out.extend_from_slice(s.as_bytes());
+        out.push(0);
+        while !out.len().is_multiple_of(4) {
+            out.push(0);
+        }
+    }
+    let mut out = Vec::new();
+    pad_str(&mut out, address);
+    let tags: String = std::iter::once(',')
+        .chain(args.iter().map(|a| match a {
+            Arg::Int(_) => 'i',
+            Arg::Float(_) => 'f',
+            Arg::Str(_) => 's',
+            Arg::Bool(true) => 'T',
+            Arg::Bool(false) => 'F',
+        }))
+        .collect();
+    pad_str(&mut out, &tags);
+    for a in args {
+        match a {
+            Arg::Int(i) => out.extend_from_slice(&i.to_be_bytes()),
+            Arg::Float(f) => out.extend_from_slice(&f.to_bits().to_be_bytes()),
+            Arg::Str(s) => pad_str(&mut out, s),
+            Arg::Bool(_) => {}
+        }
+    }
+    out
+}
+
 // --- Parsing ---------------------------------------------------------------
 
 /// Parses an OSC packet: one message, or a bundle of them (nested bundles too).
@@ -494,38 +528,6 @@ mod tests {
     use crate::fixture::Library;
     use crate::playback::Cue;
     use crate::programmer::Values;
-
-    /// Encodes a message the way OSC senders do.
-    fn encode(address: &str, args: &[Arg]) -> Vec<u8> {
-        fn pad_str(out: &mut Vec<u8>, s: &str) {
-            out.extend_from_slice(s.as_bytes());
-            out.push(0);
-            while !out.len().is_multiple_of(4) {
-                out.push(0);
-            }
-        }
-        let mut out = Vec::new();
-        pad_str(&mut out, address);
-        let tags: String = std::iter::once(',')
-            .chain(args.iter().map(|a| match a {
-                Arg::Int(_) => 'i',
-                Arg::Float(_) => 'f',
-                Arg::Str(_) => 's',
-                Arg::Bool(true) => 'T',
-                Arg::Bool(false) => 'F',
-            }))
-            .collect();
-        pad_str(&mut out, &tags);
-        for a in args {
-            match a {
-                Arg::Int(i) => out.extend_from_slice(&i.to_be_bytes()),
-                Arg::Float(f) => out.extend_from_slice(&f.to_bits().to_be_bytes()),
-                Arg::Str(s) => pad_str(&mut out, s),
-                Arg::Bool(_) => {}
-            }
-        }
-        out
-    }
 
     fn state() -> State {
         let mut state = State::new(Library::with_bundled(), Default::default(), Default::default());
